@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>WC 2026 Fantasy Predictor</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  /* ── PASTE YOUR SUPABASE CREDENTIALS BELOW (line ~20 in the script) ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green: #1a7a3c;
+    --green-mid: #22a04f;
+    --gold: #d4a017;
+    --gold-light: #f0c040;
+    --dark: #0f1a0f;
+    --card: #162616;
+    --border: rgba(255,255,255,0.09);
+    --text: #f0f0e8;
+    --muted: #7a9a7a;
+    --red: #e24b4a;
+    --success: #4caf50;
+    --info: #378add;
+    --warn: #e8a020;
+  }
+
+  body { font-family: -apple-system, 'Segoe UI', sans-serif; background: var(--dark); color: var(--text); min-height: 100vh; font-size: 14px; }
+
+  /* pitch stripe bg */
+  body::before { content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+    background: repeating-linear-gradient(0deg,rgba(26,122,60,.13) 0 44px,rgba(34,160,79,.07) 44px 88px); }
+
+  .z { position: relative; z-index: 1; }
+
+  /* ── SCREENS ── */
+  .screen { display: none; }
+  .screen.on { display: block; }
+
+  /* ── LOGIN ── */
+  .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .login-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px 22px; width: 100%; max-width: 340px; }
+  .login-logo { font-size: 36px; text-align: center; margin-bottom: 6px; }
+  .login-title { font-size: 20px; font-weight: 700; text-align: center; color: var(--gold); letter-spacing: 1px; margin-bottom: 2px; }
+  .login-sub { font-size: 12px; color: var(--muted); text-align: center; margin-bottom: 20px; }
+  .field-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .field { margin-bottom: 10px; }
+  input[type=text], input[type=password], input[type=number] {
+    width: 100%; padding: 9px 11px;
+    background: rgba(255,255,255,.06); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-size: 13px;
+    transition: border .2s; outline: none; }
+  input:focus { border-color: var(--green-mid); }
+  .btn { width: 100%; padding: 10px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity .15s, transform .1s; margin-top: 4px; }
+  .btn:active { transform: scale(.98); }
+  .btn-gold { background: var(--gold); color: var(--dark); }
+  .btn-gold:hover { background: var(--gold-light); }
+  .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn-outline:hover { background: rgba(255,255,255,.06); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 7px; }
+  .err { font-size: 11px; color: var(--red); margin: -4px 0 8px; min-height: 16px; }
+  .toggle { text-align: center; margin-top: 12px; font-size: 12px; color: var(--muted); }
+  .link { color: var(--gold); cursor: pointer; }
+
+  /* ── NAV ── */
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 11px 16px;
+    background: rgba(15,26,15,.9); border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 100; }
+  .brand { font-size: 15px; font-weight: 700; color: var(--gold); display: flex; align-items: center; gap: 6px; }
+  .nav-right { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+  .av { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .logout-btn { font-size: 11px; color: var(--muted); cursor: pointer; padding: 3px 7px; border: 1px solid var(--border); border-radius: 5px; }
+  .logout-btn:hover { color: var(--text); }
+
+  /* ── TABS ── */
+  .tab-bar { display: flex; overflow-x: auto; border-bottom: 1px solid var(--border); background: rgba(15,26,15,.6); }
+  .tab-bar::-webkit-scrollbar { display: none; }
+  .tab { padding: 10px 14px; font-size: 12px; font-weight: 500; color: var(--muted); cursor: pointer;
+    border-bottom: 2px solid transparent; white-space: nowrap; flex-shrink: 0; transition: color .15s; }
+  .tab.on { color: var(--gold); border-bottom-color: var(--gold); }
+
+  /* ── PANES ── */
+  .pane { display: none; padding: 14px 14px 40px; max-width: 680px; margin: 0 auto; }
+  .pane.on { display: block; }
+
+  /* ── CARDS ── */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 13px 15px; margin-bottom: 10px; }
+  .sec { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .8px; text-transform: uppercase; margin: 16px 0 8px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .stat { background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+  .stat-label { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+  .stat-val { font-size: 22px; font-weight: 700; }
+
+  /* ── BADGES ── */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; }
+  .b-green { background: rgba(76,175,80,.15); color: var(--success); border: 1px solid rgba(76,175,80,.25); }
+  .b-amber { background: rgba(232,160,32,.15); color: var(--warn); border: 1px solid rgba(232,160,32,.25); }
+  .b-gray { background: rgba(255,255,255,.07); color: var(--muted); }
+  .b-red { background: rgba(226,75,74,.15); color: var(--red); border: 1px solid rgba(226,75,74,.25); }
+
+  /* ── MATCH ROW ── */
+  .mrow { border: 1px solid var(--border); border-radius: 11px; padding: 11px 13px; margin-bottom: 7px; }
+  .mhead { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+  .mteams { font-size: 13px; font-weight: 600; }
+  .mmeta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .score-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .score-row input { width: 52px; text-align: center; padding: 6px 4px; }
+  .score-sep { color: var(--muted); font-size: 13px; }
+  .pred-list { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 7px; }
+  .pred-row { display: flex; align-items: center; justify-content: space-between; padding: 3px 0; font-size: 12px; color: var(--muted); }
+
+  /* ── RESULT TAGS ── */
+  .rtag { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; }
+  .rt-exact { background: rgba(76,175,80,.2); color: var(--success); }
+  .rt-outcome { background: rgba(232,160,32,.2); color: var(--warn); }
+  .rt-refund { background: rgba(55,138,221,.2); color: var(--info); }
+  .rt-wrong { background: rgba(255,255,255,.06); color: var(--muted); }
+
+  /* ── LEADERBOARD ── */
+  .lb-row { display: flex; align-items: center; gap: 9px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+  .lb-rank { width: 22px; text-align: center; font-size: 13px; font-weight: 700; color: var(--muted); }
+  .lb-info { flex: 1; }
+  .lb-name { font-size: 13px; font-weight: 600; }
+  .lb-sub { font-size: 11px; color: var(--muted); }
+  .lb-pts { text-align: right; }
+  .lb-num { font-size: 15px; font-weight: 700; }
+  .me-row { background: rgba(55,138,221,.08); border-radius: 8px; padding: 0 7px; }
+
+  /* ── INVITE CODE ── */
+  .inv-box { background: rgba(255,255,255,.05); border: 1px solid rgba(212,160,23,.3); border-radius: 9px;
+    padding: 10px; font-size: 18px; font-weight: 700; text-align: center; letter-spacing: 4px; color: var(--gold); margin: 8px 0; }
+
+  /* ── FILTER BAR ── */
+  .filter-bar { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; margin-bottom: 12px; }
+  .filter-bar::-webkit-scrollbar { display: none; }
+  .fchip { padding: 5px 10px; border: 1px solid var(--border); border-radius: 20px; font-size: 11px;
+    cursor: pointer; white-space: nowrap; color: var(--muted); background: transparent; transition: all .15s; }
+  .fchip.on { background: rgba(212,160,23,.15); border-color: rgba(212,160,23,.4); color: var(--gold); font-weight: 600; }
+
+  /* ── BANNER ── */
+  .banner { border-radius: 9px; padding: 9px 12px; margin-bottom: 8px; font-size: 12px; }
+  .bn-win { background: rgba(76,175,80,.12); border: 1px solid rgba(76,175,80,.25); color: #81c784; }
+  .bn-ref { background: rgba(55,138,221,.1); border: 1px solid rgba(55,138,221,.2); color: #64b5f6; }
+
+  /* ── LOADING ── */
+  .loading { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 13px; }
+  .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin .7s linear infinite; margin-bottom: 10px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── TOAST ── */
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: rgba(22,38,22,.95); border: 1px solid var(--border); border-radius: 9px;
+    padding: 9px 18px; font-size: 12px; color: var(--text); z-index: 999;
+    opacity: 0; transition: opacity .25s; pointer-events: none; white-space: nowrap; }
+  #toast.show { opacity: 1; }
+
+  /* ── ADMIN ── */
+  .admin-row { background: rgba(255,255,255,.03); border: 1px solid var(--border); border-radius: 10px; padding: 11px 13px; margin-bottom: 8px; }
+
+  /* ── MISC ── */
+  .grp-head { font-size: 11px; font-weight: 600; color: var(--muted); padding: 8px 0 4px; border-bottom: 1px solid var(--border); margin-bottom: 5px; letter-spacing: .5px; }
+  .empty { text-align: center; color: var(--muted); font-size: 13px; padding: 24px; }
+  .ok-msg { font-size: 11px; color: var(--success); margin-top: 5px; }
+</style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<!-- ════════════════════════════════════════════
+     LOGIN / REGISTER SCREEN
+════════════════════════════════════════════ -->
+<div id="s-auth" class="screen on z">
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-logo">🏆</div>
+      <div class="login-title">WC 2026 Predictor</div>
+      <div class="login-sub">Predict scores · Win the pot · Beat your friends</div>
+
+      <!-- LOGIN FORM -->
+      <div id="frm-login">
+        <div class="field"><div class="field-label">Username</div><input id="l-u" type="text" placeholder="your username" autocomplete="username" /></div>
+        <div class="field"><div class="field-label">Password</div><input id="l-p" type="password" placeholder="••••••" autocomplete="current-password" /></div>
+        <div class="err" id="l-err"></div>
+        <button class="btn btn-gold" onclick="doLogin()">Sign in</button>
+        <div class="toggle">No account? <span class="link" onclick="showReg()">Create one</span></div>
+      </div>
+
+      <!-- REGISTER FORM -->
+      <div id="frm-reg" style="display:none">
+        <div class="field"><div class="field-label">Username</div><input id="r-u" type="text" placeholder="e.g. golazo_king" autocomplete="username" /></div>
+        <div class="field"><div class="field-label">Password</div><input id="r-p" type="password" placeholder="••••••" autocomplete="new-password" /></div>
+        <div class="field"><div class="field-label">League invite code <span style="color:var(--muted)">(optional — leave blank to create a new league)</span></div><input id="r-c" type="text" placeholder="WC2026-XXXXX" autocomplete="off" /></div>
+        <div class="err" id="r-err"></div>
+        <button class="btn btn-gold" onclick="doRegister()">Create account</button>
+        <div class="toggle">Already signed up? <span class="link" onclick="showLogin()">Sign in</span></div>
+      </div>
+
+      <div id="auth-loading" style="display:none" class="loading"><div class="spinner"></div><br>Connecting...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     MAIN APP SCREEN
+════════════════════════════════════════════ -->
+<div id="s-app" class="screen z">
+  <nav>
+    <div class="brand">🏆 WC 2026</div>
+    <div class="nav-right">
+      <span id="nav-uname" style="font-size:12px"></span>
+      <div class="av" id="nav-av"></div>
+      <div class="logout-btn" onclick="doLogout()">Sign out</div>
+    </div>
+  </nav>
+
+  <div class="tab-bar">
+    <div class="tab on"  onclick="goTab('dash')">Dashboard</div>
+    <div class="tab"     onclick="goTab('matches')">Matches</div>
+    <div class="tab"     onclick="goTab('lb')">Leaderboard</div>
+    <div class="tab"     onclick="goTab('league')">League</div>
+    <div class="tab"     onclick="goTab('admin')">Admin</div>
+  </div>
+
+  <div id="pane-dash"    class="pane on"><div class="loading"><div class="spinner"></div></div></div>
+  <div id="pane-matches" class="pane"><div class="loading"><div class="spinner"></div></div></div>
+  <div id="pane-lb"      class="pane"><div class="loading"><div class="spinner"></div></div></div>
+  <div id="pane-league"  class="pane"><div class="loading"><div class="spinner"></div></div></div>
+  <div id="pane-admin"   class="pane"><div class="loading"><div class="spinner"></div></div></div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+//  ⚙️  CONFIGURATION — replace these two values after you set up
+//      your Supabase project (see README.md for instructions)
+// ════════════════════════════════════════════════════════════════
+const SUPABASE_URL = 'https://wxolmlxphwieqvyfuyfu.supabase.co';       // e.g. https://xyzabc.supabase.co
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4b2xtbHhwaHdpZXF2eWZ1eWZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0OTY4NDgsImV4cCI6MjA4OTA3Mjg0OH0.XGijPeimB3QiGaikuiBkwgdgVOLYBJO-m6eBNvE7JG8'; // long string starting with eyJ...
+
+// ════════════════════════════════════════════════════════════════
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ── State ──────────────────────────────────────────────────────
+let ME = null;       // current user object from DB
+let LEAGUE = null;   // current league object
+let MEMBERS = [];    // league member usernames
+let MATCHES = [];    // all matches
+let PREDS = {};      // { match_id: [ {username, pred_home, pred_away} ] }
+let matchFilter = 'All';
+
+// ── Colors ─────────────────────────────────────────────────────
+const AVC = ['#378ADD','#1D9E75','#D85A30','#D4537E','#7F77DD','#BA7517','#E24B4A','#0F6E56'];
+function avc(n){ let h=0; for(let c of n) h=(h*31+c.charCodeAt(0))%AVC.length; return AVC[h]; }
+function ini(n){ return n.slice(0,2).toUpperCase(); }
+function uid4(){ return Math.random().toString(36).slice(2,6).toUpperCase(); }
+
+// ── Toast ──────────────────────────────────────────────────────
+function toast(msg, dur=2400){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), dur);
+}
+
+// ── Auth helpers ───────────────────────────────────────────────
+function showReg(){ document.getElementById('frm-login').style.display='none'; document.getElementById('frm-reg').style.display='block'; }
+function showLogin(){ document.getElementById('frm-reg').style.display='none'; document.getElementById('frm-login').style.display='block'; }
+function setAuthLoading(on){
+  document.getElementById('auth-loading').style.display=on?'block':'none';
+  document.getElementById('frm-login').style.display=on?'none':(document.getElementById('frm-reg').style.display==='none'?'block':'none');
+  document.getElementById('frm-reg').style.display='none';
+}
+
+async function hashPass(pw){
+  const enc = new TextEncoder().encode(pw);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+async function doLogin(){
+  const u=document.getElementById('l-u').value.trim().toLowerCase();
+  const p=document.getElementById('l-p').value;
+  const e=document.getElementById('l-err');
+  if(!u||!p){e.textContent='Enter username and password';return;}
+  setAuthLoading(true);
+  const hash=await hashPass(p);
+  const {data,error}=await sb.from('users').select('*').eq('username',u).eq('password_hash',hash).single();
+  setAuthLoading(false);
+  if(error||!data){
+    e.textContent='Incorrect username or password';
+    document.getElementById('frm-login').style.display='block';
+    return;
+  }
+  e.textContent='';
+  await launchApp(data);
+}
+
+async function doRegister(){
+  const u=document.getElementById('r-u').value.trim().toLowerCase();
+  const p=document.getElementById('r-p').value;
+  const code=document.getElementById('r-c').value.trim().toUpperCase();
+  const e=document.getElementById('r-err');
+  if(!u||!p){e.textContent='Username and password required';return;}
+  if(!/^[a-z0-9_]{2,20}$/.test(u)){e.textContent='2–20 chars, letters/numbers/underscore';return;}
+  setAuthLoading(true);
+
+  // Check username taken
+  const {data:exists}=await sb.from('users').select('username').eq('username',u).single();
+  if(exists){
+    e.textContent='Username already taken';
+    document.getElementById('frm-reg').style.display='block';
+    setAuthLoading(false);
+    return;
+  }
+
+  let leagueId;
+  if(code){
+    const {data:lg}=await sb.from('leagues').select('*').eq('code',code).single();
+    if(!lg){
+      e.textContent='League code not found';
+      document.getElementById('frm-reg').style.display='block';
+      setAuthLoading(false);
+      return;
+    }
+    leagueId=lg.id;
+  } else {
+    const newCode='WC2026-'+uid4()+uid4().slice(0,2);
+    const {data:lg,error:lge}=await sb.from('leagues').insert({
+      name: u+"'s League", code: newCode, admin_username: u, bet_amount: 100
+    }).select().single();
+    if(lge){e.textContent='Error creating league: '+lge.message;setAuthLoading(false);document.getElementById('frm-reg').style.display='block';return;}
+    leagueId=lg.id;
+  }
+
+  const hash=await hashPass(p);
+  const {data:newUser,error:ue}=await sb.from('users').insert({
+    username:u, password_hash:hash, league_id:leagueId, earned:0, spent:0
+  }).select().single();
+  if(ue){e.textContent='Error creating account: '+ue.message;setAuthLoading(false);document.getElementById('frm-reg').style.display='block';return;}
+
+  e.textContent='';
+  await launchApp(newUser);
+}
+
+function doLogout(){
+  ME=null; LEAGUE=null; MEMBERS=[]; MATCHES=[]; PREDS={};
+  document.getElementById('s-app').classList.remove('on');
+  document.getElementById('s-auth').classList.add('on');
+  document.getElementById('l-u').value='';
+  document.getElementById('l-p').value='';
+  showLogin();
+}
+
+// ── Boot app ───────────────────────────────────────────────────
+async function launchApp(user){
+  ME=user;
+  document.getElementById('s-auth').classList.remove('on');
+  document.getElementById('s-app').classList.add('on');
+  document.getElementById('nav-uname').textContent=ME.username;
+  const av=document.getElementById('nav-av');
+  av.textContent=ini(ME.username); av.style.background=avc(ME.username);
+  await loadAll();
+  renderDash();
+}
+
+async function loadAll(){
+  // Load league + members
+  if(ME.league_id){
+    const {data:lg}=await sb.from('leagues').select('*').eq('id',ME.league_id).single();
+    LEAGUE=lg;
+    const {data:mem}=await sb.from('users').select('username,earned,spent').eq('league_id',ME.league_id);
+    MEMBERS=mem||[];
+  }
+  // Load matches
+  const {data:matches}=await sb.from('matches').select('*').order('id');
+  MATCHES=matches||[];
+  // Load predictions for this league
+  if(MEMBERS.length){
+    const usernames=MEMBERS.map(m=>m.username);
+    const {data:preds}=await sb.from('predictions').select('*').in('username',usernames);
+    PREDS={};
+    (preds||[]).forEach(p=>{
+      if(!PREDS[p.match_id])PREDS[p.match_id]=[];
+      PREDS[p.match_id].push(p);
+    });
+  }
+}
+
+// ── Refresh current user balance from DB ───────────────────────
+async function refreshMe(){
+  const {data}=await sb.from('users').select('*').eq('username',ME.username).single();
+  if(data)ME=data;
+  const {data:mem}=await sb.from('users').select('username,earned,spent').eq('league_id',ME.league_id);
+  MEMBERS=mem||[];
+}
+
+// ── Tab routing ────────────────────────────────────────────────
+function goTab(t){
+  const names=['dash','matches','lb','league','admin'];
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('on',names[i]===t));
+  document.querySelectorAll('.pane').forEach((el,i)=>el.classList.toggle('on',names[i]===t));
+  if(t==='dash')renderDash();
+  if(t==='matches')renderMatches();
+  if(t==='lb')renderLB();
+  if(t==='league')renderLeague();
+  if(t==='admin')renderAdmin();
+}
+
+// ── Net balance helper ─────────────────────────────────────────
+function netOf(u){
+  const m=MEMBERS.find(x=>x.username===u);
+  if(!m)return 0;
+  return (m.earned||0)-(m.spent||0);
+}
+function outcome(h,a){return h>a?'H':h<a?'A':'D';}
+
+// ════════════════════════════════════════════════════════════════
+//  DASHBOARD
+// ════════════════════════════════════════════════════════════════
+function renderDash(){
+  const n=netOf(ME.username);
+  const sorted=[...MEMBERS].sort((a,b)=>netOf(b.username)-netOf(a.username));
+  const rank=sorted.findIndex(x=>x.username===ME.username)+1;
+  const myPredCount=Object.values(PREDS).filter(arr=>arr.find(p=>p.username===ME.username)).length;
+  const wins=MATCHES.filter(m=>m.resolved&&(m.resolved_winners||[]).includes(ME.username)).length;
+
+  const recent=MATCHES.filter(m=>m.resolved&&(PREDS[m.id]||[]).find(p=>p.username===ME.username)).slice(-3);
+  const open=MATCHES.filter(m=>!m.resolved&&!(PREDS[m.id]||[]).find(p=>p.username===ME.username)).slice(0,3);
+
+  let html=`<div class="grid2">
+    <div class="stat"><div class="stat-label">Net balance</div><div class="stat-val" style="color:${n>=0?'var(--success)':'var(--red)'}">₹${n>=0?'+':''}${n}</div></div>
+    <div class="stat"><div class="stat-label">League rank</div><div class="stat-val">${rank||'—'} <span style="font-size:13px;color:var(--muted)">/ ${MEMBERS.length}</span></div></div>
+    <div class="stat"><div class="stat-label">Predictions made</div><div class="stat-val">${myPredCount}</div></div>
+    <div class="stat"><div class="stat-label">Pots won</div><div class="stat-val">${wins}</div></div>
+  </div>`;
+
+  if(recent.length){
+    html+=`<div class="sec">Recent results</div>`;
+    recent.forEach(m=>{
+      const myP=(PREDS[m.id]||[]).find(p=>p.username===ME.username);
+      const won=(m.resolved_winners||[]).includes(ME.username);
+      html+=`<div class="${won&&m.resolved_type!=='refund'?'banner bn-win':m.resolved_type==='refund'&&won?'banner bn-ref':'card'}">
+        <div style="font-weight:600">${m.home_flag}${m.home} ${m.result_home}–${m.result_away} ${m.away}${m.away_flag}</div>
+        <div style="font-size:11px;margin-top:3px;color:inherit">Your pick: ${myP.pred_home}–${myP.pred_away} &nbsp;·&nbsp; ${won&&m.resolved_type==='exact'?'Exact score! +₹'+m.resolved_share:won&&m.resolved_type==='outcome'?'Correct outcome +₹'+m.resolved_share:m.resolved_type==='refund'&&won?'All same — refund ₹'+m.resolved_share:'No win this match'}</div>
+      </div>`;
+    });
+  }
+  if(open.length){
+    html+=`<div class="sec">Open for predictions</div>`;
+    open.forEach(m=>{
+      const n=(PREDS[m.id]||[]).length;
+      html+=`<div class="card" style="display:flex;align-items:center;justify-content:space-between">
+        <div><div style="font-size:13px;font-weight:600">${m.home_flag}${m.home} vs ${m.away}${m.away_flag}</div>
+        <div style="font-size:11px;color:var(--muted)">${m.match_date} · Grp ${m.grp} · ${n} predicted · ₹${n*(LEAGUE?.bet_amount||100)} pot so far</div></div>
+        <button class="btn btn-outline btn-sm" onclick="goTab('matches')">Predict</button>
+      </div>`;
+    });
+  }
+  if(!recent.length&&!open.length){
+    html+=`<div class="empty">Head to Matches to place your first prediction!</div>`;
+  }
+  document.getElementById('pane-dash').innerHTML=html;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  MATCHES
+// ════════════════════════════════════════════════════════════════
+function renderMatches(){
+  const groups=['All','A','B','C','D','E','F','G','H','I','J','K','L','R32','R16','QF','SF','Final'];
+  let html=`<div class="filter-bar">`;
+  groups.forEach(g=>html+=`<div class="fchip${g===matchFilter?' on':''}" onclick="setFilter('${g}')">${g==='All'?'All':g}</div>`);
+  html+=`</div><div id="match-list"></div>`;
+  document.getElementById('pane-matches').innerHTML=html;
+  renderMatchList();
+}
+
+function setFilter(f){ matchFilter=f; renderMatches(); }
+
+function renderMatchList(){
+  const filtered=matchFilter==='All'?MATCHES:MATCHES.filter(m=>m.grp===matchFilter);
+  const bet=LEAGUE?.bet_amount||100;
+  let html='', lastGrp='';
+  filtered.forEach(m=>{
+    if(m.grp!==lastGrp){html+=`<div class="grp-head">Group ${m.grp}</div>`;lastGrp=m.grp;}
+    const arr=PREDS[m.id]||[];
+    const myP=arr.find(p=>p.username===ME.username);
+    const pot=arr.length*bet;
+    html+=`<div class="mrow">
+      <div class="mhead">
+        <div><div class="mteams">${m.home_flag} ${m.home} <span style="color:var(--muted);font-weight:400">vs</span> ${m.away} ${m.away_flag}</div>
+        <div class="mmeta">${m.match_date} · ₹${pot} pot · ${arr.length} predicted</div></div>
+        <span class="badge ${m.resolved?'b-gray':myP?'b-green':'b-amber'}">${m.resolved?'Settled':myP?'In':'Open'}</span>
+      </div>`;
+    if(m.resolved){
+      const won=(m.resolved_winners||[]).includes(ME.username);
+      html+=`<div style="font-size:14px;font-weight:700;margin-bottom:4px">${m.result_home} – ${m.result_away}</div>`;
+      if(myP){
+        html+=`<div style="font-size:12px;color:var(--muted)">Your pick: ${myP.pred_home}–${myP.pred_away}
+          <span class="rtag ${won&&m.resolved_type==='exact'?'rt-exact':won&&m.resolved_type==='outcome'?'rt-outcome':m.resolved_type==='refund'&&won?'rt-refund':'rt-wrong'}">
+            ${won&&m.resolved_type==='exact'?'Exact +₹'+m.resolved_share:won&&m.resolved_type==='outcome'?'Outcome +₹'+m.resolved_share:m.resolved_type==='refund'&&won?'Refund ₹'+m.resolved_share:'No win'}
+          </span></div>`;
+      }
+    } else {
+      if(myP){
+        html+=`<div style="font-size:12px;color:var(--muted)">Your prediction: <strong style="color:var(--text)">${myP.pred_home} – ${myP.pred_away}</strong>
+          <span class="link" style="font-size:11px;margin-left:8px" onclick="cancelPred('${m.id}')">Change</span></div>`;
+      } else {
+        html+=`<div class="score-row">
+          <input id="ph_${m.id}" type="number" min="0" max="20" placeholder="${m.home.slice(0,4)}" />
+          <div class="score-sep">–</div>
+          <input id="pa_${m.id}" type="number" min="0" max="20" placeholder="${m.away.slice(0,4)}" />
+          <button class="btn btn-outline btn-sm" onclick="submitPred('${m.id}')">Predict (₹${bet})</button>
+        </div>`;
+      }
+    }
+    if(arr.length){
+      html+=`<div class="pred-list">`;
+      arr.forEach(p=>{
+        let tag='';
+        if(m.resolved){
+          const w=(m.resolved_winners||[]).includes(p.username);
+          tag=w&&m.resolved_type==='exact'?`<span class="rtag rt-exact">Exact</span>`:
+              w&&m.resolved_type==='outcome'?`<span class="rtag rt-outcome">Outcome</span>`:
+              m.resolved_type==='refund'&&w?`<span class="rtag rt-refund">Refund</span>`:
+              `<span class="rtag rt-wrong">Wrong</span>`;
+        }
+        html+=`<div class="pred-row"><span>${p.username}${p.username===ME.username?' <span style="color:var(--gold)">(you)</span>':''}</span><span>${p.pred_home}–${p.pred_away} ${tag}</span></div>`;
+      });
+      html+=`</div>`;
+    }
+    html+=`</div>`;
+  });
+  const el=document.getElementById('match-list');
+  if(el)el.innerHTML=html||`<div class="empty">No matches in this group.</div>`;
+}
+
+async function submitPred(mid){
+  const hEl=document.getElementById('ph_'+mid);
+  const aEl=document.getElementById('pa_'+mid);
+  const h=parseInt(hEl?.value); const a=parseInt(aEl?.value);
+  if(isNaN(h)||isNaN(a)||h<0||a<0){toast('Enter valid scores (0 or above)');return;}
+  const {error}=await sb.from('predictions').insert({match_id:mid,username:ME.username,pred_home:h,pred_away:a});
+  if(error){toast('Error saving prediction: '+error.message);return;}
+  if(!PREDS[mid])PREDS[mid]=[];
+  PREDS[mid]=PREDS[mid].filter(p=>p.username!==ME.username);
+  PREDS[mid].push({match_id:mid,username:ME.username,pred_home:h,pred_away:a});
+  toast('Prediction saved!');
+  renderMatchList(); renderDash(); renderLB();
+}
+
+async function cancelPred(mid){
+  await sb.from('predictions').delete().eq('match_id',mid).eq('username',ME.username);
+  if(PREDS[mid])PREDS[mid]=PREDS[mid].filter(p=>p.username!==ME.username);
+  renderMatchList(); renderDash();
+}
+
+// ════════════════════════════════════════════════════════════════
+//  LEADERBOARD
+// ════════════════════════════════════════════════════════════════
+function renderLB(){
+  if(!LEAGUE){document.getElementById('pane-lb').innerHTML='<div class="empty">Not in a league yet.</div>';return;}
+  const sorted=[...MEMBERS].sort((a,b)=>netOf(b.username)-netOf(a.username));
+  const medals=['🥇','🥈','🥉'];
+  let html=`<div class="sec">${LEAGUE.name} · ${MEMBERS.length} members</div>`;
+  sorted.forEach((u,i)=>{
+    const n=netOf(u.username); const isMe=u.username===ME.username;
+    const wins=MATCHES.filter(m=>m.resolved&&(m.resolved_winners||[]).includes(u.username)).length;
+    const pc=Object.values(PREDS).filter(arr=>arr.find(p=>p.username===u.username)).length;
+    html+=`<div class="lb-row${isMe?' me-row':''}">
+      <div class="lb-rank">${i<3?medals[i]:i+1}</div>
+      <div class="av" style="background:${avc(u.username)}">${ini(u.username)}</div>
+      <div class="lb-info">
+        <div class="lb-name">${u.username}${isMe?' <span style="font-size:10px;color:var(--info)">(you)</span>':''}</div>
+        <div class="lb-sub">${wins} pot${wins!==1?'s':''} · ${pc} predictions</div>
+      </div>
+      <div class="lb-pts">
+        <div class="lb-num" style="color:${n>=0?'var(--success)':'var(--red)'}">₹${n>=0?'+':''}${n}</div>
+      </div>
+    </div>`;
+  });
+  document.getElementById('pane-lb').innerHTML=html;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  LEAGUE
+// ════════════════════════════════════════════════════════════════
+function renderLeague(){
+  let html='';
+  if(LEAGUE){
+    html+=`<div class="sec">Your league</div>
+    <div class="card">
+      <div style="font-weight:700;font-size:15px;margin-bottom:2px">${LEAGUE.name}</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">${MEMBERS.length} member${MEMBERS.length!==1?'s':''} · Admin: ${LEAGUE.admin_username}</div>
+      <div class="field-label">Share this invite code with friends on WhatsApp</div>
+      <div class="inv-box" id="inv-code">${LEAGUE.code}</div>
+      <button class="btn btn-outline btn-sm" onclick="copyCode()" style="width:auto">Copy code</button>
+      <div class="ok-msg" id="copy-ok" style="display:none">Copied to clipboard!</div>
+    </div>
+    <div class="card">
+      <div style="font-size:12px;font-weight:600;margin-bottom:8px">Members</div>
+      ${MEMBERS.map(u=>`<div class="pred-row">
+        <span style="display:flex;align-items:center;gap:7px">
+          <div class="av" style="background:${avc(u.username)};width:22px;height:22px;font-size:10px">${ini(u.username)}</div>${u.username}
+        </span>
+        <span class="badge ${u.username===LEAGUE.admin_username?'b-amber':'b-gray'}">${u.username===LEAGUE.admin_username?'Admin':'Member'}</span>
+      </div>`).join('')}
+    </div>`;
+  }
+  html+=`<div class="sec">Join a different league</div>
+  <div class="card">
+    <div class="field-label">Invite code</div>
+    <input id="jcode" type="text" placeholder="WC2026-XXXXX" autocomplete="off" />
+    <button class="btn btn-gold" onclick="joinLeague()">Join</button>
+    <div class="err" id="jerr"></div>
+    <div class="ok-msg" id="jok" style="display:none">Joined! Reloading...</div>
+  </div>`;
+  document.getElementById('pane-league').innerHTML=html;
+}
+
+function copyCode(){
+  const code=document.getElementById('inv-code')?.textContent;
+  navigator.clipboard?.writeText(code).catch(()=>{});
+  const ok=document.getElementById('copy-ok');
+  if(ok){ok.style.display='block';setTimeout(()=>ok.style.display='none',2500);}
+}
+
+async function joinLeague(){
+  const code=document.getElementById('jcode').value.trim().toUpperCase();
+  const e=document.getElementById('jerr'); const ok=document.getElementById('jok');
+  const {data:lg}=await sb.from('leagues').select('*').eq('code',code).single();
+  if(!lg){e.textContent='League code not found';return;}
+  if(LEAGUE&&lg.id===LEAGUE.id){e.textContent='You are already in this league';return;}
+  await sb.from('users').update({league_id:lg.id}).eq('username',ME.username);
+  ME.league_id=lg.id; ok.style.display='block';
+  setTimeout(async()=>{await loadAll();renderAll();},1200);
+}
+
+function renderAll(){ renderDash(); renderMatches(); renderLB(); renderLeague(); renderAdmin(); }
+
+// ════════════════════════════════════════════════════════════════
+//  ADMIN — settle matches, update bet amount, add KO fixtures
+// ════════════════════════════════════════════════════════════════
+function renderAdmin(){
+  if(!LEAGUE||LEAGUE.admin_username!==ME.username){
+    document.getElementById('pane-admin').innerHTML='<div class="empty" style="padding-top:40px">Only the league admin can access this panel.</div>';
+    return;
+  }
+  const unsettled=MATCHES.filter(m=>!m.resolved);
+  const settled=MATCHES.filter(m=>m.resolved);
+  const bet=LEAGUE.bet_amount||100;
+  let html=`<div class="sec">Bet amount</div>
+  <div class="card" style="display:flex;align-items:center;gap:10px">
+    <div style="flex:1"><div class="field-label">₹ per match</div><input id="bet-in" type="number" value="${bet}" min="1" max="100000" style="width:100px;margin:0" /></div>
+    <button class="btn btn-outline btn-sm" onclick="updateBet()">Update</button>
+  </div>
+  <div class="sec">Enter results (${unsettled.length} remaining)</div>`;
+
+  unsettled.forEach(m=>{
+    html+=`<div class="admin-row">
+      <div style="font-size:13px;font-weight:600;margin-bottom:7px">${m.home_flag}${m.home} vs ${m.away}${m.away_flag} <span style="font-weight:400;color:var(--muted)">· ${m.match_date}</span></div>
+      <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+        <input id="ah_${m.id}" type="number" min="0" max="20" placeholder="${m.home.slice(0,4)}" style="width:90px;margin:0" />
+        <div class="score-sep">–</div>
+        <input id="aa_${m.id}" type="number" min="0" max="20" placeholder="${m.away.slice(0,4)}" style="width:90px;margin:0" />
+        <button class="btn btn-outline btn-sm" onclick="settle('${m.id}')">Settle</button>
+      </div>
+    </div>`;
+  });
+
+  if(settled.length){
+    html+=`<div class="sec">Settled (${settled.length})</div>`;
+    settled.slice().reverse().slice(0,8).forEach(m=>{
+      html+=`<div class="card" style="font-size:12px">
+        <div style="font-weight:600">${m.home_flag}${m.home} ${m.result_home}–${m.result_away} ${m.away}${m.away_flag}</div>
+        <div style="color:var(--muted);margin-top:2px">Pot ₹${m.resolved_pot} · ${m.resolved_type} · Winners: ${(m.resolved_winners||[]).join(', ')||'none'} · ₹${m.resolved_share} each</div>
+      </div>`;
+    });
+  }
+
+  html+=`<div class="sec">Add/edit knockout fixture</div>
+  <div class="card">
+    <div class="field-label">Match ID (e.g. r05, qf1)</div><input id="new-id" placeholder="r05" />
+    <div class="field-label">Group/stage</div><input id="new-grp" placeholder="R16" />
+    <div class="field-label">Home team</div><input id="new-home" placeholder="Brazil" />
+    <div class="field-label">Away team</div><input id="new-away" placeholder="France" />
+    <div class="field-label">Date</div><input id="new-date" placeholder="Jul 9" />
+    <button class="btn btn-gold" onclick="addMatch()">Save fixture</button>
+    <div class="err" id="match-err"></div>
+  </div>`;
+
+  document.getElementById('pane-admin').innerHTML=html;
+}
+
+async function settle(mid){
+  const h=parseInt(document.getElementById('ah_'+mid)?.value);
+  const a=parseInt(document.getElementById('aa_'+mid)?.value);
+  if(isNaN(h)||isNaN(a)||h<0||a<0){toast('Enter valid scores');return;}
+  const m=MATCHES.find(x=>x.id===mid); if(!m)return;
+  const act=outcome(h,a);
+  const bet=LEAGUE?.bet_amount||100;
+  const arr=PREDS[mid]||[];
+  const memberNames=MEMBERS.map(u=>u.username);
+  const parts=arr.filter(p=>memberNames.includes(p.username));
+  const pot=parts.length*bet;
+  const exact=parts.filter(p=>p.pred_home===h&&p.pred_away===a);
+  const outW=parts.filter(p=>outcome(p.pred_home,p.pred_away)===act);
+  const allSame=parts.length>0&&parts.every(p=>outcome(p.pred_home,p.pred_away)===act);
+  let winners,winType;
+  if(exact.length){winners=exact;winType='exact';}
+  else if(!allSame&&outW.length){winners=outW;winType='outcome';}
+  else{winners=parts;winType='refund';}
+  const share=parts.length?Math.round(pot/winners.length):0;
+
+  // Update match in DB
+  const winnerNames=winners.map(p=>p.username);
+  await sb.from('matches').update({
+    result_home:h, result_away:a, resolved:true,
+    resolved_pot:pot, resolved_share:share, resolved_type:winType,
+    resolved_winners:winnerNames
+  }).eq('id',mid);
+
+  // Update each player's earned/spent
+  for(const p of parts){
+    const ud=MEMBERS.find(x=>x.username===p.username);
+    const curEarned=ud?.earned||0; const curSpent=ud?.spent||0;
+    const earnAdd=winnerNames.includes(p.username)?share:0;
+    await sb.from('users').update({spent:curSpent+bet, earned:curEarned+earnAdd}).eq('username',p.username);
+  }
+
+  toast('Match settled!');
+  await loadAll();
+  renderAll();
+}
+
+async function updateBet(){
+  const v=parseInt(document.getElementById('bet-in').value);
+  if(isNaN(v)||v<1){toast('Enter a valid amount');return;}
+  await sb.from('leagues').update({bet_amount:v}).eq('id',LEAGUE.id);
+  LEAGUE.bet_amount=v;
+  toast('Bet amount updated to ₹'+v);
+  renderAdmin();
+}
+
+async function addMatch(){
+  const id=document.getElementById('new-id').value.trim().toLowerCase();
+  const grp=document.getElementById('new-grp').value.trim();
+  const home=document.getElementById('new-home').value.trim();
+  const away=document.getElementById('new-away').value.trim();
+  const date=document.getElementById('new-date').value.trim();
+  const e=document.getElementById('match-err');
+  if(!id||!home||!away){e.textContent='ID, home and away are required';return;}
+  const {error}=await sb.from('matches').upsert({
+    id, grp:grp||'KO', home, away, match_date:date||'TBD',
+    home_flag:'🏳️', away_flag:'🏳️', resolved:false
+  });
+  if(error){e.textContent='Error: '+error.message;return;}
+  e.textContent='';
+  toast('Fixture saved!');
+  await loadAll();
+  renderAdmin();
+}
+</script>
+</body>
+</html>
