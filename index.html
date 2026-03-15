@@ -178,7 +178,7 @@
       <div class="login-sub">Predict scores · Win the pot · Beat your friends</div>
 
       <!-- LOGIN FORM -->
-      <div id="frm-login">
+      <div id="frm-login" style="display:block">
         <div class="field"><div class="field-label">Username</div><input id="l-u" type="text" placeholder="your username" autocomplete="username" /></div>
         <div class="field"><div class="field-label">Password</div><input id="l-p" type="password" placeholder="••••••" autocomplete="current-password" /></div>
         <div class="err" id="l-err"></div>
@@ -196,7 +196,7 @@
         <div class="toggle">Already signed up? <span class="link" onclick="showLogin()">Sign in</span></div>
       </div>
 
-      <div id="auth-loading" style="display:none" class="loading"><div class="spinner"></div><br>Connecting...</div>
+      <div id="auth-loading" style="display:none" class="loading"><div class="spinner"></div><br>Connecting...<br><span class="link" style="font-size:11px;margin-top:8px;display:inline-block" onclick="showLoginFresh()">Stuck? Tap here to reset</span></div>
     </div>
   </div>
 </div>
@@ -799,12 +799,8 @@ function showLoginFresh(){
 
 (async function restoreSession(){
   const saved = localStorage.getItem('wc2026_user');
-  if(!saved) return;
-  // Hide forms, show spinner while we restore
-  document.getElementById('frm-login').style.display='none';
-  document.getElementById('frm-reg').style.display='none';
-  document.getElementById('auth-loading').style.display='block';
-  // Hard fallback: if nothing happens in 5s, show login
+  if(!saved){ showLoginFresh(); return; }
+  setAuthLoading(true);
   const timeout = setTimeout(showLoginFresh, 5000);
   try {
     const {data,error} = await sb.from('users').select('*').eq('username', saved).single();
