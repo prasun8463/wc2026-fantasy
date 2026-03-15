@@ -263,12 +263,13 @@ function toast(msg, dur=2400){
 }
 
 // ── Auth helpers ───────────────────────────────────────────────
-function showReg(){ document.getElementById('frm-login').style.display='none'; document.getElementById('frm-reg').style.display='block'; }
-function showLogin(){ document.getElementById('frm-reg').style.display='none'; document.getElementById('frm-login').style.display='block'; }
+let _activeForm='login';
+function showReg(){ _activeForm='reg'; document.getElementById('frm-login').style.display='none'; document.getElementById('frm-reg').style.display='block'; document.getElementById('auth-loading').style.display='none'; }
+function showLogin(){ _activeForm='login'; document.getElementById('frm-reg').style.display='none'; document.getElementById('frm-login').style.display='block'; document.getElementById('auth-loading').style.display='none'; }
 function setAuthLoading(on){
   document.getElementById('auth-loading').style.display=on?'block':'none';
-  document.getElementById('frm-login').style.display=on?'none':(document.getElementById('frm-reg').style.display==='none'?'block':'none');
-  document.getElementById('frm-reg').style.display='none';
+  document.getElementById('frm-login').style.display=(!on&&_activeForm==='login')?'block':'none';
+  document.getElementById('frm-reg').style.display=(!on&&_activeForm==='reg')?'block':'none';
 }
 
 async function hashPass(pw){
@@ -282,17 +283,22 @@ async function doLogin(){
   const p=document.getElementById('l-p').value;
   const e=document.getElementById('l-err');
   if(!u||!p){e.textContent='Enter username and password';return;}
-  setAuthLoading(true);
-  const hash=await hashPass(p);
-  const {data,error}=await sb.from('users').select('*').eq('username',u).eq('password_hash',hash).single();
-  setAuthLoading(false);
-  if(error||!data){
-    e.textContent='Incorrect username or password';
-    document.getElementById('frm-login').style.display='block';
-    return;
-  }
   e.textContent='';
-  await launchApp(data);
+  setAuthLoading(true);
+  try {
+    const hash=await hashPass(p);
+    const {data,error}=await sb.from('users').select('*').eq('username',u).eq('password_hash',hash).single();
+    setAuthLoading(false);
+    if(error||!data){
+      e.textContent='Incorrect username or password';
+      return;
+    }
+    await launchApp(data);
+  } catch(err){
+    setAuthLoading(false);
+    e.textContent='Connection error — check your internet and try again.';
+    console.error('Login error:', err);
+  }
 }
 
 async function doRegister(){
@@ -797,18 +803,27 @@ async function addMatch(){
 (async function restoreSession(){
   const saved = localStorage.getItem('wc2026_user');
   if(!saved) return;
-  // Show a subtle loading state on the auth screen while we check
-  document.getElementById('auth-loading').style.display='block';
-  document.getElementById('frm-login').style.display='none';
-  const {data,error} = await sb.from('users').select('*').eq('username', saved).single();
-  if(error || !data){
-    // Stored user no longer exists — clear and show login
+  setAuthLoading(true);
+  // Safety: if Supabase never responds within 6s, fall back to login
+  const timeout = setTimeout(()=>{
     localStorage.removeItem('wc2026_user');
-    document.getElementById('auth-loading').style.display='none';
-    document.getElementById('frm-login').style.display='block';
-    return;
+    setAuthLoading(false);
+  }, 6000);
+  try {
+    const {data,error} = await sb.from('users').select('*').eq('username', saved).single();
+    clearTimeout(timeout);
+    if(error || !data){
+      localStorage.removeItem('wc2026_user');
+      setAuthLoading(false);
+      return;
+    }
+    await launchApp(data);
+  } catch(err){
+    clearTimeout(timeout);
+    localStorage.removeItem('wc2026_user');
+    setAuthLoading(false);
+    console.error('Session restore error:', err);
   }
-  await launchApp(data);
 })();
 </script>
 </body>
