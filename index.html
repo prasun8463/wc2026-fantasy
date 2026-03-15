@@ -234,8 +234,8 @@
 //  ⚙️  CONFIGURATION — replace these two values after you set up
 //      your Supabase project (see README.md for instructions)
 // ════════════════════════════════════════════════════════════════
-const SUPABASE_URL = 'https://wxolmlxphwieqvyfuyfu.supabase.co';       // e.g. https://xyzabc.supabase.co
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4b2xtbHhwaHdpZXF2eWZ1eWZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0OTY4NDgsImV4cCI6MjA4OTA3Mjg0OH0.XGijPeimB3QiGaikuiBkwgdgVOLYBJO-m6eBNvE7JG8'; // long string starting with eyJ...
+const SUPABASE_URL = 'https://wxolmlxphwieqvyfuyfu.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4b2xtbHhwaHdpZXF2eWZ1eWZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0OTY4NDgsImV4cCI6MjA4OTA3Mjg0OH0.XGijPeimB3QiGaikuiBkwgdgVOLYBJO-m6eBNvE7JG8';
 
 // ════════════════════════════════════════════════════════════════
 const { createClient } = supabase;
@@ -350,8 +350,16 @@ async function loadAll(){
     MEMBERS=mem||[];
   }
   // Load matches
-  const {data:matches}=await sb.from('matches').select('*').order('id');
-  MATCHES=matches||[];
+  const {data:matches}=await sb.from('matches').select('*');
+  // Sort by match_date chronologically, then by id within same date
+  const dateOrder=['Jun 11','Jun 12','Jun 13','Jun 14','Jun 15','Jun 16','Jun 17','Jun 18',
+    'Jun 21','Jun 22','Jun 23','Jun 25','Jun 26','Jun 28','Jun 29','Jun 30',
+    'Jul 1','Jul 2','Jul 4','Jul 5','Jul 9','Jul 10','Jul 12','Jul 13','Jul 15','Jul 16','Jul 19','TBD'];
+  MATCHES=(matches||[]).sort((a,b)=>{
+    const di=dateOrder.indexOf(a.match_date)-dateOrder.indexOf(b.match_date);
+    if(di!==0)return di;
+    return a.id.localeCompare(b.id);
+  });
   // Load predictions for this league
   if(MEMBERS.length){
     const usernames=MEMBERS.map(m=>m.username);
@@ -459,10 +467,19 @@ function renderMatchList(){
   const bet=LEAGUE?.bet_amount||100;
   let html='';
 
-  // Group matches by date, preserving order
+  // Sort matches by date then group
+  const monthOrder={Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
+  function dateSortKey(d){
+    if(!d||d==='TBD')return 9999;
+    const parts=d.trim().split(' ');
+    const mon=monthOrder[parts[0]]||0;
+    const day=parseInt(parts[1])||0;
+    return mon*100+day;
+  }
+  const sorted=[...filtered].sort((a,b)=>dateSortKey(a.match_date)-dateSortKey(b.match_date));
   const byDate=[];
   const dateIndex={};
-  filtered.forEach(m=>{
+  sorted.forEach(m=>{
     const d=m.match_date||'TBD';
     if(dateIndex[d]===undefined){dateIndex[d]=byDate.length;byDate.push({date:d,matches:[]});}
     byDate[dateIndex[d]].matches.push(m);
