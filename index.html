@@ -188,9 +188,10 @@
 
       <!-- REGISTER FORM -->
       <div id="frm-reg" style="display:none">
+        <div id="invite-banner" style="display:none;background:rgba(76,175,80,.12);border:1px solid rgba(76,175,80,.25);border-radius:8px;padding:9px 12px;font-size:12px;color:#81c784;margin-bottom:12px;text-align:center"></div>
         <div class="field"><div class="field-label">Username</div><input id="r-u" type="text" placeholder="e.g. golazo_king" autocomplete="username" /></div>
         <div class="field"><div class="field-label">Password</div><input id="r-p" type="password" placeholder="••••••" autocomplete="new-password" /></div>
-        <div class="field"><div class="field-label">League invite code <span style="color:var(--muted)">(optional — leave blank to create a new league)</span></div><input id="r-c" type="text" placeholder="WC2026-XXXXX" autocomplete="off" /></div>
+        <div id="code-field" class="field"><div class="field-label">League invite code <span style="color:var(--muted)">(optional — leave blank to create a new league)</span></div><input id="r-c" type="text" placeholder="WC2026-XXXXX" autocomplete="off" /></div>
         <div class="err" id="r-err"></div>
         <button class="btn btn-gold" onclick="doRegister()">Create account</button>
         <div class="toggle">Already signed up? <span class="link" onclick="showLogin()">Sign in</span></div>
@@ -625,10 +626,14 @@ function renderLeague(){
     <div class="card">
       <div style="font-weight:700;font-size:15px;margin-bottom:2px">${LEAGUE.name}</div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:10px">${MEMBERS.length} member${MEMBERS.length!==1?'s':''} · Admin: ${LEAGUE.admin_username}</div>
-      <div class="field-label">Share this invite code with friends on WhatsApp</div>
+      <div class="field-label">Share invite link with friends on WhatsApp</div>
       <div class="inv-box" id="inv-code">${LEAGUE.code}</div>
-      <button class="btn btn-outline btn-sm" onclick="copyCode()" style="width:auto">Copy code</button>
-      <div class="ok-msg" id="copy-ok" style="display:none">Copied to clipboard!</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+        <button class="btn btn-outline btn-sm" onclick="copyCode()" style="width:auto">Copy code</button>
+        <button class="btn btn-gold btn-sm" onclick="copyLink()" style="width:auto">Copy invite link</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Friends who open the invite link land straight on sign-up with your league pre-filled.</div>
+      <div class="ok-msg" id="copy-ok" style="display:none">Copied!</div>
     </div>
     <div class="card">
       <div style="font-size:12px;font-weight:600;margin-bottom:8px">Members</div>
@@ -655,7 +660,14 @@ function copyCode(){
   const code=document.getElementById('inv-code')?.textContent;
   navigator.clipboard?.writeText(code).catch(()=>{});
   const ok=document.getElementById('copy-ok');
-  if(ok){ok.style.display='block';setTimeout(()=>ok.style.display='none',2500);}
+  if(ok){ok.textContent='Code copied!';ok.style.display='block';setTimeout(()=>ok.style.display='none',2500);}
+}
+function copyLink(){
+  const code=document.getElementById('inv-code')?.textContent;
+  const url=window.location.origin+window.location.pathname+'?join='+encodeURIComponent(code);
+  navigator.clipboard?.writeText(url).catch(()=>{});
+  const ok=document.getElementById('copy-ok');
+  if(ok){ok.textContent='Invite link copied!';ok.style.display='block';setTimeout(()=>ok.style.display='none',2500);}
 }
 
 async function joinLeague(){
@@ -794,17 +806,33 @@ async function addMatch(){
   renderAdmin();
 }
 
+// ── Read ?join= invite code from URL ──────────────────────────
+function applyInviteParam(){
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('join');
+  if(!code) return;
+  // Pre-fill the code field and hide it (user doesn't need to see it)
+  document.getElementById('r-c').value = code.toUpperCase();
+  document.getElementById('code-field').style.display = 'none';
+  // Show a friendly banner
+  const banner = document.getElementById('invite-banner');
+  banner.textContent = "You've been invited! Create an account to join the league.";
+  banner.style.display = 'block';
+  // Go straight to register form
+  showReg();
+}
+
 // ── Auto-restore session on page load ─────────────────────────
 (async function restoreSession(){
   const saved = localStorage.getItem('wc2026_user');
-  if(!saved){ return; }
+  if(!saved){ applyInviteParam(); return; }
   setAuthLoading(true);
   try{
     const {data,error} = await sb.from('users').select('*').eq('username',saved).single();
-    if(error||!data){ localStorage.removeItem('wc2026_user'); setAuthLoading(false); showLogin(); return; }
+    if(error||!data){ localStorage.removeItem('wc2026_user'); setAuthLoading(false); applyInviteParam(); return; }
     await launchApp(data);
   }catch(err){
-    localStorage.removeItem('wc2026_user'); setAuthLoading(false); showLogin();
+    localStorage.removeItem('wc2026_user'); setAuthLoading(false); applyInviteParam();
   }
 })();
 </script>
