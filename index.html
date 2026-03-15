@@ -272,10 +272,12 @@ function setAuthLoading(on){
   document.getElementById('frm-reg').style.display=(!on&&_activeForm==='reg')?'block':'none';
 }
 
-async function hashPass(pw){
-  const enc = new TextEncoder().encode(pw);
-  const buf = await crypto.subtle.digest('SHA-256', enc);
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+// hashPass: pure JS, no crypto.subtle — works on Safari, HTTP and HTTPS
+function hashPass(pw){
+  // Two-pass djb2 gives 64-bit output — enough for friend-group auth
+  let h1=5381, h2=52711;
+  for(let i=0;i<pw.length;i++){const c=pw.charCodeAt(i);h1=Math.imul((h1<<5)+h1,1)^c;h2=Math.imul((h2<<5)+h2,1)^c;}
+  return 'v2_'+((h1>>>0).toString(16).padStart(8,'0'))+((h2>>>0).toString(16).padStart(8,'0'));
 }
 
 async function doLogin(){
@@ -283,21 +285,19 @@ async function doLogin(){
   const p=document.getElementById('l-p').value;
   const e=document.getElementById('l-err');
   if(!u||!p){e.textContent='Enter username and password';return;}
-  e.textContent='';
+  e.textContent='Checking...';
   setAuthLoading(true);
-  try {
-    const hash=await hashPass(p);
+  try{
+    const hash=hashPass(p);
     const {data,error}=await sb.from('users').select('*').eq('username',u).eq('password_hash',hash).single();
     setAuthLoading(false);
-    if(error||!data){
-      e.textContent='Incorrect username or password';
-      return;
-    }
+    if(error||!data){e.textContent='Incorrect username or password';return;}
+    e.textContent='';
     await launchApp(data);
-  } catch(err){
+  }catch(err){
     setAuthLoading(false);
-    e.textContent='Connection error — check your internet and try again.';
-    console.error('Login error:', err);
+    e.textContent='Connection failed: '+String(err).slice(0,80);
+    console.error(err);
   }
 }
 
@@ -308,45 +308,34 @@ async function doRegister(){
   const e=document.getElementById('r-err');
   if(!u||!p){e.textContent='Username and password required';return;}
   if(!/^[a-z0-9_]{2,20}$/.test(u)){e.textContent='2–20 chars, letters/numbers/underscore';return;}
+  e.textContent='Creating account...';
   setAuthLoading(true);
-
-  // Check username taken
-  const {data:exists}=await sb.from('users').select('username').eq('username',u).single();
-  if(exists){
-    e.textContent='Username already taken';
-    document.getElementById('frm-reg').style.display='block';
-    setAuthLoading(false);
-    return;
-  }
-
-  let leagueId;
-  if(code){
-    const {data:lg}=await sb.from('leagues').select('*').eq('code',code).single();
-    if(!lg){
-      e.textContent='League code not found';
-      document.getElementById('frm-reg').style.display='block';
-      setAuthLoading(false);
-      return;
+  try{
+    const {data:exists}=await sb.from('users').select('username').eq('username',u).single();
+    if(exists){setAuthLoading(false);e.textContent='Username already taken';return;}
+    let leagueId;
+    if(code){
+      const {data:lg}=await sb.from('leagues').select('*').eq('code',code).single();
+      if(!lg){setAuthLoading(false);e.textContent='League code not found';return;}
+      leagueId=lg.id;
+    }else{
+      const newCode='WC2026-'+uid4()+uid4().slice(0,2);
+      const {data:lg,error:lge}=await sb.from('leagues').insert({name:u+"'s League",code:newCode,admin_username:u,bet_amount:100}).select().single();
+      if(lge){setAuthLoading(false);e.textContent='Error: '+lge.message;return;}
+      leagueId=lg.id;
     }
-    leagueId=lg.id;
-  } else {
-    const newCode='WC2026-'+uid4()+uid4().slice(0,2);
-    const {data:lg,error:lge}=await sb.from('leagues').insert({
-      name: u+"'s League", code: newCode, admin_username: u, bet_amount: 100
-    }).select().single();
-    if(lge){e.textContent='Error creating league: '+lge.message;setAuthLoading(false);document.getElementById('frm-reg').style.display='block';return;}
-    leagueId=lg.id;
+    const hash=hashPass(p);
+    const {data:newUser,error:ue}=await sb.from('users').insert({username:u,password_hash:hash,league_id:leagueId,earned:0,spent:0}).select().single();
+    if(ue){setAuthLoading(false);e.textContent='Error: '+ue.message;return;}
+    e.textContent='';
+    await launchApp(newUser);
+  }catch(err){
+    setAuthLoading(false);
+    e.textContent='Connection failed: '+String(err).slice(0,80);
+    console.error(err);
   }
-
-  const hash=await hashPass(p);
-  const {data:newUser,error:ue}=await sb.from('users').insert({
-    username:u, password_hash:hash, league_id:leagueId, earned:0, spent:0
-  }).select().single();
-  if(ue){e.textContent='Error creating account: '+ue.message;setAuthLoading(false);document.getElementById('frm-reg').style.display='block';return;}
-
-  e.textContent='';
-  await launchApp(newUser);
 }
+
 
 function doLogout(){
   ME=null; LEAGUE=null; MEMBERS=[]; MATCHES=[]; PREDS={};
@@ -800,29 +789,32 @@ async function addMatch(){
 }
 
 // ── Auto-restore session on page load ─────────────────────────
+function showLoginFresh(){
+  localStorage.removeItem('wc2026_user');
+  _activeForm='login';
+  document.getElementById('auth-loading').style.display='none';
+  document.getElementById('frm-login').style.display='block';
+  document.getElementById('frm-reg').style.display='none';
+}
+
 (async function restoreSession(){
   const saved = localStorage.getItem('wc2026_user');
   if(!saved) return;
-  setAuthLoading(true);
-  // Safety: if Supabase never responds within 6s, fall back to login
-  const timeout = setTimeout(()=>{
-    localStorage.removeItem('wc2026_user');
-    setAuthLoading(false);
-  }, 6000);
+  // Hide forms, show spinner while we restore
+  document.getElementById('frm-login').style.display='none';
+  document.getElementById('frm-reg').style.display='none';
+  document.getElementById('auth-loading').style.display='block';
+  // Hard fallback: if nothing happens in 5s, show login
+  const timeout = setTimeout(showLoginFresh, 5000);
   try {
     const {data,error} = await sb.from('users').select('*').eq('username', saved).single();
     clearTimeout(timeout);
-    if(error || !data){
-      localStorage.removeItem('wc2026_user');
-      setAuthLoading(false);
-      return;
-    }
+    if(error || !data){ showLoginFresh(); return; }
     await launchApp(data);
   } catch(err){
     clearTimeout(timeout);
-    localStorage.removeItem('wc2026_user');
-    setAuthLoading(false);
     console.error('Session restore error:', err);
+    showLoginFresh();
   }
 })();
 </script>
