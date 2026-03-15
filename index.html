@@ -81,6 +81,54 @@
 
   /* ── PANES ── */
   .pane { display: none; padding: 14px 14px 40px; max-width: 680px; margin: 0 auto; }
+  .dash-wrap { display: flex; align-items: flex-start; }
+  .dash-side {
+    display: none;
+    width: 180px; flex-shrink: 0;
+    position: sticky; top: 60px;
+    padding: 20px 8px;
+    flex-direction: column; align-items: center; gap: 16px;
+  }
+  @media(min-width: 1060px){
+    .dash-side { display: flex; }
+    #pane-dash { flex: 1; min-width: 0; }
+  }
+  .side-trophy { font-size: 54px; line-height: 1; filter: drop-shadow(0 0 10px rgba(212,160,23,.35)); }
+  .side-ball { font-size: 42px; line-height: 1; animation: bounce 2.4s ease-in-out infinite; }
+  @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+  .side-stat { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; text-align: center; width: 100%; }
+  .side-stat-label { font-size: 10px; color: var(--muted); letter-spacing: .5px; text-transform: uppercase; margin-bottom: 4px; }
+  .side-stat-val { font-size: 22px; font-weight: 700; color: var(--gold); }
+  .side-flag-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+  .side-flag-row span { font-size: 22px; }
+  .side-label { font-size: 10px; color: var(--muted); text-align: center; letter-spacing: .4px; margin-top: -8px; }
+  .side-divider { width: 100%; height: 1px; background: var(--border); }
+  .side-tip { font-size: 11px; color: var(--muted); text-align: center; line-height: 1.5; padding: 0 4px; font-style: italic; }
+  .dash-wrap { display: flex; align-items: flex-start; gap: 0; position: relative; }
+  .dash-side {
+    display: none;
+    width: 180px; flex-shrink: 0;
+    position: sticky; top: 60px;
+    padding: 20px 8px;
+  }
+  @media(min-width: 1060px){
+    .dash-side { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+    #pane-dash { flex: 1; }
+  }
+  .side-trophy { font-size: 56px; line-height: 1; filter: drop-shadow(0 0 12px rgba(212,160,23,.4)); }
+  .side-ball { font-size: 44px; line-height: 1; animation: bounce 2.4s ease-in-out infinite; }
+  @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+  .side-stat {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 14px; text-align: center; width: 100%;
+  }
+  .side-stat-label { font-size: 10px; color: var(--muted); letter-spacing: .5px; text-transform: uppercase; margin-bottom: 4px; }
+  .side-stat-val { font-size: 22px; font-weight: 700; color: var(--gold); }
+  .side-flag-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+  .side-flag-row span { font-size: 22px; }
+  .side-label { font-size: 10px; color: var(--muted); text-align: center; letter-spacing: .4px; margin-top: -10px; }
+  .side-divider { width: 100%; height: 1px; background: var(--border); }
+  .side-tip { font-size: 11px; color: var(--muted); text-align: center; line-height: 1.5; padding: 0 4px; font-style: italic; }
   .pane.on { display: block; }
 
   /* ── CARDS ── */
@@ -222,7 +270,42 @@
     <div class="tab"     onclick="goTab('admin')">Admin</div>
   </div>
 
-  <div id="pane-dash"    class="pane on"><div class="loading"><div class="spinner"></div></div></div>
+  <div class="dash-wrap">
+    <!-- LEFT SIDE PANEL -->
+    <div class="dash-side" id="side-left">
+      <div class="side-trophy">🏆</div>
+      <div class="side-stat">
+        <div class="side-stat-label">Matches</div>
+        <div class="side-stat-val">104</div>
+      </div>
+      <div class="side-divider"></div>
+      <div class="side-flag-row">
+        <span>🇧🇷</span><span>🇦🇷</span><span>🇫🇷</span><span>🇩🇪</span>
+        <span>🇪🇸</span><span>🇵🇹</span><span>🇮🇹</span><span>🏴󠁧󠁢󠁥󠁮󠁧󠁿</span>
+      </div>
+      <div class="side-label">32 nations</div>
+      <div class="side-divider"></div>
+      <div class="side-tip">Predict the exact score to win the full pot</div>
+    </div>
+
+    <div id="pane-dash" class="pane on"><div class="loading"><div class="spinner"></div></div></div>
+
+    <!-- RIGHT SIDE PANEL -->
+    <div class="dash-side" id="side-right">
+      <div class="side-ball">⚽</div>
+      <div class="side-stat">
+        <div class="side-stat-label">Host cities</div>
+        <div class="side-stat-val">16</div>
+      </div>
+      <div class="side-divider"></div>
+      <div class="side-flag-row">
+        <span>🇺🇸</span><span>🇨🇦</span><span>🇲🇽</span>
+      </div>
+      <div class="side-label">USA · Canada · Mexico</div>
+      <div class="side-divider"></div>
+      <div class="side-tip">Correct outcome splits the pot among those who got it right</div>
+    </div>
+  </div>
   <div id="pane-matches" class="pane"><div class="loading"><div class="spinner"></div></div></div>
   <div id="pane-lb"      class="pane"><div class="loading"><div class="spinner"></div></div></div>
   <div id="pane-league"  class="pane"><div class="loading"><div class="spinner"></div></div></div>
@@ -411,7 +494,10 @@ function renderDash(){
   const wins=MATCHES.filter(m=>m.resolved&&(m.resolved_winners||[]).includes(ME.username)).length;
 
   const recent=MATCHES.filter(m=>m.resolved&&(PREDS[m.id]||[]).find(p=>p.username===ME.username)).slice(-3);
-  const open=MATCHES.filter(m=>!m.resolved&&!(PREDS[m.id]||[]).find(p=>p.username===ME.username)).slice(0,3);
+  // Open matches: group by date, show all matches from the next 2 dates that have unpredicted games
+  const allOpen=MATCHES.filter(m=>!m.resolved&&!(PREDS[m.id]||[]).find(p=>p.username===ME.username));
+  const openDates=[...new Set(allOpen.map(m=>m.match_date))].slice(0,2);
+  const open=allOpen.filter(m=>openDates.includes(m.match_date));
 
   let html=`<div class="grid2">
     <div class="stat"><div class="stat-label">Net balance</div><div class="stat-val" style="color:${n>=0?'var(--success)':'var(--red)'}">₹${n>=0?'+':''}${n}</div></div>
@@ -432,12 +518,17 @@ function renderDash(){
     });
   }
   if(open.length){
-    html+=`<div class="sec">Open for predictions</div>`;
+    let lastDate='';
+    html+=`<div class="sec">Upcoming matches to predict</div>`;
     open.forEach(m=>{
       const n=(PREDS[m.id]||[]).length;
-      html+=`<div class="card" style="display:flex;align-items:center;justify-content:space-between">
+      if(m.match_date!==lastDate){
+        html+=`<div style="font-size:12px;font-weight:600;color:var(--text);margin:10px 0 5px">${m.match_date}</div>`;
+        lastDate=m.match_date;
+      }
+      html+=`<div class="card" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <div><div style="font-size:13px;font-weight:600">${m.home_flag}${m.home} vs ${m.away}${m.away_flag}</div>
-        <div style="font-size:11px;color:var(--muted)">${m.match_date} · Grp ${m.grp} · ${n} predicted · ₹${n*(LEAGUE?.bet_amount||100)} pot so far</div></div>
+        <div style="font-size:11px;color:var(--muted)">Grp ${m.grp} · ${n} predicted · ₹${n*(LEAGUE?.bet_amount||100)} pot so far</div></div>
         <button class="btn btn-outline btn-sm" onclick="goTab('matches')">Predict</button>
       </div>`;
     });
