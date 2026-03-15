@@ -252,6 +252,37 @@ let MATCHES = [];    // all matches
 let PREDS = {};      // { match_id: [ {username, pred_home, pred_away} ] }
 let matchFilter = 'All';
 
+// ── Round definitions & helpers (used by Leaderboard + Dashboard) ──
+const ROUND_DEFS=[
+  {key:'group', label:'Group Stage', grps:['A','B','C','D','E','F','G','H','I','J','K','L']},
+  {key:'r32',   label:'R32',         grps:['R32']},
+  {key:'r16',   label:'R16',         grps:['R16']},
+  {key:'qf',    label:'QF',          grps:['QF']},
+  {key:'sf',    label:'SF / Final',  grps:['SF','Final']},
+];
+
+function calcRoundStats(username){
+  const bet=LEAGUE?.bet_amount||100;
+  const stats={};
+  ROUND_DEFS.forEach(r=>{
+    let spent=0, earned=0;
+    MATCHES.forEach(m=>{
+      if(!r.grps.includes(m.grp))return;
+      if(!m.resolved)return;
+      const myP=(PREDS[m.id]||[]).find(p=>p.username===username);
+      if(!myP)return;
+      spent+=bet;
+      if((m.resolved_winners||[]).includes(username))earned+=m.resolved_share||0;
+    });
+    stats[r.key]={bet:spent, won:earned, pl:earned-spent};
+  });
+  const ud=MEMBERS.find(x=>x.username===username);
+  stats.overall={bet:ud?.spent||0, won:ud?.earned||0, pl:(ud?.earned||0)-(ud?.spent||0)};
+  return stats;
+}
+function plColor(v){ return v>0?'var(--success)':v<0?'var(--red)':'var(--muted)'; }
+function fmtPL(v){ return (v>0?'+':'')+v; }
+
 // ── Colors ─────────────────────────────────────────────────────
 const AVC = ['#378ADD','#1D9E75','#D85A30','#D4537E','#7F77DD','#BA7517','#E24B4A','#0F6E56'];
 function avc(n){ let h=0; for(let c of n) h=(h*31+c.charCodeAt(0))%AVC.length; return AVC[h]; }
@@ -427,6 +458,18 @@ function renderDash(){
     <div class="stat"><div class="stat-label">Pots won</div><div class="stat-val">${wins}</div></div>
   </div>`;
 
+  if(recent.length){
+    html+=`<div class="sec">Your recent results</div>`;
+    recent.forEach(m=>{
+      const myP=(PREDS[m.id]||[]).find(p=>p.username===ME.username);
+      const won=(m.resolved_winners||[]).includes(ME.username);
+      html+=`<div class="${won&&m.resolved_type!=='refund'?'banner bn-win':m.resolved_type==='refund'&&won?'banner bn-ref':'card'}">
+        <div style="font-weight:600">${m.home_flag}${m.home} ${m.result_home}–${m.result_away} ${m.away}${m.away_flag}</div>
+        <div style="font-size:11px;margin-top:3px;color:inherit">Your pick: ${myP.pred_home}–${myP.pred_away} &nbsp;·&nbsp; ${won&&m.resolved_type==='exact'?'Exact! +₹'+m.resolved_share:won&&m.resolved_type==='outcome'?'Outcome +₹'+m.resolved_share:m.resolved_type==='refund'&&won?'Refund ₹'+m.resolved_share:'No win'}</div>
+      </div>`;
+    });
+  }
+
   if(open.length){
     let lastDate='';
     html+=`<div class="sec">Upcoming matches to predict</div>`;
@@ -440,18 +483,6 @@ function renderDash(){
         <div><div style="font-size:13px;font-weight:600">${m.home_flag}${m.home} vs ${m.away}${m.away_flag}</div>
         <div style="font-size:11px;color:var(--muted)">Grp ${m.grp} · ${n} predicted · ₹${n*bet} pot so far</div></div>
         <button class="btn btn-outline btn-sm" onclick="goTab('matches')">Predict</button>
-      </div>`;
-    });
-  }
-
-  if(recent.length){
-    html+=`<div class="sec">Your recent results</div>`;
-    recent.forEach(m=>{
-      const myP=(PREDS[m.id]||[]).find(p=>p.username===ME.username);
-      const won=(m.resolved_winners||[]).includes(ME.username);
-      html+=`<div class="${won&&m.resolved_type!=='refund'?'banner bn-win':m.resolved_type==='refund'&&won?'banner bn-ref':'card'}">
-        <div style="font-weight:600">${m.home_flag}${m.home} ${m.result_home}–${m.result_away} ${m.away}${m.away_flag}</div>
-        <div style="font-size:11px;margin-top:3px;color:inherit">Your pick: ${myP.pred_home}–${myP.pred_away} &nbsp;·&nbsp; ${won&&m.resolved_type==='exact'?'Exact! +₹'+m.resolved_share:won&&m.resolved_type==='outcome'?'Outcome +₹'+m.resolved_share:m.resolved_type==='refund'&&won?'Refund ₹'+m.resolved_share:'No win'}</div>
       </div>`;
     });
   }
