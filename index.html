@@ -234,8 +234,8 @@
 //  ⚙️  CONFIGURATION — replace these two values after you set up
 //      your Supabase project (see README.md for instructions)
 // ════════════════════════════════════════════════════════════════
-const SUPABASE_URL = 'https://wxolmlxphwieqvyfuyfu.supabase.co';       // e.g. https://xyzabc.supabase.co
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4b2xtbHhwaHdpZXF2eWZ1eWZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0OTY4NDgsImV4cCI6MjA4OTA3Mjg0OH0.XGijPeimB3QiGaikuiBkwgdgVOLYBJO-m6eBNvE7JG8'; // long string starting with eyJ...
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';       // e.g. https://xyzabc.supabase.co
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'; // long string starting with eyJ...
 
 // ════════════════════════════════════════════════════════════════
 const { createClient } = supabase;
@@ -344,6 +344,7 @@ async function doRegister(){
 
 function doLogout(){
   ME=null; LEAGUE=null; MEMBERS=[]; MATCHES=[]; PREDS={};
+  localStorage.removeItem('wc2026_user');
   document.getElementById('s-app').classList.remove('on');
   document.getElementById('s-auth').classList.add('on');
   document.getElementById('l-u').value='';
@@ -354,6 +355,7 @@ function doLogout(){
 // ── Boot app ───────────────────────────────────────────────────
 async function launchApp(user){
   ME=user;
+  localStorage.setItem('wc2026_user', ME.username);
   document.getElementById('s-auth').classList.remove('on');
   document.getElementById('s-app').classList.add('on');
   document.getElementById('nav-uname').textContent=ME.username;
@@ -479,16 +481,46 @@ function setFilter(f){ matchFilter=f; renderMatches(); }
 function renderMatchList(){
   const filtered=matchFilter==='All'?MATCHES:MATCHES.filter(m=>m.grp===matchFilter);
   const bet=LEAGUE?.bet_amount||100;
-  let html='', lastGrp='';
+  let html='';
+
+  // Group matches by date, preserving order
+  const byDate=[];
+  const dateIndex={};
   filtered.forEach(m=>{
-    if(m.grp!==lastGrp){html+=`<div class="grp-head">Group ${m.grp}</div>`;lastGrp=m.grp;}
+    const d=m.match_date||'TBD';
+    if(dateIndex[d]===undefined){dateIndex[d]=byDate.length;byDate.push({date:d,matches:[]});}
+    byDate[dateIndex[d]].matches.push(m);
+  });
+
+  byDate.forEach(({date,matches})=>{
+    // Count open predictions for this date
+    const openCount=matches.filter(m=>!m.resolved&&!(PREDS[m.id]||[]).find(p=>p.username===ME.username)).length;
+    const settledCount=matches.filter(m=>m.resolved).length;
+    let dateMeta='';
+    if(openCount>0) dateMeta=`<span style="color:var(--warn);font-size:11px">${openCount} open</span>`;
+    else if(settledCount===matches.length) dateMeta=`<span style="color:var(--muted);font-size:11px">all settled</span>`;
+
+    html+=`<div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 8px">
+      <div style="font-size:15px;font-weight:700;color:var(--text)">${date}</div>
+      ${dateMeta}
+    </div>`;
+
+    // Sub-group by group within this date
+    let lastGrp='';
+    matches.forEach(m=>{
+      if(m.grp!==lastGrp){
+        html+=`<div style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin:6px 0 4px;padding-left:2px">
+          ${['R32','R16','QF','SF','Final'].includes(m.grp)?m.grp:'Group '+m.grp}
+        </div>`;
+        lastGrp=m.grp;
+      }
     const arr=PREDS[m.id]||[];
     const myP=arr.find(p=>p.username===ME.username);
     const pot=arr.length*bet;
     html+=`<div class="mrow">
       <div class="mhead">
         <div><div class="mteams">${m.home_flag} ${m.home} <span style="color:var(--muted);font-weight:400">vs</span> ${m.away} ${m.away_flag}</div>
-        <div class="mmeta">${m.match_date} · ₹${pot} pot · ${arr.length} predicted</div></div>
+        <div class="mmeta">₹${pot} pot · ${arr.length} predicted</div></div>
         <span class="badge ${m.resolved?'b-gray':myP?'b-green':'b-amber'}">${m.resolved?'Settled':myP?'In':'Open'}</span>
       </div>`;
     if(m.resolved){
@@ -529,7 +561,8 @@ function renderMatchList(){
       html+=`</div>`;
     }
     html+=`</div>`;
-  });
+    }); // end matches.forEach
+  }); // end byDate.forEach
   const el=document.getElementById('match-list');
   if(el)el.innerHTML=html||`<div class="empty">No matches in this group.</div>`;
 }
@@ -759,6 +792,24 @@ async function addMatch(){
   await loadAll();
   renderAdmin();
 }
+
+// ── Auto-restore session on page load ─────────────────────────
+(async function restoreSession(){
+  const saved = localStorage.getItem('wc2026_user');
+  if(!saved) return;
+  // Show a subtle loading state on the auth screen while we check
+  document.getElementById('auth-loading').style.display='block';
+  document.getElementById('frm-login').style.display='none';
+  const {data,error} = await sb.from('users').select('*').eq('username', saved).single();
+  if(error || !data){
+    // Stored user no longer exists — clear and show login
+    localStorage.removeItem('wc2026_user');
+    document.getElementById('auth-loading').style.display='none';
+    document.getElementById('frm-login').style.display='block';
+    return;
+  }
+  await launchApp(data);
+})();
 </script>
 </body>
 </html>
