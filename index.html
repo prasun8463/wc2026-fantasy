@@ -85,7 +85,7 @@
 
   /* ── CARDS ── */
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 13px 15px; margin-bottom: 10px; }
-  .sec { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .8px; text-transform: uppercase; margin: 16px 0 8px; }
+  .sec { font-size: 16px; font-weight: 700; color: var(--gold); letter-spacing: .3px; text-transform: none; margin: 20px 0 12px; border-bottom: 2px solid rgba(212,160,23,.35); padding-bottom: 8px; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
   .stat { background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
   .stat-label { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
@@ -216,11 +216,11 @@
   </nav>
 
   <div class="tab-bar">
+    <div class="tab"     onclick="goTab('howto')">How to Play</div>
     <div class="tab on"  onclick="goTab('dash')">Dashboard</div>
     <div class="tab"     onclick="goTab('matches')">Matches</div>
     <div class="tab"     onclick="goTab('lb')">Leaderboard</div>
     <div class="tab"     onclick="goTab('league')">League</div>
-    <div class="tab"     onclick="goTab('howto')">How to Play</div>
     <div class="tab"     onclick="goTab('admin')">Admin</div>
   </div>
 
@@ -416,7 +416,7 @@ async function refreshMe(){
 
 // ── Tab routing ────────────────────────────────────────────────
 function goTab(t){
-  const names=['dash','matches','lb','league','howto','admin'];
+  const names=['howto','dash','matches','lb','league','admin'];
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('on',names[i]===t));
   document.querySelectorAll('.pane').forEach((el,i)=>el.classList.toggle('on',names[i]===t));
   if(t==='dash')renderDash();
@@ -480,7 +480,7 @@ function renderDash(){
         lastDate=m.match_date;
       }
       html+=`<div class="card" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <div><div style="font-size:13px;font-weight:600">${m.home_flag}${m.home} vs ${m.away}${m.away_flag}</div>
+        <div><div style="font-size:13px;font-weight:600"><span style="white-space:nowrap">${m.home_flag}${m.home}</span> vs <span style="white-space:nowrap">${m.away}${m.away_flag}</span></div>
         <div style="font-size:11px;color:var(--muted)">Grp ${m.grp} · ${n} predicted · ₹${n*bet} pot so far</div></div>
         <button class="btn btn-outline btn-sm" onclick="goTab('matches')">Predict</button>
       </div>`;
@@ -556,7 +556,7 @@ function renderMatchList(){
     const pot=arr.length*bet;
     html+=`<div class="mrow">
       <div class="mhead">
-        <div><div class="mteams">${m.home_flag} ${m.home} <span style="color:var(--muted);font-weight:400">vs</span> ${m.away} ${m.away_flag}</div>
+        <div><div class="mteams"><span style="white-space:nowrap">${m.home_flag} ${m.home}</span> <span style="color:var(--muted);font-weight:400">vs</span> <span style="white-space:nowrap">${m.away} ${m.away_flag}</span></div>
         <div class="mmeta">₹${pot} pot · ${arr.length} predicted</div></div>
         <span class="badge ${m.resolved?'b-gray':myP?'b-green':'b-amber'}">${m.resolved?'Settled':myP?'In':'Open'}</span>
       </div>`;
