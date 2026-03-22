@@ -262,7 +262,6 @@ const ROUND_DEFS=[
 ];
 
 function calcRoundStats(username){
-  const bet=LEAGUE?.bet_amount||100;
   const stats={};
   ROUND_DEFS.forEach(r=>{
     let spent=0, earned=0;
@@ -271,7 +270,7 @@ function calcRoundStats(username){
       if(!m.resolved)return;
       const myP=(PREDS[m.id]||[]).find(p=>p.username===username);
       if(!myP)return;
-      spent+=bet;
+      spent+=betFor(m);
       if((m.resolved_winners||[]).includes(username))earned+=m.resolved_share||0;
     });
     stats[r.key]={bet:spent, won:earned, pl:earned-spent};
@@ -435,29 +434,87 @@ function netOf(u){
 }
 function outcome(h,a){return h>a?'H':h<a?'A':'D';}
 
+// Returns the bet amount for a given match, supporting per-stage amounts
+function betFor(match){
+  const ba=LEAGUE?.bet_amount;
+  if(!ba) return 100;
+  if(typeof ba==='object'){
+    const grp=match?.grp||'';
+    if(['A','B','C','D','E','F','G','H','I','J','K','L'].includes(grp)) return ba.group||100;
+    if(grp==='R32') return ba.r32||ba.group||100;
+    if(grp==='R16') return ba.r16||ba.group||100;
+    if(grp==='QF')  return ba.qf||ba.group||100;
+    if(['SF','Final'].includes(grp)) return ba.sf||ba.group||100;
+    return ba.group||100;
+  }
+  return typeof ba==='number'?ba:100;
+}
+function parseBetAmount(raw){
+  if(!raw) return 100;
+  if(typeof raw==='number') return raw;
+  if(typeof raw==='object') return raw;
+  try{ const p=JSON.parse(raw); return p; }catch(e){ return parseInt(raw)||100; }
+}
+
 // ════════════════════════════════════════════════════════════════
 //  DASHBOARD — personal summary + upcoming predictions
 // ════════════════════════════════════════════════════════════════
 function renderDash(){
   const bet=LEAGUE?.bet_amount||100;
   const n=netOf(ME.username);
+  const ud=MEMBERS.find(x=>x.username===ME.username);
+  const totalBet=ud?.spent||0;
+  const totalWon=ud?.earned||0;
   const sorted=[...MEMBERS].sort((a,b)=>netOf(b.username)-netOf(a.username));
   const rank=sorted.findIndex(x=>x.username===ME.username)+1;
-  const myPredCount=Object.values(PREDS).filter(arr=>arr.find(p=>p.username===ME.username)).length;
   const wins=MATCHES.filter(m=>m.resolved&&(m.resolved_winners||[]).includes(ME.username)).length;
+
+  const settledPlayed=MATCHES.filter(m=>m.resolved&&(PREDS[m.id]||[]).find(p=>p.username===ME.username));
+  let exact=0,outcomeW=0,wrong=0;
+  settledPlayed.forEach(m=>{
+    const won=(m.resolved_winners||[]).includes(ME.username);
+    if(m.resolved_type==='exact'&&won) exact++;
+    else if(m.resolved_type==='outcome'&&won) outcomeW++;
+    else if(!(m.resolved_type==='refund'&&won)) wrong++;
+  });
+  const played=settledPlayed.length;
+  const hitRate=played>0?Math.round(((exact+outcomeW)/played)*100):0;
 
   const allOpen=MATCHES.filter(m=>!m.resolved&&!(PREDS[m.id]||[]).find(p=>p.username===ME.username));
   const openDates=[...new Set(allOpen.map(m=>m.match_date))].slice(0,2);
   const open=allOpen.filter(m=>openDates.includes(m.match_date));
   const recent=MATCHES.filter(m=>m.resolved&&(PREDS[m.id]||[]).find(p=>p.username===ME.username)).slice(-3);
 
-  let html=`<div class="grid2">
-    <div class="stat"><div class="stat-label">Net balance</div><div class="stat-val" style="color:${n>=0?'var(--success)':'var(--red)'}">₹${n>=0?'+':''}${n}</div></div>
-    <div class="stat"><div class="stat-label">League rank</div><div class="stat-val">${rank||'—'} <span style="font-size:13px;color:var(--muted)">/ ${MEMBERS.length}</span></div></div>
-    <div class="stat"><div class="stat-label">Predictions made</div><div class="stat-val">${myPredCount}</div></div>
-    <div class="stat"><div class="stat-label">Pots won</div><div class="stat-val">${wins}</div></div>
+  let html=`<div style="background:rgba(212,160,23,.1);border:1px solid rgba(212,160,23,.22);border-radius:12px;padding:16px 18px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Your net balance</div>
+      <div style="font-size:30px;font-weight:700;color:var(--gold)">₹${n>=0?'+':''}${n}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:3px">Rank ${rank} of ${MEMBERS.length} &nbsp;·&nbsp; ₹${totalBet} bet &nbsp;·&nbsp; ₹${totalWon} won</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Hit rate</div>
+      <div style="font-size:28px;font-weight:700;color:${hitRate>=50?'var(--success)':hitRate>=30?'var(--warn)':'var(--red)'}">${played>0?hitRate+'%':'—'}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:3px">${played>0?`${exact+outcomeW} of ${played} correct`:'No settled matches yet'}</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px">
+    <div style="background:rgba(76,175,80,.08);border:1px solid rgba(76,175,80,.2);border-radius:9px;padding:10px;text-align:center">
+      <div style="font-size:20px;font-weight:700;color:var(--success)">${exact||'—'}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">Exact scores</div>
+    </div>
+    <div style="background:rgba(232,160,32,.08);border:1px solid rgba(232,160,32,.2);border-radius:9px;padding:10px;text-align:center">
+      <div style="font-size:20px;font-weight:700;color:var(--warn)">${outcomeW||'—'}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">Outcomes</div>
+    </div>
+    <div style="background:rgba(226,75,74,.08);border:1px solid rgba(226,75,74,.2);border-radius:9px;padding:10px;text-align:center">
+      <div style="font-size:20px;font-weight:700;color:var(--red)">${wrong||'—'}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">Wrong</div>
+    </div>
+    <div style="background:rgba(55,138,221,.08);border:1px solid rgba(55,138,221,.2);border-radius:9px;padding:10px;text-align:center">
+      <div style="font-size:20px;font-weight:700;color:var(--info)">${wins||'—'}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">Pots won</div>
+    </div>
   </div>`;
-
   if(recent.length){
     html+=`<div class="sec">Your recent results</div>`;
     recent.forEach(m=>{
@@ -553,7 +610,7 @@ function renderMatchList(){
       }
     const arr=PREDS[m.id]||[];
     const myP=arr.find(p=>p.username===ME.username);
-    const pot=arr.length*bet;
+    const pot=arr.length*betFor(m);
     html+=`<div class="mrow">
       <div class="mhead">
         <div><div class="mteams"><span style="white-space:nowrap">${m.home_flag} ${m.home}</span> <span style="color:var(--muted);font-weight:400">vs</span> <span style="white-space:nowrap">${m.away} ${m.away_flag}</span></div>
@@ -578,7 +635,7 @@ function renderMatchList(){
           <input id="ph_${m.id}" type="number" min="0" max="20" placeholder="${m.home.slice(0,4)}" />
           <div class="score-sep">–</div>
           <input id="pa_${m.id}" type="number" min="0" max="20" placeholder="${m.away.slice(0,4)}" />
-          <button class="btn btn-outline btn-sm" onclick="submitPred('${m.id}')">Predict (₹${bet})</button>
+          <button class="btn btn-outline btn-sm" onclick="submitPred('${m.id}')">Predict (₹${betFor(m)})</button>
         </div>`;
       }
     }
@@ -978,11 +1035,22 @@ function renderAdmin(){
   }
   const unsettled=MATCHES.filter(m=>!m.resolved);
   const settled=MATCHES.filter(m=>m.resolved);
-  const bet=LEAGUE.bet_amount||100;
-  let html=`<div class="sec">Bet amount</div>
-  <div class="card" style="display:flex;align-items:center;gap:10px">
-    <div style="flex:1"><div class="field-label">₹ per match</div><input id="bet-in" type="number" value="${bet}" min="1" max="100000" style="width:100px;margin:0" /></div>
-    <button class="btn btn-outline btn-sm" onclick="updateBet()">Update</button>
+  const ba=parseBetAmount(LEAGUE.bet_amount);
+  const bGroup=typeof ba==='object'?ba.group:ba||100;
+  const bR32=typeof ba==='object'?(ba.r32||ba.group||100):ba||100;
+  const bR16=typeof ba==='object'?(ba.r16||ba.group||100):ba||100;
+  const bQF=typeof ba==='object'?(ba.qf||ba.group||100):ba||100;
+  const bSF=typeof ba==='object'?(ba.sf||ba.group||100):ba||100;
+  let html=`<div class="sec">Bet amounts by stage</div>
+  <div class="card">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div><div class="field-label">Group stage (₹)</div><input id="bet-group" type="number" value="${bGroup}" min="1" style="margin:0" /></div>
+      <div><div class="field-label">Round of 32 (₹)</div><input id="bet-r32" type="number" value="${bR32}" min="1" style="margin:0" /></div>
+      <div><div class="field-label">Round of 16 (₹)</div><input id="bet-r16" type="number" value="${bR16}" min="1" style="margin:0" /></div>
+      <div><div class="field-label">Quarter-finals (₹)</div><input id="bet-qf" type="number" value="${bQF}" min="1" style="margin:0" /></div>
+      <div><div class="field-label">Semi-finals &amp; Final (₹)</div><input id="bet-sf" type="number" value="${bSF}" min="1" style="margin:0" /></div>
+    </div>
+    <button class="btn btn-gold btn-sm" onclick="updateBet()" style="width:auto;padding:8px 20px">Save bet amounts</button>
   </div>
   <div class="sec">Enter results (${unsettled.length} remaining)</div>`;
 
@@ -1028,11 +1096,10 @@ async function settle(mid){
   if(isNaN(h)||isNaN(a)||h<0||a<0){toast('Enter valid scores');return;}
   const m=MATCHES.find(x=>x.id===mid); if(!m)return;
   const act=outcome(h,a);
-  const bet=LEAGUE?.bet_amount||100;
   const arr=PREDS[mid]||[];
   const memberNames=MEMBERS.map(u=>u.username);
   const parts=arr.filter(p=>memberNames.includes(p.username));
-  const pot=parts.length*bet;
+  const pot=parts.length*betFor(m);
   const exact=parts.filter(p=>p.pred_home===h&&p.pred_away===a);
   const outW=parts.filter(p=>outcome(p.pred_home,p.pred_away)===act);
   const allSame=parts.length>0&&parts.every(p=>outcome(p.pred_home,p.pred_away)===act);
@@ -1064,11 +1131,16 @@ async function settle(mid){
 }
 
 async function updateBet(){
-  const v=parseInt(document.getElementById('bet-in').value);
-  if(isNaN(v)||v<1){toast('Enter a valid amount');return;}
-  await sb.from('leagues').update({bet_amount:v}).eq('id',LEAGUE.id);
-  LEAGUE.bet_amount=v;
-  toast('Bet amount updated to ₹'+v);
+  const g=parseInt(document.getElementById('bet-group').value);
+  const r32=parseInt(document.getElementById('bet-r32').value);
+  const r16=parseInt(document.getElementById('bet-r16').value);
+  const qf=parseInt(document.getElementById('bet-qf').value);
+  const sf=parseInt(document.getElementById('bet-sf').value);
+  if([g,r32,r16,qf,sf].some(v=>isNaN(v)||v<1)){toast('All amounts must be at least ₹1');return;}
+  const amounts={group:g,r32,r16,qf,sf};
+  await sb.from('leagues').update({bet_amount:JSON.stringify(amounts)}).eq('id',LEAGUE.id);
+  LEAGUE.bet_amount=amounts;
+  toast('Bet amounts saved!');
   renderAdmin();
 }
 
