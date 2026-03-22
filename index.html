@@ -537,9 +537,11 @@ function renderDash(){
         lastDate=m.match_date;
       }
       html+=`<div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px">
-        <div style="min-width:0;flex:1"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${m.home_flag}${m.home} vs ${m.away}${m.away_flag}</div>
-        <div style="font-size:11px;color:var(--muted)">Grp ${m.grp} · ${n} predicted · ₹${n*betFor(m)} pot so far</div></div>
-        <button class="btn btn-outline btn-sm" style="flex-shrink:0" onclick="goTab('matches')">Predict</button>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;line-height:1.4">${m.home_flag} ${m.home} <span style="color:var(--muted);font-weight:400">vs</span> ${m.away} ${m.away_flag}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">Grp ${m.grp} · ${n} predicted · ₹${n*betFor(m)} pot so far</div>
+        </div>
+        <button class="btn btn-outline btn-sm" style="flex-shrink:0;white-space:nowrap" onclick="goTab('matches')">Predict</button>
       </div>`;
     });
   }
