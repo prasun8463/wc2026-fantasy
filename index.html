@@ -237,8 +237,8 @@
   <div class="tab-bar">
     <div class="tab"     onclick="goTab('howto')">How to Play</div>
     <div class="tab on"  onclick="goTab('dash')">Dashboard</div>
-    <div class="tab"     onclick="goTab('matches')">Matches</div>
     <div class="tab"     onclick="goTab('lb')">Leaderboard</div>
+    <div class="tab"     onclick="goTab('matches')">Matches</div>
     <div class="tab"     onclick="goTab('groups')">Groups</div>
     <div class="tab"     onclick="goTab('league')">League</div>
     <div class="tab"     onclick="goTab('admin')">Admin</div>
@@ -246,8 +246,8 @@
 
   <div id="pane-howto"   class="pane"></div>
   <div id="pane-dash"    class="pane on"><div class="loading"><div class="spinner"></div></div></div>
-  <div id="pane-matches" class="pane"><div class="loading"><div class="spinner"></div></div></div>
   <div id="pane-lb"      class="pane"><div class="loading"><div class="spinner"></div></div></div>
+  <div id="pane-matches" class="pane"><div class="loading"><div class="spinner"></div></div></div>
   <div id="pane-groups"  class="pane"><div class="loading"><div class="spinner"></div></div></div>
   <div id="pane-league"  class="pane"><div class="loading"><div class="spinner"></div></div></div>
   <div id="pane-admin"   class="pane"><div class="loading"><div class="spinner"></div></div></div>
@@ -456,7 +456,7 @@ async function refreshMe(){
 
 // ── Tab routing ────────────────────────────────────────────────
 function goTab(t){
-  const names=['howto','dash','matches','lb','groups','league','admin'];
+  const names=['howto','dash','lb','matches','groups','league','admin'];
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('on',names[i]===t));
   document.querySelectorAll('.pane').forEach((el,i)=>el.classList.toggle('on',names[i]===t));
   if(t==='dash')renderDash();
@@ -523,9 +523,7 @@ function renderDash(){
   const hitRate=played>0?Math.round(((exact+outcomeW)/played)*100):0;
   const pct=t=>played>0?Math.round((t/played)*100)+'%':'0%';
 
-  const allOpen=MATCHES.filter(m=>!m.resolved&&!(PREDS[m.id]||[]).find(p=>p.username===ME.username));
-  const openDates=[...new Set(allOpen.map(m=>m.match_date))].slice(0,2);
-  const open=allOpen.filter(m=>openDates.includes(m.match_date));
+
   const recent=MATCHES.filter(m=>m.resolved&&(PREDS[m.id]||[]).find(p=>p.username===ME.username)).slice(-3);
 
   // ── PROFILE CARD ──
@@ -547,7 +545,7 @@ function renderDash(){
     <div style="height:1px;background:var(--border);margin:0 14px"></div>
 
     <!-- 2x2 scorecard grid -->
-    <div style="padding:10px 14px">
+    <div style="padding:14px 16px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
         <div class="scorecard-btn" onclick="showScorecardModal('exact')" style="background:rgba(76,175,80,.08);border:1px solid rgba(76,175,80,.2);border-radius:9px;padding:9px 12px;display:flex;align-items:center;gap:10px">
           <div style="font-size:20px;font-weight:700;color:var(--success);line-height:1">${exact||'0'}</div>
@@ -596,33 +594,8 @@ function renderDash(){
 
   </div>`;
 
-  // ── UPCOMING MATCHES ──
-  if(open.length){
-    let lastDate='';
-    html+=`<div class="sec">Upcoming matches to predict</div>`;
-    open.forEach(m=>{
-      const np=(PREDS[m.id]||[]).length;
-      if(m.match_date!==lastDate){
-        html+=`<div style="font-size:12px;font-weight:600;color:var(--text);margin:10px 0 5px">${m.match_date}</div>`;
-        lastDate=m.match_date;
-      }
-      html+=`<div class="card" style="margin-bottom:6px">
-        <table style="width:100%;border-collapse:collapse">
-          <tr>
-            <td style="vertical-align:middle;padding:0">
-              <div style="font-size:13px;font-weight:600;line-height:1.5;margin-bottom:2px">${m.home_flag} ${m.home} vs ${m.away} ${m.away_flag}</div>
-              <div style="font-size:11px;color:var(--muted)">Grp ${m.grp} · ${np} predicted · ₹${np*betFor(m)} pot so far</div>
-            </td>
-            <td style="vertical-align:middle;padding:0 0 0 10px;width:90px;text-align:right">
-              <button class="btn btn-gold btn-sm" style="width:auto;padding:7px 14px;white-space:nowrap;margin:0" onclick="goTab('matches')">Predict</button>
-            </td>
-          </tr>
-        </table>
-      </div>`;
-    });
-  }
-  if(!open.length&&!recent.length){
-    html+=`<div class="empty">Head to Matches to place your first prediction!</div>`;
+  if(!recent.length){
+    html+=`<div style="text-align:center;color:var(--muted);font-size:13px;padding:20px 0">Head to Matches to start predicting!</div>`;
   }
   document.getElementById('pane-dash').innerHTML=html;
 }
