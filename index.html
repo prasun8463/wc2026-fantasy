@@ -52,9 +52,9 @@
     transition: border .2s; outline: none; }
   input:focus { border-color: var(--green-mid); }
   .btn { width: 100%; padding: 10px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity .15s, transform .1s; margin-top: 4px; }
-  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:500; align-items:flex-end; justify-content:center; }
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:500; align-items:center; justify-content:center; padding:16px; }
   .modal-overlay.open { display:flex; }
-  .modal-box { background:#162616; border:1px solid rgba(255,255,255,.12); border-radius:20px 20px 0 0; width:100%; max-width:520px; max-height:88vh; overflow-y:auto; padding:18px 18px 28px; }
+  .modal-box { background:#162616; border:1px solid rgba(255,255,255,.12); border-radius:16px; width:100%; max-width:480px; max-height:82vh; overflow-y:auto; padding:20px; }
   .sheet-handle { width:36px; height:4px; background:rgba(255,255,255,.18); border-radius:2px; margin:0 auto 16px; }
   .modal-header { margin-bottom:12px; }
   .modal-title { font-size:15px; font-weight:700; color:var(--gold); }
@@ -252,12 +252,21 @@
 <!-- SCORECARD MODAL -->
 <div class="modal-overlay" id="score-modal" onclick="closeModal(event)">
   <div class="modal-box">
-    <div class="sheet-handle"></div>
     <div class="modal-header">
       <div class="modal-title" id="modal-title"></div>
     </div>
     <div id="modal-body"></div>
     <button class="sheet-close-btn" onclick="document.getElementById('score-modal').classList.remove('open')">Close</button>
+  </div>
+</div>
+<div class="modal-overlay" id="match-sheet" onclick="maybeCloseMatchSheet(event)">
+  <div class="modal-box">
+    <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between">
+      <div class="modal-title" id="ms-title"></div>
+      <button style="background:transparent;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0;line-height:1" onclick="closeMatchSheet()">&#x2715;</button>
+    </div>
+    <div id="ms-body"></div>
+    <button class="sheet-close-btn" onclick="closeMatchSheet()">Close</button>
   </div>
 </div>
 </div>
@@ -608,21 +617,11 @@ function setFilter(f){ matchFilter=f; renderMatches(); }
 
 function renderMatchList(){
   const filtered=matchFilter==='All'?MATCHES:MATCHES.filter(m=>m.grp===matchFilter);
-  const bet=LEAGUE?.bet_amount||100;
   let html='';
-
-  // Sort matches by date then group
   const monthOrder={Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
-  function dateSortKey(d){
-    if(!d||d==='TBD')return 9999;
-    const parts=d.trim().split(' ');
-    const mon=monthOrder[parts[0]]||0;
-    const day=parseInt(parts[1])||0;
-    return mon*100+day;
-  }
+  function dateSortKey(d){if(!d||d==='TBD')return 9999;const p=d.trim().split(' ');return (monthOrder[p[0]]||0)*100+(parseInt(p[1])||0);}
   const sorted=[...filtered].sort((a,b)=>dateSortKey(a.match_date)-dateSortKey(b.match_date));
-  const byDate=[];
-  const dateIndex={};
+  const byDate=[];const dateIndex={};
   sorted.forEach(m=>{
     const d=m.match_date||'TBD';
     if(dateIndex[d]===undefined){dateIndex[d]=byDate.length;byDate.push({date:d,matches:[]});}
@@ -630,79 +629,170 @@ function renderMatchList(){
   });
 
   byDate.forEach(({date,matches})=>{
-    // Count open predictions for this date
     const openCount=matches.filter(m=>!m.resolved&&!(PREDS[m.id]||[]).find(p=>p.username===ME.username)).length;
     const settledCount=matches.filter(m=>m.resolved).length;
     let dateMeta='';
     if(openCount>0) dateMeta=`<span style="color:var(--warn);font-size:11px">${openCount} open</span>`;
     else if(settledCount===matches.length) dateMeta=`<span style="color:var(--muted);font-size:11px">all settled</span>`;
-
     html+=`<div style="display:flex;align-items:center;justify-content:space-between;margin:20px 0 8px;padding-bottom:8px;border-bottom:2px solid rgba(212,160,23,.35)">
-      <div style="font-size:16px;font-weight:700;color:var(--gold);letter-spacing:.3px">${date}</div>
-      ${dateMeta}
+      <div style="font-size:16px;font-weight:700;color:var(--gold)">${date}</div>${dateMeta}
     </div>`;
-
-    // Sub-group by group within this date
     let lastGrp='';
     matches.forEach(m=>{
       if(m.grp!==lastGrp){
-        html+=`<div style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin:6px 0 4px;padding-left:2px">
-          ${['R32','R16','QF','SF','Final'].includes(m.grp)?m.grp:'Group '+m.grp}
-        </div>`;
+        html+=`<div style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin:8px 0 4px">${['R32','R16','QF','SF','Final'].includes(m.grp)?m.grp:'Group '+m.grp}</div>`;
         lastGrp=m.grp;
       }
-    const arr=PREDS[m.id]||[];
-    const myP=arr.find(p=>p.username===ME.username);
-    const pot=arr.length*betFor(m);
-    html+=`<div class="mrow">
-      <div class="mhead">
-        <div><div class="mteams"><span style="white-space:nowrap">${m.home_flag} ${m.home}</span> <span style="color:var(--muted);font-weight:400">vs</span> <span style="white-space:nowrap">${m.away} ${m.away_flag}</span></div>
-        <div class="mmeta">₹${pot} pot · ${arr.length} predicted</div></div>
-        <span class="badge ${m.resolved?'b-gray':myP?'b-green':'b-amber'}">${m.resolved?'Settled':myP?'In':'Open'}</span>
-      </div>`;
-    if(m.resolved){
-      const won=(m.resolved_winners||[]).includes(ME.username);
-      html+=`<div style="font-size:20px;font-weight:700;margin-bottom:4px;color:var(--gold)">${m.result_home} – ${m.result_away}</div>`;
-      if(myP){
-        html+=`<div style="font-size:12px;color:var(--muted)">Your pick: ${myP.pred_home}–${myP.pred_away}
-          <span class="rtag ${won&&m.resolved_type==='exact'?'rt-exact':won&&m.resolved_type==='outcome'?'rt-outcome':m.resolved_type==='refund'&&won?'rt-refund':'rt-wrong'}">
-            ${won&&m.resolved_type==='exact'?'Exact +₹'+m.resolved_share:won&&m.resolved_type==='outcome'?'Outcome +₹'+m.resolved_share:m.resolved_type==='refund'&&won?'Refund ₹'+m.resolved_share:'No win'}
-          </span></div>`;
+      const arr=PREDS[m.id]||[];
+      const myP=arr.find(p=>p.username===ME.username);
+      const pot=arr.length*betFor(m);
+      // My pick inline badge
+      let pickBadge='';
+      if(myP&&m.resolved){
+        const won=(m.resolved_winners||[]).includes(ME.username);
+        const rc=won&&m.resolved_type==='exact'?'rt-exact':won&&m.resolved_type==='outcome'?'rt-outcome':m.resolved_type==='refund'&&won?'rt-refund':'rt-wrong';
+        const rl=won&&m.resolved_type==='exact'?'Exact +₹'+m.resolved_share:won&&m.resolved_type==='outcome'?'Outcome +₹'+m.resolved_share:m.resolved_type==='refund'&&won?'Refund ₹'+m.resolved_share:'No win';
+        pickBadge=`<span class="rtag ${rc}" style="font-size:9px;margin-left:4px">${rl}</span>`;
+      } else if(myP){
+        pickBadge=`<span class="badge b-green" style="font-size:9px;padding:1px 6px;margin-left:4px">In</span>`;
       }
-    } else {
-      if(myP){
-        html+=`<div style="font-size:12px;color:var(--muted)">Your prediction: <strong style="color:var(--text)">${myP.pred_home} – ${myP.pred_away}</strong>
-          <span class="link" style="font-size:11px;margin-left:8px" onclick="cancelPred('${m.id}')">Change</span></div>`;
-      } else {
-        html+=`<div class="score-row">
-          <input id="ph_${m.id}" type="number" min="0" max="20" placeholder="${m.home.slice(0,4)}" />
-          <div class="score-sep">–</div>
-          <input id="pa_${m.id}" type="number" min="0" max="20" placeholder="${m.away.slice(0,4)}" />
-          <button class="btn btn-outline btn-sm" onclick="submitPred('${m.id}')">Predict (₹${betFor(m)})</button>
+      const metaPick=myP?` · Pick: <strong style="color:var(--gold)">${myP.pred_home}–${myP.pred_away}</strong>${pickBadge}`:'';
+      // Right side
+      const rightHtml=m.resolved
+        ?`<div style="font-size:20px;font-weight:700;color:var(--gold);flex-shrink:0">${m.result_home}–${m.result_away}</div>`
+        :`<div class="badge ${myP?'b-green':'b-amber'}" style="flex-shrink:0">${myP?'In':'Open'}</div>`;
+
+      html+=`<div class="mrow" id="mr_${m.id}" onclick="toggleMatchSheet('${m.id}')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div class="mteams">${m.home_flag} ${m.home} <span style="color:var(--muted);font-weight:400;font-size:13px">vs</span> ${m.away} ${m.away_flag}</div>
+          <div class="mmeta">₹${pot} pot · ${arr.length} predicted${metaPick}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">${rightHtml}${m.resolved?`<div class="badge b-gray">Settled</div>`:''}</div>
+      </div>`;
+
+      // Inline predict form only if open and not yet predicted
+      if(!m.resolved&&!myP){
+        html+=`<div id="pred-form-${m.id}" style="display:none;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:0 0 10px 10px;margin-top:-6px;padding:10px 12px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <input id="ph_${m.id}" type="number" min="0" max="20" placeholder="${m.home.slice(0,4)}" style="width:70px;margin:0" />
+            <div style="color:var(--muted)">–</div>
+            <input id="pa_${m.id}" type="number" min="0" max="20" placeholder="${m.away.slice(0,4)}" style="width:70px;margin:0" />
+            <button class="btn btn-gold btn-sm" style="width:auto;padding:7px 14px;margin:0" onclick="event.stopPropagation();submitPred('${m.id}')">Predict (₹${betFor(m)})</button>
+            <button class="btn btn-outline btn-sm" style="width:auto;padding:7px 10px;margin:0" onclick="event.stopPropagation();hidePredForm('${m.id}')">Cancel</button>
+          </div>
         </div>`;
       }
-    }
-    if(arr.length){
-      html+=`<div class="pred-list">`;
-      arr.forEach(p=>{
-        let tag='';
-        if(m.resolved){
-          const w=(m.resolved_winners||[]).includes(p.username);
-          tag=w&&m.resolved_type==='exact'?`<span class="rtag rt-exact">Exact</span>`:
-              w&&m.resolved_type==='outcome'?`<span class="rtag rt-outcome">Outcome</span>`:
-              m.resolved_type==='refund'&&w?`<span class="rtag rt-refund">Refund</span>`:
-              `<span class="rtag rt-wrong">Wrong</span>`;
-        }
-        html+=`<div class="pred-row"><span>${p.username}${p.username===ME.username?' <span style="color:var(--gold)">(you)</span>':''}</span><span>${p.pred_home}–${p.pred_away} ${tag}</span></div>`;
-      });
-      html+=`</div>`;
-    }
-    html+=`</div>`;
     }); // end matches.forEach
   }); // end byDate.forEach
   const el=document.getElementById('match-list');
   if(el)el.innerHTML=html||`<div class="empty">No matches in this group.</div>`;
 }
+
+let activeMatchId=null;
+function toggleMatchSheet(mid){
+  if(activeMatchId===mid){ closeMatchSheet(); return; }
+  activeMatchId=mid;
+  document.querySelectorAll('.mrow').forEach(r=>r.style.borderColor='');
+  const row=document.getElementById('mr_'+mid);
+  if(row) row.style.borderColor='rgba(212,160,23,.5)';
+  openMatchSheet(mid);
+}
+function closeMatchSheet(){
+  activeMatchId=null;
+  document.querySelectorAll('.mrow').forEach(r=>r.style.borderColor='');
+  document.getElementById('match-sheet').classList.remove('open');
+}
+function maybeCloseMatchSheet(e){ if(e.target.id==='match-sheet') closeMatchSheet(); }
+function hidePredForm(mid){ const el=document.getElementById('pred-form-'+mid); if(el)el.style.display='none'; }
+
+function openMatchSheet(mid){
+  const m=MATCHES.find(x=>x.id===mid); if(!m)return;
+  const arr=PREDS[mid]||[];
+  const myP=arr.find(p=>p.username===ME.username);
+  const pot=arr.length*betFor(m);
+  document.getElementById('ms-title').textContent=m.home+' vs '+m.away;
+
+  let html=`<div style="font-size:11px;color:var(--muted);margin-bottom:12px">${['R32','R16','QF','SF','Final'].includes(m.grp)?m.grp:'Group '+m.grp} · ${m.match_date}</div>`;
+
+  if(m.resolved){
+    html+=`<div style="text-align:center;padding:14px;background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.2);border-radius:10px;margin-bottom:12px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${m.home_flag} ${m.home} &nbsp;vs&nbsp; ${m.away} ${m.away_flag}</div>
+      <div style="font-size:30px;font-weight:700;color:var(--gold)">${m.result_home} – ${m.result_away}</div>
+    </div>`;
+  } else {
+    html+=`<div style="text-align:center;padding:12px;background:rgba(232,160,32,.08);border:1px solid rgba(232,160,32,.2);border-radius:10px;margin-bottom:12px;font-size:13px;color:var(--warn)">
+      ${m.home_flag} ${m.home} vs ${m.away} ${m.away_flag}<br><span style="font-size:11px;color:var(--muted)">Match not started</span>
+    </div>`;
+    // predict form inside sheet if not yet predicted
+    if(!myP){
+      html+=`<div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Your prediction (₹${betFor(m)})</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <input id="sh_ph_${mid}" type="number" min="0" max="20" placeholder="${m.home.slice(0,4)}" style="width:80px;margin:0" />
+          <div style="color:var(--muted)">–</div>
+          <input id="sh_pa_${mid}" type="number" min="0" max="20" placeholder="${m.away.slice(0,4)}" style="width:80px;margin:0" />
+          <button class="btn btn-gold btn-sm" style="width:auto;padding:8px 16px;margin:0" onclick="submitPredFromSheet('${mid}')">Predict</button>
+        </div>
+      </div>`;
+    } else {
+      html+=`<div style="font-size:13px;color:var(--muted);margin-bottom:12px">Your pick: <strong style="color:var(--text)">${myP.pred_home}–${myP.pred_away}</strong>
+        <span class="link" style="font-size:11px;margin-left:8px" onclick="cancelPredFromSheet('${mid}')">Change</span></div>`;
+    }
+  }
+
+  html+=`<div class="pot-strip">
+    <div class="pot-cell"><div class="pot-lbl">Pot</div><div class="pot-val">₹${pot}</div></div>
+    <div class="pot-cell"><div class="pot-lbl">Players</div><div class="pot-val">${arr.length}</div></div>
+    <div class="pot-cell"><div class="pot-lbl">Per winner</div><div class="pot-val">${m.resolved&&m.resolved_share?'₹'+m.resolved_share:'—'}</div></div>
+  </div>`;
+
+  if(arr.length){
+    html+=`<div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px;letter-spacing:.4px">Predictions</div>`;
+    arr.forEach(p=>{
+      const isMe=p.username===ME.username;
+      const won=(m.resolved_winners||[]).includes(p.username);
+      let tag='';
+      if(m.resolved){
+        tag=won&&m.resolved_type==='exact'?`<span class="rtag rt-exact">Exact</span>`:
+            won&&m.resolved_type==='outcome'?`<span class="rtag rt-outcome">Outcome</span>`:
+            m.resolved_type==='refund'&&won?`<span class="rtag rt-refund">Refund</span>`:
+            `<span class="rtag rt-wrong">Wrong</span>`;
+        if(won) tag+=`<span style="font-size:11px;color:var(--success);font-weight:600;margin-left:4px">+₹${m.resolved_share}</span>`;
+      }
+      html+=`<div class="pred-row">
+        <span style="color:var(--text)">${p.username}${isMe?` <span style="font-size:10px;color:var(--info)">(you)</span>`:''}</span>
+        <span style="display:flex;align-items:center;gap:6px"><span style="font-size:12px;color:var(--muted)">${p.pred_home}–${p.pred_away}</span>${tag}</span>
+      </div>`;
+    });
+  } else {
+    html+=`<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px 0">No predictions yet.</div>`;
+  }
+
+  document.getElementById('ms-body').innerHTML=html;
+  document.getElementById('match-sheet').classList.add('open');
+}
+
+async function submitPredFromSheet(mid){
+  const h=parseInt(document.getElementById('sh_ph_'+mid)?.value);
+  const a=parseInt(document.getElementById('sh_pa_'+mid)?.value);
+  if(isNaN(h)||isNaN(a)||h<0||a<0){toast('Enter valid scores');return;}
+  const {error}=await sb.from('predictions').insert({match_id:mid,username:ME.username,pred_home:h,pred_away:a});
+  if(error){toast('Error: '+error.message);return;}
+  if(!PREDS[mid])PREDS[mid]=[];
+  PREDS[mid]=PREDS[mid].filter(p=>p.username!==ME.username);
+  PREDS[mid].push({match_id:mid,username:ME.username,pred_home:h,pred_away:a});
+  toast('Prediction saved!');
+  closeMatchSheet();
+  renderMatchList(); renderDash(); renderLB();
+}
+
+async function cancelPredFromSheet(mid){
+  await sb.from('predictions').delete().eq('mid',mid).eq('username',ME.username);
+  if(PREDS[mid])PREDS[mid]=PREDS[mid].filter(p=>p.username!==ME.username);
+  closeMatchSheet();
+  renderMatchList(); renderDash();
+}
+
 
 async function submitPred(mid){
   const hEl=document.getElementById('ph_'+mid);
