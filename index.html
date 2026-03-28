@@ -492,12 +492,13 @@ function renderDash(){
   const wins=MATCHES.filter(m=>m.resolved&&(m.resolved_winners||[]).includes(ME.username)).length;
 
   const settledPlayed=MATCHES.filter(m=>m.resolved&&(PREDS[m.id]||[]).find(p=>p.username===ME.username));
-  let exact=0,outcomeW=0,wrong=0;
+  let exact=0,outcomeW=0,wrong=0,refunds=0;
   settledPlayed.forEach(m=>{
     const won=(m.resolved_winners||[]).includes(ME.username);
     if(m.resolved_type==='exact'&&won) exact++;
     else if(m.resolved_type==='outcome'&&won) outcomeW++;
-    else if(!(m.resolved_type==='refund'&&won)) wrong++;
+    else if(m.resolved_type==='refund'&&won) refunds++;
+    else wrong++;
   });
   const played=settledPlayed.length;
   const hitRate=played>0?Math.round(((exact+outcomeW)/played)*100):0;
@@ -519,22 +520,26 @@ function renderDash(){
       <div style="font-size:11px;color:var(--muted);margin-top:3px">${played>0?`${exact+outcomeW} of ${played} correct`:'No settled matches yet'}</div>
     </div>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px">
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:4px">
     <div class="scorecard-btn" onclick="showScorecardModal('exact')" style="background:rgba(76,175,80,.08);border:1px solid rgba(76,175,80,.2);border-radius:9px;padding:10px;text-align:center">
       <div style="font-size:20px;font-weight:700;color:var(--success)">${exact||'—'}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:3px">Exact scores</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">Exact</div>
     </div>
     <div class="scorecard-btn" onclick="showScorecardModal('outcome')" style="background:rgba(232,160,32,.08);border:1px solid rgba(232,160,32,.2);border-radius:9px;padding:10px;text-align:center">
       <div style="font-size:20px;font-weight:700;color:var(--warn)">${outcomeW||'—'}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:3px">Outcomes</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">Outcome</div>
     </div>
     <div class="scorecard-btn" onclick="showScorecardModal('wrong')" style="background:rgba(226,75,74,.08);border:1px solid rgba(226,75,74,.2);border-radius:9px;padding:10px;text-align:center">
       <div style="font-size:20px;font-weight:700;color:var(--red)">${wrong||'—'}</div>
       <div style="font-size:10px;color:var(--muted);margin-top:3px">Wrong</div>
     </div>
-    <div class="scorecard-btn" onclick="showScorecardModal('pots')" style="background:rgba(55,138,221,.08);border:1px solid rgba(55,138,221,.2);border-radius:9px;padding:10px;text-align:center">
-      <div style="font-size:20px;font-weight:700;color:var(--info)">${wins||'—'}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:3px">Pots won</div>
+    <div class="scorecard-btn" onclick="showScorecardModal('refund')" style="background:rgba(55,138,221,.08);border:1px solid rgba(55,138,221,.2);border-radius:9px;padding:10px;text-align:center">
+      <div style="font-size:20px;font-weight:700;color:var(--info)">${refunds||'—'}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">Refund</div>
+    </div>
+    <div class="scorecard-btn" onclick="showScorecardModal('played')" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:9px;padding:10px;text-align:center">
+      <div style="font-size:20px;font-weight:700;color:var(--text)">${played||'—'}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">Played</div>
     </div>
   </div>`;
   if(recent.length){
@@ -962,7 +967,7 @@ function renderAll(){ renderDash(); renderMatches(); renderLB(); renderLeague();
 //  SCORECARD MODAL
 // ════════════════════════════════════════════════════════════════
 function showScorecardModal(type){
-  const titles={exact:'Exact scores',outcome:'Correct outcomes',wrong:'Wrong predictions',pots:'Pots won'};
+  const titles={exact:'Exact scores',outcome:'Correct outcomes',wrong:'Wrong predictions',refund:'Refunds',played:'All predictions made'};
   const settled=MATCHES.filter(m=>m.resolved&&(PREDS[m.id]||[]).find(p=>p.username===ME.username));
   let matches=[];
   if(type==='exact'){
@@ -983,8 +988,13 @@ function showScorecardModal(type){
       const won=(m.resolved_winners||[]).includes(ME.username);
       return !won;
     });
-  } else if(type==='pots'){
-    matches=settled.filter(m=>(m.resolved_winners||[]).includes(ME.username));
+  } else if(type==='refund'){
+    matches=settled.filter(m=>{
+      const won=(m.resolved_winners||[]).includes(ME.username);
+      return m.resolved_type==='refund'&&won;
+    });
+  } else if(type==='played'){
+    matches=settled;
   }
 
   document.getElementById('modal-title').textContent=titles[type];
@@ -998,14 +1008,17 @@ function showScorecardModal(type){
     matches.forEach(m=>{
       const myP=(PREDS[m.id]||[]).find(p=>p.username===ME.username);
       const won=(m.resolved_winners||[]).includes(ME.username);
+      const won2=(m.resolved_winners||[]).includes(ME.username);
       let resultLine='';
       if(type==='exact') resultLine=`<span style="color:var(--success);font-weight:600">Exact! +₹${m.resolved_share}</span>`;
       else if(type==='outcome') resultLine=`<span style="color:var(--warn);font-weight:600">Outcome +₹${m.resolved_share}</span>`;
       else if(type==='wrong') resultLine=`<span style="color:var(--red)">No win</span>`;
-      else if(type==='pots'){
-        if(m.resolved_type==='exact') resultLine=`<span style="color:var(--success);font-weight:600">Exact +₹${m.resolved_share}</span>`;
-        else if(m.resolved_type==='outcome') resultLine=`<span style="color:var(--warn);font-weight:600">Outcome +₹${m.resolved_share}</span>`;
-        else resultLine=`<span style="color:var(--info)">Refund ₹${m.resolved_share}</span>`;
+      else if(type==='refund') resultLine=`<span style="color:var(--info)">Refund ₹${m.resolved_share}</span>`;
+      else if(type==='played'){
+        if(m.resolved_type==='exact'&&won2) resultLine=`<span style="color:var(--success);font-weight:600">Exact +₹${m.resolved_share}</span>`;
+        else if(m.resolved_type==='outcome'&&won2) resultLine=`<span style="color:var(--warn);font-weight:600">Outcome +₹${m.resolved_share}</span>`;
+        else if(m.resolved_type==='refund'&&won2) resultLine=`<span style="color:var(--info)">Refund ₹${m.resolved_share}</span>`;
+        else resultLine=`<span style="color:var(--red)">No win</span>`;
       }
       html+=`<div class="modal-row">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
