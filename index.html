@@ -94,7 +94,7 @@
   /* ── TABS ── */
   .tab-bar { display: flex; overflow-x: auto; border-bottom: 1px solid var(--border); background: rgba(15,26,15,.6); }
   .tab-bar::-webkit-scrollbar { display: none; }
-  .tab { padding: 10px 14px; font-size: 12px; font-weight: 500; color: var(--muted); cursor: pointer;
+  .tab { padding: 13px 16px; font-size: 14px; font-weight: 500; color: var(--muted); cursor: pointer;
     border-bottom: 2px solid transparent; white-space: nowrap; flex-shrink: 0; transition: color .15s; }
   .tab.on { color: var(--gold); border-bottom-color: var(--gold); }
 
@@ -845,7 +845,51 @@ function renderLB(){
   const sortedMembers=[...MEMBERS].sort((a,b)=>calcRoundStats(b.username).overall.pl-calcRoundStats(a.username).overall.pl);
   const activeRounds=ROUND_DEFS.filter(r=>MATCHES.some(m=>r.grps.includes(m.grp)&&m.resolved));
   const medals=['🥇','🥈','🥉'];
-  let html=`<div class="sec">${LEAGUE.name} <span style="font-size:13px;font-weight:400;color:var(--muted)">· ${MEMBERS.length} members</span></div>`;
+  let html=`<div class="sec">Standings <span style="font-size:13px;font-weight:400;color:var(--muted)">· ${LEAGUE.name} · ${MEMBERS.length} members</span></div>`;
+
+  // ── Highlights (always shown when there are settled matches) ──
+  {
+    const settledMatches=MATCHES.filter(m=>m.resolved);
+    if(settledMatches.length>0){
+      const playerStats=sortedMembers.map(u=>{
+        let exact=0,outcome_win=0,wrong=0,skipped=0,biggestWin=0,onStreak=0,streak=0;
+        settledMatches.forEach(m=>{
+          const myP=(PREDS[m.id]||[]).find(p=>p.username===u.username);
+          if(!myP){skipped++;return;}
+          const won=(m.resolved_winners||[]).includes(u.username);
+          if(m.resolved_type==='exact'&&won){exact++;onStreak++;streak=Math.max(streak,onStreak);if(m.resolved_share>biggestWin)biggestWin=m.resolved_share;}
+          else if(m.resolved_type==='outcome'&&won){outcome_win++;onStreak++;streak=Math.max(streak,onStreak);if(m.resolved_share>biggestWin)biggestWin=m.resolved_share;}
+          else if(m.resolved_type==='refund'&&won){onStreak++;}
+          else{wrong++;onStreak=0;}
+        });
+        return {u,exact,outcome_win,wrong,skipped,biggestWin,streak,participated:settledMatches.length-skipped};
+      });
+      const mostExact=playerStats.reduce((a,b)=>b.exact>a.exact?b:a,playerStats[0]);
+      const mostSkipped=playerStats.reduce((a,b)=>b.skipped>a.skipped?b:a,playerStats[0]);
+      const bigWinner=playerStats.reduce((a,b)=>b.biggestWin>a.biggestWin?b:a,playerStats[0]);
+      const bestStreak=playerStats.reduce((a,b)=>b.streak>a.streak?b:a,playerStats[0]);
+      const boldest=playerStats.reduce((a,b)=>b.participated>a.participated?b:a,playerStats[0]);
+      const badges=[];
+      if(mostExact.exact>0) badges.push({icon:'🎯',title:'Sharpshooter',desc:`${mostExact.u.username} · ${mostExact.exact} exact score${mostExact.exact!==1?'s':''}`});
+      if(bestStreak.streak>1) badges.push({icon:'🔥',title:'Hot streak',desc:`${bestStreak.u.username} · ${bestStreak.streak} wins in a row`});
+      if(bigWinner.biggestWin>0) badges.push({icon:'💰',title:'Biggest single win',desc:`${bigWinner.u.username} · ₹${bigWinner.biggestWin}`});
+      if(boldest.participated>0) badges.push({icon:'⚡',title:'Most active',desc:`${boldest.u.username} · ${boldest.participated} match${boldest.participated!==1?'es':''} predicted`});
+      if(mostSkipped.skipped>0) badges.push({icon:'👻',title:'Most matches skipped',desc:`${mostSkipped.u.username} · ${mostSkipped.skipped} skipped`});
+      if(badges.length){
+        html+=`<div class="sec">Highlights</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:14px">`;
+        badges.forEach(b=>{
+          html+=`<div class="card" style="padding:12px;text-align:center;margin:0">
+            <div style="font-size:24px;margin-bottom:4px">${b.icon}</div>
+            <div style="font-size:11px;font-weight:600;color:var(--gold);margin-bottom:2px">${b.title}</div>
+            <div style="font-size:11px;color:var(--muted)">${b.desc}</div>
+          </div>`;
+        });
+        html+=`</div>`;
+      }
+    }
+  }
+
 
   if(activeRounds.length===0){
     // No settled matches yet — show simple ranked list
@@ -959,33 +1003,6 @@ function renderLB(){
       </tr>`;
     });
     html+=`</tbody></table></div>`;
-
-    // ── Fun stat badges ──
-    const mostExact=playerStats.reduce((a,b)=>b.exact>a.exact?b:a,playerStats[0]);
-    const mostSkipped=playerStats.reduce((a,b)=>b.skipped>a.skipped?b:a,playerStats[0]);
-    const bigWinner=playerStats.reduce((a,b)=>b.biggestWin>a.biggestWin?b:a,playerStats[0]);
-    const bestStreak=playerStats.reduce((a,b)=>b.streak>a.streak?b:a,playerStats[0]);
-    const boldest=playerStats.reduce((a,b)=>b.participated>a.participated?b:a,playerStats[0]);
-
-    const badges=[];
-    if(mostExact.exact>0) badges.push({icon:'🎯',title:'Sharpshooter',desc:`${mostExact.u.username} · ${mostExact.exact} exact score${mostExact.exact!==1?'s':''}`});
-    if(bestStreak.streak>1) badges.push({icon:'🔥',title:'Hot streak',desc:`${bestStreak.u.username} · ${bestStreak.streak} wins in a row`});
-    if(bigWinner.biggestWin>0) badges.push({icon:'💰',title:'Biggest single win',desc:`${bigWinner.u.username} · ₹${bigWinner.biggestWin}`});
-    if(boldest.participated>0) badges.push({icon:'⚡',title:'Most active',desc:`${boldest.u.username} · ${boldest.participated} match${boldest.participated!==1?'es':''} predicted`});
-    if(mostSkipped.skipped>0) badges.push({icon:'👻',title:'Most matches skipped',desc:`${mostSkipped.u.username} · ${mostSkipped.skipped} skipped`});
-
-    if(badges.length){
-      html+=`<div class="sec">Highlights</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-bottom:14px">`;
-      badges.forEach(b=>{
-        html+=`<div class="card" style="padding:12px;text-align:center;margin:0">
-          <div style="font-size:24px;margin-bottom:4px">${b.icon}</div>
-          <div style="font-size:11px;font-weight:600;color:var(--gold);margin-bottom:2px">${b.title}</div>
-          <div style="font-size:11px;color:var(--muted)">${b.desc}</div>
-        </div>`;
-      });
-      html+=`</div>`;
-    }
 
     // ── Match that caused the most controversy (biggest score variance in predictions) ──
     let hotMatch=null, hotVar=0;
