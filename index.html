@@ -239,6 +239,7 @@
     <div class="tab on"  onclick="goTab('dash')">Dashboard</div>
     <div class="tab"     onclick="goTab('matches')">Matches</div>
     <div class="tab"     onclick="goTab('lb')">Leaderboard</div>
+    <div class="tab"     onclick="goTab('groups')">Groups</div>
     <div class="tab"     onclick="goTab('league')">League</div>
     <div class="tab"     onclick="goTab('admin')">Admin</div>
   </div>
@@ -247,6 +248,7 @@
   <div id="pane-dash"    class="pane on"><div class="loading"><div class="spinner"></div></div></div>
   <div id="pane-matches" class="pane"><div class="loading"><div class="spinner"></div></div></div>
   <div id="pane-lb"      class="pane"><div class="loading"><div class="spinner"></div></div></div>
+  <div id="pane-groups"  class="pane"><div class="loading"><div class="spinner"></div></div></div>
   <div id="pane-league"  class="pane"><div class="loading"><div class="spinner"></div></div></div>
   <div id="pane-admin"   class="pane"><div class="loading"><div class="spinner"></div></div></div>
 <!-- SCORECARD MODAL -->
@@ -454,13 +456,14 @@ async function refreshMe(){
 
 // ── Tab routing ────────────────────────────────────────────────
 function goTab(t){
-  const names=['howto','dash','matches','lb','league','admin'];
+  const names=['howto','dash','matches','lb','groups','league','admin'];
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('on',names[i]===t));
   document.querySelectorAll('.pane').forEach((el,i)=>el.classList.toggle('on',names[i]===t));
   if(t==='dash')renderDash();
   if(t==='matches')renderMatches();
   if(t==='lb')renderLB();
   if(t==='league')renderLeague();
+  if(t==='groups')renderGroups();
   if(t==='howto')renderHowTo();
   if(t==='admin')renderAdmin();
 }
@@ -1101,7 +1104,7 @@ async function joinLeague(){
   setTimeout(async()=>{await loadAll();renderAll();},1200);
 }
 
-function renderAll(){ renderDash(); renderMatches(); renderLB(); renderLeague(); renderAdmin(); }
+function renderAll(){ renderDash(); renderMatches(); renderLB(); renderGroups(); renderLeague(); renderAdmin(); }
 
 // ════════════════════════════════════════════════════════════════
 //  SCORECARD MODAL
@@ -1282,6 +1285,153 @@ function renderHowTo(){
     <div style="font-size:12px;color:var(--muted)">Go to the League tab and tap "Copy invite link". Share it on WhatsApp — friends land directly on the sign-up form with your league pre-filled.</div>
   </div>
   `;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  GROUPS — live standings computed from Supabase match results
+// ════════════════════════════════════════════════════════════════
+let groupsLastFetched = 0;
+async function renderGroups(){
+  const el = document.getElementById('pane-groups');
+  const now = Date.now();
+  // Refresh from DB if stale (>5 min) or never loaded
+  if(now - groupsLastFetched > 5 * 60 * 1000){
+    const {data:freshMatches} = await sb.from('matches').select('*');
+    if(freshMatches) MATCHES = freshMatches.sort((a,b)=>{
+      const mo={Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
+      function dk(d){if(!d||d==='TBD')return 9999;const p=d.trim().split(' ');return(mo[p[0]]||0)*100+(parseInt(p[1])||0);}
+      return dk(a.match_date)-dk(b.match_date);
+    });
+    groupsLastFetched = now;
+  }
+
+  const GROUP_TEAMS = {
+    A:['Mexico','South Africa','South Korea','UEFA Play-off D'],
+    B:['Canada','UEFA Play-off A','Qatar','Switzerland'],
+    C:['Brazil','Morocco','Haiti','Scotland'],
+    D:['USA','Paraguay','Australia','UEFA Play-off C'],
+    E:['Germany','Curaçao','Ivory Coast','Ecuador'],
+    F:['Netherlands','Japan','Tunisia','UEFA Play-off B'],
+    G:['Belgium','Egypt','Iran','New Zealand'],
+    H:['Spain','Cabo Verde','Saudi Arabia','Uruguay'],
+    I:['France','Senegal','Norway','CONMEBOL Play-off'],
+    J:['Argentina','Algeria','Austria','Jordan'],
+    K:['Portugal','Uzbekistan','Colombia','IC Play-off'],
+    L:['England','Croatia','Ghana','Panama'],
+  };
+
+  const FLAGS = {
+    'Mexico':'🇲🇽','South Africa':'🇿🇦','South Korea':'🇰🇷',
+    'Canada':'🇨🇦','Qatar':'🇶🇦','Switzerland':'🇨🇭',
+    'Brazil':'🇧🇷','Morocco':'🇲🇦','Haiti':'🇭🇹','Scotland':'🏴󠁧󠁢󠁳󠁣󠁴󠁿',
+    'USA':'🇺🇸','Paraguay':'🇵🇾','Australia':'🇦🇺',
+    'Germany':'🇩🇪','Ivory Coast':'🇨🇮','Ecuador':'🇪🇨',
+    'Netherlands':'🇳🇱','Japan':'🇯🇵','Tunisia':'🇹🇳',
+    'Belgium':'🇧🇪','Egypt':'🇪🇬','Iran':'🇮🇷','New Zealand':'🇳🇿',
+    'Spain':'🇪🇸','Cabo Verde':'🇨🇻','Saudi Arabia':'🇸🇦','Uruguay':'🇺🇾',
+    'France':'🇫🇷','Senegal':'🇸🇳','Norway':'🇳🇴',
+    'Argentina':'🇦🇷','Algeria':'🇩🇿','Austria':'🇦🇹','Jordan':'🇯🇴',
+    'Portugal':'🇵🇹','Uzbekistan':'🇺🇿','Colombia':'🇨🇴',
+    'England':'🏴󠁧󠁢󠁥󠁮󠁧󠁿','Croatia':'🇭🇷','Ghana':'🇬🇭','Panama':'🇵🇦',
+    'Curaçao':'🌍','UEFA Play-off A':'🌍','UEFA Play-off B':'🌍',
+    'UEFA Play-off C':'🌍','UEFA Play-off D':'🌍',
+    'CONMEBOL Play-off':'🌍','IC Play-off':'🌍',
+  };
+
+  // Build standings from settled matches
+  function getGroupStandings(grpLetter, teams){
+    const stats = {};
+    teams.forEach(t=>{ stats[t]={mp:0,w:0,d:0,l:0,gf:0,ga:0,pts:0}; });
+
+    const grpMatches = MATCHES.filter(m=>m.grp===grpLetter && m.resolved && m.result_home!=null);
+    grpMatches.forEach(m=>{
+      const h=m.home, a=m.away, gh=m.result_home, ga=m.result_away;
+      if(!stats[h]||!stats[a]) return;
+      stats[h].mp++; stats[a].mp++;
+      stats[h].gf+=gh; stats[h].ga+=ga;
+      stats[a].gf+=ga; stats[a].ga+=gh;
+      if(gh>ga){ stats[h].w++; stats[h].pts+=3; stats[a].l++; }
+      else if(gh<ga){ stats[a].w++; stats[a].pts+=3; stats[h].l++; }
+      else { stats[h].d++; stats[h].pts+=1; stats[a].d++; stats[a].pts+=1; }
+    });
+
+    return teams.map(t=>({name:t,...stats[t]}))
+      .sort((a,b)=>b.pts-a.pts||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf);
+  }
+
+  const lastRefresh = new Date(groupsLastFetched).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const groups = Object.keys(GROUP_TEAMS);
+  const activeFilter = window._groupFilter||'All';
+
+  let html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+    <div class="sec" style="margin:0;border:none;padding:0">Group Standings</div>
+    <button onclick="refreshGroups()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:11px;color:var(--muted);cursor:pointer">↻ Refresh</button>
+  </div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:14px">Last updated: ${lastRefresh} &nbsp;·&nbsp; Auto-refreshes every 5 min</div>`;
+
+  // Group filter chips
+  html+=`<div class="filter-bar" style="margin-bottom:14px">
+    <div class="fchip${activeFilter==='All'?' on':''}" onclick="setGroupFilter('All')">All</div>`;
+  groups.forEach(g=>{ html+=`<div class="fchip${activeFilter===g?' on':''}" onclick="setGroupFilter('${g}')">Grp ${g}</div>`; });
+  html+=`</div>`;
+
+  const toShow = activeFilter==='All'?groups:[activeFilter];
+
+  toShow.forEach(g=>{
+    const standings = getGroupStandings(g, GROUP_TEAMS[g]);
+    const hasGames = standings.some(t=>t.mp>0);
+    html+=`<div class="sec">Group ${g}</div>
+    <div style="overflow-x:auto;border-radius:12px;border:1px solid var(--border);margin-bottom:4px">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:360px">
+      <thead>
+        <tr style="background:rgba(255,255,255,.04)">
+          <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);width:28px">#</th>
+          <th style="padding:8px 8px;text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Team</th>
+          <th style="padding:8px 8px;text-align:center;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">MP</th>
+          <th style="padding:8px 8px;text-align:center;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">W</th>
+          <th style="padding:8px 8px;text-align:center;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">D</th>
+          <th style="padding:8px 8px;text-align:center;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">L</th>
+          <th style="padding:8px 8px;text-align:center;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">GD</th>
+          <th style="padding:8px 10px;text-align:center;color:var(--gold);font-weight:700;border-bottom:1px solid var(--border)">Pts</th>
+        </tr>
+      </thead>
+      <tbody>`;
+    standings.forEach((t,i)=>{
+      const qualify = i<2; // top 2 guaranteed, 3rd may qualify
+      const third = i===2;
+      const rowBg = qualify?'background:rgba(76,175,80,.06)':third?'background:rgba(55,138,221,.04)':'';
+      const gd = t.gf-t.ga;
+      html+=`<tr style="${rowBg}${i%2===1&&!qualify&&!third?'background:rgba(255,255,255,.015)':''}">
+        <td style="padding:10px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px">${i+1}</td>
+        <td style="padding:10px 8px;border-bottom:1px solid var(--border);font-weight:${qualify?'700':'500'}">
+          <span style="margin-right:6px">${FLAGS[t.name]||'🏳️'}</span>${t.name}
+          ${qualify?'<span style="font-size:9px;color:var(--success);margin-left:4px">Q</span>':''}
+        </td>
+        <td style="padding:10px 8px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted)">${t.mp}</td>
+        <td style="padding:10px 8px;text-align:center;border-bottom:1px solid var(--border);color:${t.w>0?'var(--success)':'var(--muted)'};font-weight:${t.w>0?700:400}">${t.w}</td>
+        <td style="padding:10px 8px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted)">${t.d}</td>
+        <td style="padding:10px 8px;text-align:center;border-bottom:1px solid var(--border);color:${t.l>0?'var(--red)':'var(--muted)'}">${t.l}</td>
+        <td style="padding:10px 8px;text-align:center;border-bottom:1px solid var(--border);color:${gd>0?'var(--success)':gd<0?'var(--red)':'var(--muted)'}">${gd>0?'+':''}${gd}</td>
+        <td style="padding:10px 10px;text-align:center;border-bottom:1px solid var(--border);font-weight:700;font-size:15px;color:${qualify?'var(--gold)':'var(--text)'}">${t.pts}</td>
+      </tr>`;
+    });
+    html+=`</tbody></table></div>`;
+    if(!hasGames){ html+=`<div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:14px;margin-top:-2px">No matches played yet</div>`; }
+    else { html+=`<div style="font-size:10px;color:var(--muted);margin-bottom:16px;padding-left:2px"><span style="color:var(--success)">■</span> Qualified &nbsp; <span style="color:var(--info)">■</span> 3rd place (may advance)</div>`; }
+  });
+
+  el.innerHTML = html;
+}
+
+async function refreshGroups(){
+  groupsLastFetched = 0; // force refresh
+  await renderGroups();
+  toast('Group standings refreshed!');
+}
+
+function setGroupFilter(f){
+  window._groupFilter = f;
+  renderGroups();
 }
 
 // ════════════════════════════════════════════════════════════════
