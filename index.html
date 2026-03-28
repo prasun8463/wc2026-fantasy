@@ -845,7 +845,7 @@ function renderLB(){
   const sortedMembers=[...MEMBERS].sort((a,b)=>calcRoundStats(b.username).overall.pl-calcRoundStats(a.username).overall.pl);
   const activeRounds=ROUND_DEFS.filter(r=>MATCHES.some(m=>r.grps.includes(m.grp)&&m.resolved));
   const medals=['🥇','🥈','🥉'];
-  let html=`<div class="sec">Standings <span style="font-size:13px;font-weight:400;color:var(--muted)">· ${LEAGUE.name} · ${MEMBERS.length} members</span></div>`;
+  let html='';
 
   // ── Highlights (always shown when there are settled matches) ──
   {
@@ -890,6 +890,8 @@ function renderLB(){
     }
   }
 
+
+  html+=`<div class="sec">Standings <span style="font-size:13px;font-weight:400;color:var(--muted)">· ${LEAGUE.name} · ${MEMBERS.length} members</span></div>`;
 
   if(activeRounds.length===0){
     // No settled matches yet — show simple ranked list
@@ -974,7 +976,7 @@ function renderLB(){
     });
 
     // ── Accuracy table ──
-    html+=`<div class="sec" style="margin-top:20px">Prediction accuracy</div>
+    html+=`<div class="sec">Prediction accuracy</div>
     <div style="overflow-x:auto;border-radius:12px;border:1px solid var(--border);margin-bottom:14px">
     <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:420px">
       <thead>
@@ -1015,7 +1017,7 @@ function renderLB(){
     });
     if(hotMatch){
       const preds=PREDS[hotMatch.id]||[];
-      html+=`<div class="sec">Most contested match</div>
+      html+=`<div class="sec">Most debated match</div>
       <div class="card">
         <div style="font-weight:600;font-size:13px;margin-bottom:6px">${hotMatch.home_flag}${hotMatch.home} ${hotMatch.result_home}–${hotMatch.result_away} ${hotMatch.away}${hotMatch.away_flag}</div>
         <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Everyone predicted differently — ${preds.length} different predictions</div>
