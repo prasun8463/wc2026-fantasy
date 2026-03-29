@@ -819,194 +819,146 @@ async function cancelPred(mid){
 function renderLB(){
   if(!LEAGUE){document.getElementById('pane-lb').innerHTML='<div class="empty">Not in a league yet.</div>';return;}
   const sortedMembers=[...MEMBERS].sort((a,b)=>calcRoundStats(b.username).overall.pl-calcRoundStats(a.username).overall.pl);
-  const activeRounds=ROUND_DEFS.filter(r=>MATCHES.some(m=>r.grps.includes(m.grp)&&m.resolved));
   const medals=['🥇','🥈','🥉'];
-  let html='';
+  const settledMatches=MATCHES.filter(m=>m.resolved);
 
-  // ── Highlights (always shown when there are settled matches) ──
-  {
-    const settledMatches=MATCHES.filter(m=>m.resolved);
-    if(settledMatches.length>0){
-      const playerStats=sortedMembers.map(u=>{
-        let exact=0,outcome_win=0,wrong=0,skipped=0,biggestWin=0,onStreak=0,streak=0;
-        settledMatches.forEach(m=>{
-          const myP=(PREDS[m.id]||[]).find(p=>p.username===u.username);
-          if(!myP){skipped++;return;}
-          const won=(m.resolved_winners||[]).includes(u.username);
-          if(m.resolved_type==='exact'&&won){exact++;onStreak++;streak=Math.max(streak,onStreak);if(m.resolved_share>biggestWin)biggestWin=m.resolved_share;}
-          else if(m.resolved_type==='outcome'&&won){outcome_win++;onStreak++;streak=Math.max(streak,onStreak);if(m.resolved_share>biggestWin)biggestWin=m.resolved_share;}
-          else if(m.resolved_type==='refund'&&won){onStreak++;}
-          else{wrong++;onStreak=0;}
-        });
-        return {u,exact,outcome_win,wrong,skipped,biggestWin,streak,participated:settledMatches.length-skipped};
+  // ── Compute per-player stats (used by both standings and accuracy) ──
+  const playerStats=sortedMembers.map(u=>{
+    let exact=0,outcome_win=0,wrong=0,participated=0,skipped=0,biggestWin=0,onStreak=0,streak=0;
+    settledMatches.forEach(m=>{
+      const myP=(PREDS[m.id]||[]).find(p=>p.username===u.username);
+      if(!myP){skipped++;return;}
+      participated++;
+      const won=(m.resolved_winners||[]).includes(u.username);
+      if(m.resolved_type==='exact'&&won){exact++;onStreak++;streak=Math.max(streak,onStreak);if(m.resolved_share>biggestWin)biggestWin=m.resolved_share;}
+      else if(m.resolved_type==='outcome'&&won){outcome_win++;onStreak++;streak=Math.max(streak,onStreak);if(m.resolved_share>biggestWin)biggestWin=m.resolved_share;}
+      else if(m.resolved_type==='refund'&&won){onStreak++;}
+      else{wrong++;onStreak=0;}
+    });
+    const acc=participated>0?Math.round(((exact+outcome_win)/participated)*100):0;
+    return {u,exact,outcome_win,wrong,participated,skipped,acc,biggestWin,streak};
+  });
+
+  // ── Build highlights badges ──
+  let highlightsHtml='';
+  if(settledMatches.length>0&&playerStats.length>0){
+    const mostExact=playerStats.reduce((a,b)=>b.exact>a.exact?b:a,playerStats[0]);
+    const mostSkipped=playerStats.reduce((a,b)=>b.skipped>a.skipped?b:a,playerStats[0]);
+    const bigWinner=playerStats.reduce((a,b)=>b.biggestWin>a.biggestWin?b:a,playerStats[0]);
+    const bestStreak=playerStats.reduce((a,b)=>b.streak>a.streak?b:a,playerStats[0]);
+    const boldest=playerStats.reduce((a,b)=>b.participated>a.participated?b:a,playerStats[0]);
+    const badges=[];
+    if(mostExact.exact>0) badges.push({icon:'🎯',title:'Sharpshooter',desc:`${mostExact.u.username}<br>${mostExact.exact} exact score${mostExact.exact!==1?'s':''}`});
+    if(bestStreak.streak>1) badges.push({icon:'🔥',title:'Hot streak',desc:`${bestStreak.u.username}<br>${bestStreak.streak} wins in a row`});
+    if(bigWinner.biggestWin>0) badges.push({icon:'💰',title:'Biggest win',desc:`${bigWinner.u.username}<br>₹${bigWinner.biggestWin}`});
+    if(boldest.participated>0) badges.push({icon:'⚡',title:'Most active',desc:`${boldest.u.username}<br>${boldest.participated} match${boldest.participated!==1?'es':''}`});
+    if(mostSkipped.skipped>0) badges.push({icon:'👻',title:'Most skipped',desc:`${mostSkipped.u.username}<br>${mostSkipped.skipped} skipped`});
+    if(badges.length){
+      highlightsHtml+=`<div class="sec">Highlights</div>`;
+      badges.forEach(b=>{
+        highlightsHtml+=`<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:11px;text-align:center;margin-bottom:6px">
+          <div style="font-size:20px;margin-bottom:4px">${b.icon}</div>
+          <div style="font-size:10px;font-weight:700;color:var(--gold);margin-bottom:3px">${b.title}</div>
+          <div style="font-size:10px;color:var(--muted);line-height:1.4">${b.desc}</div>
+        </div>`;
       });
-      const mostExact=playerStats.reduce((a,b)=>b.exact>a.exact?b:a,playerStats[0]);
-      const mostSkipped=playerStats.reduce((a,b)=>b.skipped>a.skipped?b:a,playerStats[0]);
-      const bigWinner=playerStats.reduce((a,b)=>b.biggestWin>a.biggestWin?b:a,playerStats[0]);
-      const bestStreak=playerStats.reduce((a,b)=>b.streak>a.streak?b:a,playerStats[0]);
-      const boldest=playerStats.reduce((a,b)=>b.participated>a.participated?b:a,playerStats[0]);
-      const badges=[];
-      if(mostExact.exact>0) badges.push({icon:'🎯',title:'Sharpshooter',desc:`${mostExact.u.username} · ${mostExact.exact} exact score${mostExact.exact!==1?'s':''}`});
-      if(bestStreak.streak>1) badges.push({icon:'🔥',title:'Hot streak',desc:`${bestStreak.u.username} · ${bestStreak.streak} wins in a row`});
-      if(bigWinner.biggestWin>0) badges.push({icon:'💰',title:'Biggest single win',desc:`${bigWinner.u.username} · ₹${bigWinner.biggestWin}`});
-      if(boldest.participated>0) badges.push({icon:'⚡',title:'Most active',desc:`${boldest.u.username} · ${boldest.participated} match${boldest.participated!==1?'es':''} predicted`});
-      if(mostSkipped.skipped>0) badges.push({icon:'👻',title:'Most matches skipped',desc:`${mostSkipped.u.username} · ${mostSkipped.skipped} skipped`});
-      if(badges.length){
-        html+=`<div class="sec">Highlights</div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:14px">`;
-        badges.forEach(b=>{
-          html+=`<div class="card" style="padding:12px;text-align:center;margin:0">
-            <div style="font-size:24px;margin-bottom:4px">${b.icon}</div>
-            <div style="font-size:11px;font-weight:600;color:var(--gold);margin-bottom:2px">${b.title}</div>
-            <div style="font-size:11px;color:var(--muted)">${b.desc}</div>
-          </div>`;
-        });
-        html+=`</div>`;
-      }
     }
   }
 
-
-  html+=`<div class="sec">Standings <span style="font-size:13px;font-weight:400;color:var(--muted)">· ${LEAGUE.name} · ${MEMBERS.length} members</span></div>`;
-
-  if(activeRounds.length===0){
-    // No settled matches yet — show simple ranked list
-    html+=`<div class="card" style="text-align:center;color:var(--muted);font-size:13px;padding:20px">No settled matches yet — standings will appear once results are in.</div>`;
+  // ── Build standings html ──
+  let standingsHtml=`<div class="sec">Standings <span style="font-size:12px;font-weight:400;color:var(--muted)">· ${LEAGUE.name} · ${MEMBERS.length} members</span></div>`;
+  if(settledMatches.length===0){
+    standingsHtml+=`<div class="card" style="text-align:center;color:var(--muted);font-size:13px;padding:20px">No settled matches yet.</div>`;
     sortedMembers.forEach((u,i)=>{
       const isMe=u.username===ME.username;
       const pc=Object.values(PREDS).filter(arr=>arr.find(p=>p.username===u.username)).length;
-      html+=`<div class="lb-row${isMe?' me-row':''}">
-        <div class="lb-rank">${i<3?medals[i]:i+1}</div>
-        <div class="av" style="background:${avc(u.username)};width:38px;height:38px;font-size:13px;flex-shrink:0">${ini(u.username)}</div>
-        <div class="lb-info">
-          <div class="lb-name">${u.username}${isMe?' <span style="font-size:10px;color:var(--info)">(you)</span>':''}</div>
-          <div class="lb-sub">${pc} predictions made</div>
+      standingsHtml+=`<div style="background:${isMe?'rgba(55,138,221,.08)':'var(--card)'};border:1px solid ${isMe?'rgba(55,138,221,.3)':'var(--border)'};${isMe?'border-left:3px solid var(--info);':''}border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:6px">
+        <div style="font-size:${i<3?20:14}px;font-weight:700;color:var(--muted);width:26px;text-align:center">${i<3?medals[i]:i+1}</div>
+        <div class="av" style="background:${avc(u.username)};width:38px;height:38px;font-size:13px">${ini(u.username)}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:700;color:${isMe?'var(--info)':'var(--text)'}">${u.username}${isMe?' <span style="font-size:10px;color:var(--muted)">(you)</span>':''}</div>
+          <div style="font-size:11px;color:var(--muted)">${pc} predictions</div>
         </div>
       </div>`;
     });
   } else {
-    html+=`<div style="overflow-x:auto;border-radius:12px;border:1px solid var(--border)">
-    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:480px">
-      <thead>
-        <tr style="background:rgba(255,255,255,.05)">
-          <th style="padding:10px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">#</th>
-          <th style="padding:10px 8px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Player</th>`;
-    activeRounds.forEach(r=>{
-      html+=`<th colspan="2" style="padding:10px 6px;text-align:center;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);border-left:1px solid var(--border);white-space:nowrap">${r.label}</th>`;
-    });
-    html+=`<th colspan="3" style="padding:10px 6px;text-align:center;color:var(--gold);font-weight:700;border-bottom:1px solid var(--border);border-left:2px solid rgba(212,160,23,.3);white-space:nowrap">Overall</th>
-        </tr>
-        <tr style="background:rgba(255,255,255,.02)">
-          <th style="border-bottom:1px solid var(--border)"></th>
-          <th style="border-bottom:1px solid var(--border)"></th>`;
-    activeRounds.forEach(()=>{
-      html+=`<th style="padding:4px 6px;text-align:right;color:var(--muted);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);border-left:1px solid var(--border)">Bet</th>
-             <th style="padding:4px 6px;text-align:right;color:var(--muted);font-weight:500;font-size:11px;border-bottom:1px solid var(--border)">Won</th>`;
-    });
-    html+=`<th style="padding:4px 6px;text-align:right;color:var(--muted);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);border-left:2px solid rgba(212,160,23,.3)">Bet</th>
-           <th style="padding:4px 6px;text-align:right;color:var(--muted);font-weight:500;font-size:11px;border-bottom:1px solid var(--border)">Won</th>
-           <th style="padding:4px 6px;text-align:right;color:var(--gold);font-weight:700;font-size:11px;border-bottom:1px solid var(--border)">P/L</th>
-        </tr>
-      </thead>
-      <tbody>`;
     sortedMembers.forEach((u,i)=>{
-      const s=calcRoundStats(u.username);
       const isMe=u.username===ME.username;
-      html+=`<tr style="${isMe?'background:rgba(55,138,221,.1)':i%2===1?'background:rgba(255,255,255,.02)':''}">
-        <td style="padding:9px 12px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted)">${i<3?medals[i]:i+1}</td>
-        <td style="padding:9px 8px;font-weight:${isMe?'600':'400'};border-bottom:1px solid var(--border);white-space:nowrap">
-          ${isMe?'<span style="color:var(--info)">':''}${u.username}${isMe?'</span>':''}
-        </td>`;
-      activeRounds.forEach(r=>{
-        const rs=s[r.key];
-        html+=`<td style="padding:9px 6px;text-align:right;border-bottom:1px solid var(--border);border-left:1px solid var(--border);color:var(--muted)">${rs.bet||'—'}</td>
-               <td style="padding:9px 6px;text-align:right;border-bottom:1px solid var(--border);color:${rs.won>0?'var(--success)':'var(--muted)'};font-weight:${rs.won>0?600:400}">${rs.won||'—'}</td>`;
-      });
-      const ov=s.overall;
-      html+=`<td style="padding:9px 6px;text-align:right;border-bottom:1px solid var(--border);border-left:2px solid rgba(212,160,23,.3);color:var(--muted)">${ov.bet||'—'}</td>
-             <td style="padding:9px 6px;text-align:right;border-bottom:1px solid var(--border);color:${ov.won>0?'var(--success)':'var(--muted)'};font-weight:${ov.won>0?600:400}">${ov.won||'—'}</td>
-             <td style="padding:9px 6px;text-align:right;border-bottom:1px solid var(--border);color:${plColor(ov.pl)};font-weight:700">${fmtPL(ov.pl)}</td>
-      </tr>`;
+      const s=calcRoundStats(u.username);
+      const ps=playerStats.find(p=>p.u.username===u.username)||{participated:0,acc:0};
+      standingsHtml+=`<div style="background:${isMe?'rgba(55,138,221,.08)':'var(--card)'};border:1px solid ${isMe?'rgba(55,138,221,.3)':'var(--border)'};${isMe?'border-left:3px solid var(--info);':''}border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:6px">
+        <div style="font-size:${i<3?20:14}px;font-weight:700;color:var(--muted);width:26px;text-align:center;flex-shrink:0">${i<3?medals[i]:i+1}</div>
+        <div class="av" style="background:${avc(u.username)};width:38px;height:38px;font-size:13px;flex-shrink:0">${ini(u.username)}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:700;color:${isMe?'var(--info)':'var(--text)'}">${u.username}${isMe?' <span style="font-size:10px;color:var(--muted)">(you)</span>':''}</div>
+          <div style="font-size:11px;color:var(--muted)">${ps.participated} played · ${ps.participated>0?ps.acc+'% hit':'no data'}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:17px;font-weight:700;color:${plColor(s.overall.pl)}">${fmtPL(s.overall.pl)}</div>
+        </div>
+      </div>`;
     });
-    html+=`</tbody></table></div>`;
   }
 
-  // ── Per-player accuracy stats ──────────────────────────────
-  const settledMatches=MATCHES.filter(m=>m.resolved);
+  // ── Build accuracy html ──
+  let accuracyHtml='';
   if(settledMatches.length>0){
-    // Build per-player stats
-    const playerStats=sortedMembers.map(u=>{
-      let exact=0, outcome_win=0, wrong=0, participated=0, skipped=0, biggestWin=0, onStreak=0, streak=0;
-      settledMatches.forEach(m=>{
-        const myP=(PREDS[m.id]||[]).find(p=>p.username===u.username);
-        if(!myP){skipped++;return;}
-        participated++;
-        const won=(m.resolved_winners||[]).includes(u.username);
-        if(m.resolved_type==='exact'&&won){exact++;onStreak++;streak=Math.max(streak,onStreak);if(m.resolved_share>biggestWin)biggestWin=m.resolved_share;}
-        else if(m.resolved_type==='outcome'&&won){outcome_win++;onStreak++;streak=Math.max(streak,onStreak);if(m.resolved_share>biggestWin)biggestWin=m.resolved_share;}
-        else if(m.resolved_type==='refund'&&won){onStreak++;}
-        else{wrong++;onStreak=0;}
-      });
-      const acc=participated>0?Math.round(((exact+outcome_win)/participated)*100):0;
-      return {u,exact,outcome_win,wrong,participated,skipped,acc,biggestWin,streak};
-    });
-
-    // ── Accuracy table ──
-    html+=`<div class="sec">Prediction accuracy</div>
-    <div style="overflow-x:auto;border-radius:12px;border:1px solid var(--border);margin-bottom:14px">
-    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:420px">
-      <thead>
-        <tr style="background:rgba(255,255,255,.05)">
-          <th style="padding:9px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Player</th>
-          <th style="padding:9px 8px;text-align:center;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Played</th>
-          <th style="padding:9px 8px;text-align:center;color:var(--success);font-weight:600;border-bottom:1px solid var(--border)">Exact</th>
-          <th style="padding:9px 8px;text-align:center;color:var(--warn);font-weight:600;border-bottom:1px solid var(--border)">Outcome</th>
-          <th style="padding:9px 8px;text-align:center;color:var(--red);font-weight:600;border-bottom:1px solid var(--border)">Wrong</th>
-          <th style="padding:9px 8px;text-align:center;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Skipped</th>
-          <th style="padding:9px 8px;text-align:center;color:var(--gold);font-weight:700;border-bottom:1px solid var(--border)">Hit %</th>
-        </tr>
-      </thead>
-      <tbody>`;
     const accSorted=[...playerStats].sort((a,b)=>b.acc-a.acc);
+    accuracyHtml+=`<div class="sec" style="margin-top:16px">Prediction accuracy</div>
+    <div style="border-radius:10px;border:1px solid var(--border);overflow:hidden">
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:rgba(255,255,255,.04)">
+        <th style="padding:9px 12px;text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Player</th>
+        <th style="padding:9px 6px;text-align:center;color:var(--success);font-weight:600;border-bottom:1px solid var(--border)">Exact</th>
+        <th style="padding:9px 6px;text-align:center;color:var(--warn);font-weight:600;border-bottom:1px solid var(--border)">Out</th>
+        <th style="padding:9px 6px;text-align:center;color:var(--red);font-weight:600;border-bottom:1px solid var(--border)">Wrong</th>
+        <th style="padding:9px 6px;text-align:center;color:var(--info);font-weight:600;border-bottom:1px solid var(--border)">Ref</th>
+        <th style="padding:9px 8px;text-align:center;color:var(--gold);font-weight:700;border-bottom:1px solid var(--border)">Hit%</th>
+      </tr></thead>
+      <tbody>`;
     accSorted.forEach((s,i)=>{
       const isMe=s.u.username===ME.username;
-      html+=`<tr style="${isMe?'background:rgba(55,138,221,.1)':i%2===1?'background:rgba(255,255,255,.02)':''}">
-        <td style="padding:8px 12px;font-weight:${isMe?600:400};border-bottom:1px solid var(--border);white-space:nowrap">${isMe?'<span style="color:var(--info)">':''}${s.u.username}${isMe?'</span>':''}</td>
-        <td style="padding:8px 8px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted)">${s.participated}</td>
-        <td style="padding:8px 8px;text-align:center;border-bottom:1px solid var(--border);color:var(--success);font-weight:${s.exact>0?600:400}">${s.exact||'—'}</td>
-        <td style="padding:8px 8px;text-align:center;border-bottom:1px solid var(--border);color:var(--warn);font-weight:${s.outcome_win>0?600:400}">${s.outcome_win||'—'}</td>
-        <td style="padding:8px 8px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted)">${s.wrong||'—'}</td>
-        <td style="padding:8px 8px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted)">${s.skipped||'—'}</td>
-        <td style="padding:8px 8px;text-align:center;border-bottom:1px solid var(--border);color:${s.acc>=50?'var(--success)':s.acc>=30?'var(--warn)':'var(--red)'};font-weight:700">${s.participated>0?s.acc+'%':'—'}</td>
+      accuracyHtml+=`<tr style="${isMe?'background:rgba(55,138,221,.08)':i%2===1?'background:rgba(255,255,255,.02)':''}">
+        <td style="padding:9px 12px;font-weight:${isMe?700:600};border-bottom:1px solid var(--border);color:${isMe?'var(--info)':'var(--text)'}">${s.u.username}${isMe?' <span style="font-size:10px;color:var(--muted)">(you)</span>':''}</td>
+        <td style="padding:9px 6px;text-align:center;border-bottom:1px solid var(--border);color:var(--success);font-weight:${s.exact>0?700:400}">${s.exact||'—'}</td>
+        <td style="padding:9px 6px;text-align:center;border-bottom:1px solid var(--border);color:var(--warn);font-weight:${s.outcome_win>0?700:400}">${s.outcome_win||'—'}</td>
+        <td style="padding:9px 6px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted)">${s.wrong||'—'}</td>
+        <td style="padding:9px 6px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted)">${s.skipped||'—'}</td>
+        <td style="padding:9px 8px;text-align:center;border-bottom:1px solid var(--border);color:${s.acc>=50?'var(--success)':s.acc>=30?'var(--warn)':'var(--red)'};font-weight:700">${s.participated>0?s.acc+'%':'—'}</td>
       </tr>`;
     });
-    html+=`</tbody></table></div>`;
+    accuracyHtml+=`</tbody></table></div>`;
 
-    // ── Match that caused the most controversy (biggest score variance in predictions) ──
-    let hotMatch=null, hotVar=0;
+    // Most debated match
+    let hotMatch=null,hotVar=0;
     settledMatches.forEach(m=>{
       const preds=(PREDS[m.id]||[]);
       if(preds.length<2)return;
-      const outcomes=preds.map(p=>outcome(p.pred_home,p.pred_away));
-      const unique=new Set(outcomes).size;
+      const unique=new Set(preds.map(p=>outcome(p.pred_home,p.pred_away))).size;
       if(unique>hotVar){hotVar=unique;hotMatch=m;}
     });
     if(hotMatch){
       const preds=PREDS[hotMatch.id]||[];
-      html+=`<div class="sec">Most debated match</div>
+      accuracyHtml+=`<div class="sec" style="margin-top:16px">Most debated match</div>
       <div class="card">
         <div style="font-weight:600;font-size:13px;margin-bottom:6px">${hotMatch.home_flag}${hotMatch.home} ${hotMatch.result_home}–${hotMatch.result_away} ${hotMatch.away}${hotMatch.away_flag}</div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Everyone predicted differently — ${preds.length} different predictions</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">${preds.length} different predictions</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px">
-          ${preds.map(p=>{
-            const won=(hotMatch.resolved_winners||[]).includes(p.username);
-            return `<div style="background:${won?'rgba(76,175,80,.15)':'rgba(255,255,255,.04)'};border:1px solid ${won?'rgba(76,175,80,.3)':'var(--border)'};border-radius:7px;padding:4px 9px;font-size:11px">
-              <span style="color:var(--muted)">${p.username}</span> <strong style="color:${won?'var(--success)':'var(--text)'}">${p.pred_home}–${p.pred_away}</strong>
-            </div>`;
-          }).join('')}
+          ${preds.map(p=>{const won=(hotMatch.resolved_winners||[]).includes(p.username);return`<div style="background:${won?'rgba(76,175,80,.15)':'rgba(255,255,255,.04)'};border:1px solid ${won?'rgba(76,175,80,.3)':'var(--border)'};border-radius:7px;padding:4px 9px;font-size:11px"><span style="color:var(--muted)">${p.username}</span> <strong style="color:${won?'var(--success)':'var(--text)'}">${p.pred_home}–${p.pred_away}</strong></div>`;}).join('')}
         </div>
       </div>`;
     }
+  }
+
+  // ── Assemble: two-column grid ──
+  let html='';
+  if(highlightsHtml){
+    html=`<div style="display:grid;grid-template-columns:1fr 148px;gap:12px;align-items:start">
+      <div>${standingsHtml}${accuracyHtml}</div>
+      <div>${highlightsHtml}</div>
+    </div>`;
+  } else {
+    html=standingsHtml+accuracyHtml;
   }
 
   document.getElementById('pane-lb').innerHTML=html;
@@ -1268,7 +1220,7 @@ async function renderGroups(){
   const el = document.getElementById('pane-groups');
   const now = Date.now();
   // Refresh from DB if stale (>5 min) or never loaded
-  if(now - groupsLastFetched > 5 * 60 * 1000){
+  if(now - groupsLastFetched > 24 * 60 * 60 * 1000){
     const {data:freshMatches} = await sb.from('matches').select('*');
     if(freshMatches) MATCHES = freshMatches.sort((a,b)=>{
       const mo={Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
@@ -1340,7 +1292,7 @@ async function renderGroups(){
     <div class="sec" style="margin:0;border:none;padding:0">Group Standings</div>
     <button onclick="refreshGroups()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:11px;color:var(--muted);cursor:pointer">↻ Refresh</button>
   </div>
-  <div style="font-size:11px;color:var(--muted);margin-bottom:14px">Last updated: ${lastRefresh} &nbsp;·&nbsp; Auto-refreshes every 5 min</div>`;
+  <div style="font-size:11px;color:var(--muted);margin-bottom:14px">Last updated: ${lastRefresh} &nbsp;·&nbsp; Auto-refreshes every 24h</div>`;
 
   // Group filter chips
   html+=`<div class="filter-bar" style="margin-bottom:14px">
