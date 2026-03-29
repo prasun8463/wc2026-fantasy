@@ -527,73 +527,73 @@ function renderDash(){
   const recent=MATCHES.filter(m=>m.resolved&&(PREDS[m.id]||[]).find(p=>p.username===ME.username)).slice(-3);
 
   // ── PROFILE CARD ──
-  let html=`<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:12px">
+  let html=`<div style="background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden">
 
     <!-- header row -->
-    <div style="display:flex;align-items:center;gap:12px;padding:14px 14px 12px">
-      <div style="width:54px;height:54px;border-radius:12px;background:${avc_color};border:2px solid rgba(212,160,23,.4);display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700;color:#fff;flex-shrink:0">${ini(ME.username)}</div>
+    <div style="display:flex;align-items:center;gap:16px;padding:20px 18px 16px">
+      <div style="width:68px;height:68px;border-radius:14px;background:${avc_color};border:2px solid rgba(212,160,23,.4);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;flex-shrink:0">${ini(ME.username)}</div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:15px;font-weight:700;color:var(--text)">${ME.username}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px">Rank ${rank} of ${MEMBERS.length} &nbsp;·&nbsp; ${played>0?hitRate+'% hit rate':'No matches yet'}</div>
+        <div style="font-size:20px;font-weight:700;color:var(--text)">${ME.username}</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:3px">Rank ${rank} of ${MEMBERS.length} &nbsp;·&nbsp; ${played>0?hitRate+'% hit rate':'No matches yet'}</div>
       </div>
       <div style="text-align:right;flex-shrink:0">
-        <div style="font-size:22px;font-weight:700;color:${n>=0?'var(--success)':'var(--red)'}">₹${n>=0?'+':''}${n}</div>
-        <div style="font-size:10px;color:var(--muted)">net balance</div>
+        <div style="font-size:30px;font-weight:700;color:${n>=0?'var(--success)':'var(--red)'}">₹${n>=0?'+':''}${n}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">net balance</div>
       </div>
     </div>
 
-    <div style="height:1px;background:var(--border);margin:0 14px"></div>
+    <div style="height:1px;background:var(--border);margin:0 18px"></div>
 
     <!-- 2x2 scorecard grid -->
-    <div style="padding:14px 16px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
-        <div class="scorecard-btn" onclick="showScorecardModal('exact')" style="background:rgba(76,175,80,.08);border:1px solid rgba(76,175,80,.2);border-radius:9px;padding:9px 12px;display:flex;align-items:center;gap:10px">
-          <div style="font-size:20px;font-weight:700;color:var(--success);line-height:1">${exact||'0'}</div>
-          <div style="min-width:0"><div style="font-size:10px;color:var(--muted)">Exact scores</div>
-            <div style="height:3px;background:rgba(76,175,80,.2);border-radius:2px;margin-top:3px"><div style="width:${pct(exact)};height:100%;background:var(--success);border-radius:2px"></div></div></div>
+    <div style="padding:18px 18px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div class="scorecard-btn" onclick="showScorecardModal('exact')" style="background:rgba(76,175,80,.08);border:1px solid rgba(76,175,80,.2);border-radius:12px;padding:16px;display:flex;align-items:center;gap:14px">
+          <div style="font-size:36px;font-weight:700;color:var(--success);line-height:1">${exact||'0'}</div>
+          <div style="min-width:0"><div style="font-size:14px;font-weight:600;color:var(--muted)">Exact scores</div>
+            <div style="height:4px;background:rgba(76,175,80,.2);border-radius:2px;margin-top:6px"><div style="width:${pct(exact)};height:100%;background:var(--success);border-radius:2px"></div></div></div>
         </div>
-        <div class="scorecard-btn" onclick="showScorecardModal('outcome')" style="background:rgba(232,160,32,.08);border:1px solid rgba(232,160,32,.2);border-radius:9px;padding:9px 12px;display:flex;align-items:center;gap:10px">
-          <div style="font-size:20px;font-weight:700;color:var(--warn);line-height:1">${outcomeW||'0'}</div>
-          <div style="min-width:0"><div style="font-size:10px;color:var(--muted)">Outcomes</div>
-            <div style="height:3px;background:rgba(232,160,32,.2);border-radius:2px;margin-top:3px"><div style="width:${pct(outcomeW)};height:100%;background:var(--warn);border-radius:2px"></div></div></div>
+        <div class="scorecard-btn" onclick="showScorecardModal('outcome')" style="background:rgba(232,160,32,.08);border:1px solid rgba(232,160,32,.2);border-radius:12px;padding:16px;display:flex;align-items:center;gap:14px">
+          <div style="font-size:36px;font-weight:700;color:var(--warn);line-height:1">${outcomeW||'0'}</div>
+          <div style="min-width:0"><div style="font-size:14px;font-weight:600;color:var(--muted)">Outcomes</div>
+            <div style="height:4px;background:rgba(232,160,32,.2);border-radius:2px;margin-top:6px"><div style="width:${pct(outcomeW)};height:100%;background:var(--warn);border-radius:2px"></div></div></div>
         </div>
-        <div class="scorecard-btn" onclick="showScorecardModal('wrong')" style="background:rgba(226,75,74,.08);border:1px solid rgba(226,75,74,.2);border-radius:9px;padding:9px 12px;display:flex;align-items:center;gap:10px">
-          <div style="font-size:20px;font-weight:700;color:var(--red);line-height:1">${wrong||'0'}</div>
-          <div style="min-width:0"><div style="font-size:10px;color:var(--muted)">Wrong</div>
-            <div style="height:3px;background:rgba(226,75,74,.2);border-radius:2px;margin-top:3px"><div style="width:${pct(wrong)};height:100%;background:var(--red);border-radius:2px"></div></div></div>
+        <div class="scorecard-btn" onclick="showScorecardModal('wrong')" style="background:rgba(226,75,74,.08);border:1px solid rgba(226,75,74,.2);border-radius:12px;padding:16px;display:flex;align-items:center;gap:14px">
+          <div style="font-size:36px;font-weight:700;color:var(--red);line-height:1">${wrong||'0'}</div>
+          <div style="min-width:0"><div style="font-size:14px;font-weight:600;color:var(--muted)">Wrong</div>
+            <div style="height:4px;background:rgba(226,75,74,.2);border-radius:2px;margin-top:6px"><div style="width:${pct(wrong)};height:100%;background:var(--red);border-radius:2px"></div></div></div>
         </div>
-        <div class="scorecard-btn" onclick="showScorecardModal('refund')" style="background:rgba(55,138,221,.08);border:1px solid rgba(55,138,221,.2);border-radius:9px;padding:9px 12px;display:flex;align-items:center;gap:10px">
-          <div style="font-size:20px;font-weight:700;color:var(--info);line-height:1">${refunds||'0'}</div>
-          <div style="min-width:0"><div style="font-size:10px;color:var(--muted)">Refunds</div>
-            <div style="height:3px;background:rgba(55,138,221,.2);border-radius:2px;margin-top:3px"><div style="width:${pct(refunds)};height:100%;background:var(--info);border-radius:2px"></div></div></div>
+        <div class="scorecard-btn" onclick="showScorecardModal('refund')" style="background:rgba(55,138,221,.08);border:1px solid rgba(55,138,221,.2);border-radius:12px;padding:16px;display:flex;align-items:center;gap:14px">
+          <div style="font-size:36px;font-weight:700;color:var(--info);line-height:1">${refunds||'0'}</div>
+          <div style="min-width:0"><div style="font-size:14px;font-weight:600;color:var(--muted)">Refunds</div>
+            <div style="height:4px;background:rgba(55,138,221,.2);border-radius:2px;margin-top:6px"><div style="width:${pct(refunds)};height:100%;background:var(--info);border-radius:2px"></div></div></div>
         </div>
       </div>
       <!-- total played strip -->
-      <div class="scorecard-btn" onclick="showScorecardModal('played')" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between">
-        <div style="font-size:10px;color:var(--muted)">Total played</div>
-        <div style="font-size:14px;font-weight:700;color:var(--text)">${played} matches &nbsp;<span style="font-size:10px;color:var(--muted);font-weight:400">· ₹${totalBet} bet · ₹${totalWon} won</span></div>
+      <div class="scorecard-btn" onclick="showScorecardModal('played')" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:14px;color:var(--muted)">Total played</div>
+        <div style="font-size:18px;font-weight:700;color:var(--text)">${played} <span style="font-size:13px;color:var(--muted);font-weight:400">matches · ₹${totalBet} bet · ₹${totalWon} won</span></div>
       </div>
     </div>
 
     ${recent.length?`
-    <div style="height:1px;background:var(--border);margin:0 14px"></div>
-    <div style="font-size:13px;font-weight:700;color:var(--gold);padding:10px 14px 6px;border-top:1px solid var(--border);letter-spacing:.3px">Recent results</div>
+    <div style="height:1px;background:var(--border);margin:0 18px"></div>
+    <div style="font-size:15px;font-weight:700;color:var(--gold);padding:14px 18px 8px;letter-spacing:.3px">Recent results</div>
     ${recent.map(m=>{
       const myP=(PREDS[m.id]||[]).find(p=>p.username===ME.username);
       const won=(m.resolved_winners||[]).includes(ME.username);
       const rc=won&&m.resolved_type==='exact'?'rt-exact':won&&m.resolved_type==='outcome'?'rt-outcome':m.resolved_type==='refund'&&won?'rt-refund':'rt-wrong';
       const rl=won&&m.resolved_type==='exact'?'Exact +₹'+m.resolved_share:won&&m.resolved_type==='outcome'?'Outcome +₹'+m.resolved_share:m.resolved_type==='refund'&&won?'Refund ₹'+m.resolved_share:'No win';
-      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;gap:8px;border-bottom:1px solid rgba(255,255,255,.05)">'
-        +'<div style="font-size:12px;font-weight:600;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+m.home_flag+m.home+' '+m.result_home+'–'+m.result_away+' '+m.away+m.away_flag+'</div>'
-        +'<div style="display:flex;align-items:center;gap:5px;flex-shrink:0">'
-        +'<span style="font-size:11px;color:var(--muted)">'+myP.pred_home+'–'+myP.pred_away+'</span>'
-        +'<span class="rtag '+rc+'" style="font-size:10px">'+rl+'</span>'
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 18px;gap:10px;border-bottom:1px solid rgba(255,255,255,.05)">'
+        +'<div style="font-size:14px;font-weight:600;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+m.home_flag+m.home+' '+m.result_home+'–'+m.result_away+' '+m.away+m.away_flag+'</div>'
+        +'<div style="display:flex;align-items:center;gap:7px;flex-shrink:0">'
+        +'<span style="font-size:13px;color:var(--muted)">'+myP.pred_home+'–'+myP.pred_away+'</span>'
+        +'<span class="rtag '+rc+'" style="font-size:11px;padding:3px 9px">'+rl+'</span>'
         +'</div></div>';
     }).join('')}
+    <div style="padding-bottom:6px"></div>
     `:''}
 
   </div>`;
-
   if(!recent.length){
     html+=`<div style="text-align:center;color:var(--muted);font-size:13px;padding:20px 0">Head to Matches to start predicting!</div>`;
   }
