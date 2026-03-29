@@ -856,10 +856,10 @@ function renderLB(){
     if(badges.length){
       highlightsHtml+=`<div class="sec">Highlights</div>`;
       badges.forEach(b=>{
-        highlightsHtml+=`<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:11px;text-align:center;margin-bottom:6px">
-          <div style="font-size:20px;margin-bottom:4px">${b.icon}</div>
-          <div style="font-size:10px;font-weight:700;color:var(--gold);margin-bottom:3px">${b.title}</div>
-          <div style="font-size:10px;color:var(--muted);line-height:1.4">${b.desc}</div>
+        highlightsHtml+=`<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 12px;text-align:center;margin-bottom:8px">
+          <div style="font-size:28px;margin-bottom:7px">${b.icon}</div>
+          <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">${b.title}</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.5">${b.desc}</div>
         </div>`;
       });
     }
@@ -953,7 +953,7 @@ function renderLB(){
   // ── Assemble: two-column grid ──
   let html='';
   if(highlightsHtml){
-    html=`<div style="display:grid;grid-template-columns:1fr 148px;gap:12px;align-items:start">
+    html=`<div style="display:grid;grid-template-columns:1fr 170px;gap:12px;align-items:start">
       <div>${standingsHtml}${accuracyHtml}</div>
       <div>${highlightsHtml}</div>
     </div>`;
