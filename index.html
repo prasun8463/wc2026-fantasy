@@ -244,7 +244,7 @@
     <div class="tab on"  onclick="goTab('dash')">Dashboard</div>
     <div class="tab"     onclick="goTab('lb')">Leaderboard</div>
     <div class="tab"     onclick="goTab('matches')">Matches</div>
-    <div class="tab"     onclick="goTab('groups')">Groups</div>
+    <div class="tab"     onclick="goTab('groups')">Tournament</div>
     <div class="tab"     onclick="goTab('league')">League</div>
     <div class="tab"     onclick="goTab('admin')">Admin</div>
   </div>
@@ -1444,10 +1444,10 @@ function renderHowTo(){
 //  GROUPS — live standings computed from Supabase match results
 // ════════════════════════════════════════════════════════════════
 let groupsLastFetched = 0;
+
 async function renderGroups(){
   const el = document.getElementById('pane-groups');
   const now = Date.now();
-  // Refresh from DB if stale (>5 min) or never loaded
   if(now - groupsLastFetched > 24 * 60 * 60 * 1000){
     const {data:freshMatches} = await sb.from('matches').select('*');
     if(freshMatches) MATCHES = freshMatches.sort((a,b)=>{
@@ -1474,30 +1474,24 @@ async function renderGroups(){
   };
 
   const FLAGS = {
-    'Mexico':'🇲🇽','South Africa':'🇿🇦','South Korea':'🇰🇷',
-    'Canada':'🇨🇦','Qatar':'🇶🇦','Switzerland':'🇨🇭',
+    'Mexico':'🇲🇽','South Africa':'🇿🇦','South Korea':'🇰🇷','Czechia':'🇨🇿',
+    'Canada':'🇨🇦','Bosnia and Herzegovina':'🇧🇦','Qatar':'🇶🇦','Switzerland':'🇨🇭',
     'Brazil':'🇧🇷','Morocco':'🇲🇦','Haiti':'🇭🇹','Scotland':'🏴󠁧󠁢󠁳󠁣󠁴󠁿',
-    'USA':'🇺🇸','Paraguay':'🇵🇾','Australia':'🇦🇺',
-    'Germany':'🇩🇪','Ivory Coast':'🇨🇮','Ecuador':'🇪🇨',
-    'Netherlands':'🇳🇱','Japan':'🇯🇵','Tunisia':'🇹🇳',
+    'USA':'🇺🇸','Paraguay':'🇵🇾','Australia':'🇦🇺','Türkiye':'🇹🇷',
+    'Germany':'🇩🇪','Curaçao':'🌍','Ivory Coast':'🇨🇮','Ecuador':'🇪🇨',
+    'Netherlands':'🇳🇱','Japan':'🇯🇵','Tunisia':'🇹🇳','Sweden':'🇸🇪',
     'Belgium':'🇧🇪','Egypt':'🇪🇬','Iran':'🇮🇷','New Zealand':'🇳🇿',
     'Spain':'🇪🇸','Cabo Verde':'🇨🇻','Saudi Arabia':'🇸🇦','Uruguay':'🇺🇾',
-    'France':'🇫🇷','Senegal':'🇸🇳','Norway':'🇳🇴',
+    'France':'🇫🇷','Senegal':'🇸🇳','Norway':'🇳🇴','Iraq':'🇮🇶',
     'Argentina':'🇦🇷','Algeria':'🇩🇿','Austria':'🇦🇹','Jordan':'🇯🇴',
-    'Portugal':'🇵🇹','Uzbekistan':'🇺🇿','Colombia':'🇨🇴',
+    'Portugal':'🇵🇹','Uzbekistan':'🇺🇿','Colombia':'🇨🇴','DR Congo':'🇨🇩',
     'England':'🏴󠁧󠁢󠁥󠁮󠁧󠁿','Croatia':'🇭🇷','Ghana':'🇬🇭','Panama':'🇵🇦',
-    'Curaçao':'🌍','Bosnia and Herzegovina':'🇧🇦','Sweden':'🇸🇪',
-    'Türkiye':'🇹🇷','Czechia':'🇨🇿',
-    'Iraq':'🇮🇶','DR Congo':'🇨🇩',
   };
 
-  // Build standings from settled matches
   function getGroupStandings(grpLetter, teams){
     const stats = {};
     teams.forEach(t=>{ stats[t]={mp:0,w:0,d:0,l:0,gf:0,ga:0,pts:0}; });
-
-    const grpMatches = MATCHES.filter(m=>m.grp===grpLetter && m.resolved && m.result_home!=null);
-    grpMatches.forEach(m=>{
+    MATCHES.filter(m=>m.grp===grpLetter&&m.resolved&&m.result_home!=null).forEach(m=>{
       const h=m.home, a=m.away, gh=m.result_home, ga=m.result_away;
       if(!stats[h]||!stats[a]) return;
       stats[h].mp++; stats[a].mp++;
@@ -1507,79 +1501,193 @@ async function renderGroups(){
       else if(gh<ga){ stats[a].w++; stats[a].pts+=3; stats[h].l++; }
       else { stats[h].d++; stats[h].pts+=1; stats[a].d++; stats[a].pts+=1; }
     });
-
     return teams.map(t=>({name:t,...stats[t]}))
       .sort((a,b)=>b.pts-a.pts||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf);
   }
 
   const lastRefresh = new Date(groupsLastFetched).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-  const groups = Object.keys(GROUP_TEAMS);
   const activeFilter = window._groupFilter||'All';
+  const groups = Object.keys(GROUP_TEAMS);
 
-  let html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-    <div class="sec" style="margin:0;border:none;padding:0">Group Standings</div>
-    <button onclick="refreshGroups()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:11px;color:var(--muted);cursor:pointer">↻ Refresh</button>
+  // ── Filter chips ──
+  let html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+    <div style="font-size:11px;color:var(--muted)">Last updated: ${lastRefresh}</div>
+    <button onclick="refreshGroups()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:11px;color:var(--muted);cursor:pointer">↻ Refresh</button>
   </div>
-  <div style="font-size:11px;color:var(--muted);margin-bottom:14px">Last updated: ${lastRefresh} &nbsp;·&nbsp; Auto-refreshes every 24h</div>`;
-
-  // Group filter chips
-  html+=`<div class="filter-bar" style="margin-bottom:14px">
+  <div class="filter-bar" style="margin-bottom:14px">
     <div class="fchip${activeFilter==='All'?' on':''}" onclick="setGroupFilter('All')">All</div>`;
   groups.forEach(g=>{ html+=`<div class="fchip${activeFilter===g?' on':''}" onclick="setGroupFilter('${g}')">Grp ${g}</div>`; });
   html+=`</div>`;
 
-  const toShow = activeFilter==='All'?groups:[activeFilter];
+  // ── BRACKET VIEW (All) ──
+  if(activeFilter==='All'){
+    // Define R32 matchups (from official WC2026 schedule)
+    const R32 = [
+      {label:'R32 — 1',home:'2nd Group A',away:'2nd Group B'},
+      {label:'R32 — 2',home:'1st Group C',away:'2nd Group F'},
+      {label:'R32 — 3',home:'1st Group E',away:'Best 3rd A/B/C/D/F'},
+      {label:'R32 — 4',home:'1st Group F',away:'2nd Group C'},
+      {label:'R32 — 5',home:'2nd Group E',away:'2nd Group I'},
+      {label:'R32 — 6',home:'1st Group I',away:'Best 3rd C/D/F/G/H'},
+      {label:'R32 — 7',home:'1st Group A',away:'Best 3rd C/E/F/H/I'},
+      {label:'R32 — 8',home:'1st Group L',away:'Best 3rd E/H/I/J/K'},
+      {label:'R32 — 9',home:'1st Group G',away:'Best 3rd A/E/H/I/J'},
+      {label:'R32 — 10',home:'1st Group D',away:'Best 3rd B/E/F/I/J'},
+      {label:'R32 — 11',home:'1st Group H',away:'2nd Group J'},
+      {label:'R32 — 12',home:'2nd Group K',away:'2nd Group L'},
+      {label:'R32 — 13',home:'1st Group B',away:'Best 3rd E/F/G/I/J'},
+      {label:'R32 — 14',home:'2nd Group D',away:'2nd Group G'},
+      {label:'R32 — 15',home:'1st Group J',away:'2nd Group H'},
+      {label:'R32 — 16',home:'1st Group K',away:'Best 3rd D/E/I/J/L'},
+    ];
 
-  toShow.forEach(g=>{
-    const standings = getGroupStandings(g, GROUP_TEAMS[g]);
-    const hasGames = standings.some(t=>t.mp>0);
-    html+=`<div class="sec">Group ${g}</div>
-    <div style="overflow-x:auto;border-radius:12px;border:1px solid var(--border);margin-bottom:4px">
-    <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:360px">
-      <thead>
-        <tr style="background:rgba(255,255,255,.04)">
-          <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);width:28px">#</th>
-          <th style="padding:8px 8px;text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Team</th>
-          <th style="padding:8px 8px;text-align:center;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">MP</th>
-          <th style="padding:8px 8px;text-align:center;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">W</th>
-          <th style="padding:8px 8px;text-align:center;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">D</th>
-          <th style="padding:8px 8px;text-align:center;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">L</th>
-          <th style="padding:8px 8px;text-align:center;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">GD</th>
-          <th style="padding:8px 10px;text-align:center;color:var(--gold);font-weight:700;border-bottom:1px solid var(--border)">Pts</th>
-        </tr>
-      </thead>
-      <tbody>`;
-    standings.forEach((t,i)=>{
-      const qualify = i<2; // top 2 guaranteed, 3rd may qualify
-      const third = i===2;
-      const rowBg = qualify?'background:rgba(76,175,80,.06)':third?'background:rgba(55,138,221,.04)':'';
-      const gd = t.gf-t.ga;
-      html+=`<tr style="${rowBg}${i%2===1&&!qualify&&!third?'background:rgba(255,255,255,.015)':''}">
-        <td style="padding:10px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px">${i+1}</td>
-        <td style="padding:10px 8px;border-bottom:1px solid var(--border);font-weight:${qualify?'700':'500'}">
-          <span style="margin-right:6px">${FLAGS[t.name]||'🏳️'}</span>${t.name}
-          ${qualify?'<span style="font-size:9px;color:var(--success);margin-left:4px">Q</span>':''}
-        </td>
-        <td style="padding:10px 8px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted)">${t.mp}</td>
-        <td style="padding:10px 8px;text-align:center;border-bottom:1px solid var(--border);color:${t.w>0?'var(--success)':'var(--muted)'};font-weight:${t.w>0?700:400}">${t.w}</td>
-        <td style="padding:10px 8px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted)">${t.d}</td>
-        <td style="padding:10px 8px;text-align:center;border-bottom:1px solid var(--border);color:${t.l>0?'var(--red)':'var(--muted)'}">${t.l}</td>
-        <td style="padding:10px 8px;text-align:center;border-bottom:1px solid var(--border);color:${gd>0?'var(--success)':gd<0?'var(--red)':'var(--muted)'}">${gd>0?'+':''}${gd}</td>
-        <td style="padding:10px 10px;text-align:center;border-bottom:1px solid var(--border);font-weight:700;font-size:15px;color:${qualify?'var(--gold)':'var(--text)'}">${t.pts}</td>
-      </tr>`;
+    // Try to fill team names from standings
+    function getTop(grp, pos){
+      const st=getGroupStandings(grp, GROUP_TEAMS[grp]);
+      const t=st[pos-1];
+      if(!t||t.mp===0) return null;
+      return {name:t.name, flag:FLAGS[t.name]||'🏳️'};
+    }
+
+    function slotHTML(label, resolved=false, score=''){
+      const parts = label.split(' ');
+      const pos = parts[0]==='1st'?1:parts[0]==='2nd'?2:null;
+      const grpLetter = parts[1]==='Group'?parts[2]:null;
+      let team = null;
+      if(pos && grpLetter) team = getTop(grpLetter, pos);
+      const flag = team?(FLAGS[team.name]||'🏳️'):'';
+      const name = team?team.name:label;
+      const nameColor = team?'var(--text)':'var(--muted)';
+      return `<div style="display:flex;align-items:center;gap:5px;padding:3px 0">
+        <span style="font-size:12px;width:18px;flex-shrink:0">${flag}</span>
+        <span style="font-size:11px;font-weight:${team?600:400};color:${nameColor};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
+        ${resolved?`<span style="font-size:11px;font-weight:700;color:var(--gold);width:14px;text-align:right">${score}</span>`:''}
+      </div>`;
+    }
+
+    // Group matches into pairs for R32 display (2 columns of 8)
+    const half1=R32.slice(0,8), half2=R32.slice(8,16);
+
+    html+=`<div class="sec">Knockout bracket</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Teams populate as group stage settles · Scroll right on small screens</div>
+    <div style="overflow-x:auto;margin-bottom:16px">
+    <div style="min-width:640px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;align-items:start">
+
+      <!-- R32 -->
+      <div>
+        <div style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;text-align:center;padding:6px 4px;margin-bottom:6px;border-bottom:1px solid var(--border)">Round of 32</div>
+        <div style="display:flex;flex-direction:column;gap:5px">`;
+
+    R32.forEach(m=>{
+      html+=`<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 8px">
+        <div style="border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:3px;margin-bottom:3px">${slotHTML(m.home)}</div>
+        ${slotHTML(m.away)}
+      </div>`;
     });
-    html+=`</tbody></table></div>`;
-    if(!hasGames){ html+=`<div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:14px;margin-top:-2px">No matches played yet</div>`; }
-    else { html+=`<div style="font-size:10px;color:var(--muted);margin-bottom:16px;padding-left:2px"><span style="color:var(--success)">■</span> Qualified &nbsp; <span style="color:var(--info)">■</span> 3rd place (may advance)</div>`; }
-  });
+
+    html+=`</div></div>
+
+      <!-- R16 -->
+      <div>
+        <div style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;text-align:center;padding:6px 4px;margin-bottom:6px;border-bottom:1px solid var(--border)">Round of 16</div>
+        <div style="display:flex;flex-direction:column;gap:5px;padding-top:16px">`;
+    for(let i=0;i<8;i++){
+      html+=`<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-bottom:11px">
+        <div style="border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:3px;margin-bottom:3px">${slotHTML('TBD')}</div>
+        ${slotHTML('TBD')}
+      </div>`;
+    }
+    html+=`</div></div>
+
+      <!-- QF -->
+      <div>
+        <div style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;text-align:center;padding:6px 4px;margin-bottom:6px;border-bottom:1px solid var(--border)">Quarter-finals</div>
+        <div style="display:flex;flex-direction:column;gap:5px;padding-top:56px">`;
+    for(let i=0;i<4;i++){
+      html+=`<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-bottom:55px">
+        <div style="border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:3px;margin-bottom:3px">${slotHTML('TBD')}</div>
+        ${slotHTML('TBD')}
+      </div>`;
+    }
+    html+=`</div></div>
+
+      <!-- SF -->
+      <div>
+        <div style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;text-align:center;padding:6px 4px;margin-bottom:6px;border-bottom:1px solid var(--border)">Semi-finals</div>
+        <div style="display:flex;flex-direction:column;gap:5px;padding-top:136px">`;
+    for(let i=0;i<2;i++){
+      html+=`<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-bottom:180px">
+        <div style="border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:3px;margin-bottom:3px">${slotHTML('TBD')}</div>
+        ${slotHTML('TBD')}
+      </div>`;
+    }
+    html+=`</div></div>
+
+      <!-- Final -->
+      <div>
+        <div style="font-size:10px;font-weight:600;color:var(--gold);letter-spacing:.6px;text-transform:uppercase;text-align:center;padding:6px 4px;margin-bottom:6px;border-bottom:1px solid rgba(212,160,23,.35)">Final · Jul 19</div>
+        <div style="display:flex;flex-direction:column;gap:5px;padding-top:296px">
+          <div style="background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.35);border-radius:8px;padding:8px 10px">
+            <div style="border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:3px;margin-bottom:3px">${slotHTML('TBD')}</div>
+            ${slotHTML('TBD')}
+          </div>
+        </div>
+      </div>
+
+    </div></div>`;
+
+  } else {
+    // ── GROUP TABLE VIEW ──
+    const teams = GROUP_TEAMS[activeFilter];
+    if(!teams){ html+=`<div class="empty">Unknown group.</div>`; }
+    else {
+      const standings = getGroupStandings(activeFilter, teams);
+      const hasGames = standings.some(t=>t.mp>0);
+      html+=`<div class="sec">Group ${activeFilter}</div>
+      <div style="overflow-x:auto;border-radius:12px;border:1px solid var(--border);margin-bottom:8px">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:340px">
+        <thead><tr style="background:rgba(255,255,255,.04)">
+          <th style="padding:9px 12px;text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">#</th>
+          <th style="padding:9px 8px;text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Team</th>
+          <th style="padding:9px 8px;text-align:center;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">MP</th>
+          <th style="padding:9px 8px;text-align:center;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">W</th>
+          <th style="padding:9px 8px;text-align:center;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">D</th>
+          <th style="padding:9px 8px;text-align:center;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">L</th>
+          <th style="padding:9px 8px;text-align:center;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">GD</th>
+          <th style="padding:9px 10px;text-align:center;color:var(--gold);font-weight:700;border-bottom:1px solid var(--border)">Pts</th>
+        </tr></thead>
+        <tbody>`;
+      standings.forEach((t,i)=>{
+        const qualify=i<2, third=i===2;
+        const gd=t.gf-t.ga;
+        const rowBg=qualify?'background:rgba(76,175,80,.06)':third?'background:rgba(55,138,221,.04)':i%2===1?'background:rgba(255,255,255,.015)':'';
+        html+=`<tr style="${rowBg}">
+          <td style="padding:10px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px">${i+1}</td>
+          <td style="padding:10px 8px;border-bottom:1px solid var(--border);font-weight:${qualify?700:500}">
+            <span style="margin-right:6px">${FLAGS[t.name]||'🏳️'}</span>${t.name}
+            ${qualify?'<span style="font-size:9px;color:var(--success);margin-left:4px">Q</span>':''}
+          </td>
+          <td style="padding:10px 8px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted)">${t.mp}</td>
+          <td style="padding:10px 8px;text-align:center;border-bottom:1px solid var(--border);color:${t.w>0?'var(--success)':'var(--muted)'};font-weight:${t.w>0?700:400}">${t.w}</td>
+          <td style="padding:10px 8px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted)">${t.d}</td>
+          <td style="padding:10px 8px;text-align:center;border-bottom:1px solid var(--border);color:${t.l>0?'var(--red)':'var(--muted)'}">${t.l}</td>
+          <td style="padding:10px 8px;text-align:center;border-bottom:1px solid var(--border);color:${gd>0?'var(--success)':gd<0?'var(--red)':'var(--muted)'}">${gd>0?'+':''}${gd}</td>
+          <td style="padding:10px 10px;text-align:center;border-bottom:1px solid var(--border);font-weight:700;font-size:15px;color:${qualify?'var(--gold)':'var(--text)'}">${t.pts}</td>
+        </tr>`;
+      });
+      html+=`</tbody></table></div>`;
+      if(!hasGames) html+=`<div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:10px">No matches played yet</div>`;
+      else html+=`<div style="font-size:10px;color:var(--muted);margin-bottom:10px"><span style="color:var(--success)">■</span> Qualified &nbsp; <span style="color:var(--info)">■</span> 3rd (may advance)</div>`;
+    }
+  }
 
   el.innerHTML = html;
 }
 
 async function refreshGroups(){
-  groupsLastFetched = 0; // force refresh
+  groupsLastFetched = 0;
   await renderGroups();
-  toast('Group standings refreshed!');
+  toast('Tournament view refreshed!');
 }
 
 function setGroupFilter(f){
@@ -1590,6 +1698,59 @@ function setGroupFilter(f){
 // ════════════════════════════════════════════════════════════════
 //  ADMIN — settle matches, update bet amount, add KO fixtures
 // ════════════════════════════════════════════════════════════════
+// ── WhatsApp Reminder helpers ──
+function getTodayMatches(){
+  const nowIST=new Date(new Date().getTime()+5.5*60*60*1000);
+  const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const todayStr=monthNames[nowIST.getUTCMonth()]+' '+nowIST.getUTCDate();
+  return MATCHES.filter(m=>m.match_date===todayStr).sort((a,b)=>{
+    const [ah,am]=(a.kickoff_ist||'23:59').split(':').map(Number);
+    const [bh,bm]=(b.kickoff_ist||'23:59').split(':').map(Number);
+    return (ah*60+am)-(bh*60+bm);
+  });
+}
+
+function generateWhatsAppMessage(matches){
+  const nowIST=new Date(new Date().getTime()+5.5*60*60*1000);
+  const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const dateStr=monthNames[nowIST.getUTCMonth()]+' '+nowIST.getUTCDate();
+  const bet=betFor(matches[0]);
+  let lines=[];
+  lines.push('\u26bd *WC2026 Fantasy \u2014 '+dateStr+'*');
+  lines.push('');
+  lines.push('Matches to predict today (\u20b9'+bet+' each):');
+  lines.push('');
+  matches.forEach(m=>{
+    lines.push(m.home_flag+' *'+m.home+'* vs *'+m.away+'* '+m.away_flag);
+    lines.push('  Time: '+m.kickoff_ist+' IST  |  Group '+m.grp);
+    lines.push('  Closes: '+getClosingTime(m.kickoff_ist)+' IST');
+    lines.push('');
+  });
+  lines.push('Predict here:');
+  lines.push('https://prasun8463.github.io/wc2026-fantasy');
+  lines.push('');
+  lines.push('Good luck! \ud83c\udfc6');
+  let msg=lines.join('\n');
+  return msg;
+}
+
+function getClosingTime(kickoff_ist){
+  if(!kickoff_ist)return '';
+  const [hh,mm]=kickoff_ist.split(':').map(Number);
+  const totalMins=hh*60+mm-5;
+  const ch=Math.floor(totalMins/60)%24;
+  const cm=totalMins%60;
+  return (ch<10?'0':'')+ch+':'+(cm<10?'0':'')+cm;
+}
+
+function sendWhatsAppReminder(){
+  const matches=getTodayMatches();
+  if(!matches.length){toast('No matches today!');return;}
+  const msg=generateWhatsAppMessage(matches);
+  const encoded=encodeURIComponent(msg);
+  window.open('https://wa.me/?text='+encoded,'_blank');
+}
+
 function renderAdmin(){
   if(!LEAGUE||LEAGUE.admin_username!==ME.username){
     document.getElementById('pane-admin').innerHTML='<div class="empty" style="padding-top:40px">Only the league admin can access this panel.</div>';
@@ -1603,7 +1764,23 @@ function renderAdmin(){
   const bR16=typeof ba==='object'?(ba.r16||ba.group||100):ba||100;
   const bQF=typeof ba==='object'?(ba.qf||ba.group||100):ba||100;
   const bSF=typeof ba==='object'?(ba.sf||ba.group||100):ba||100;
-  let html=`<div class="sec">Bet amounts by stage</div>
+  // ── WhatsApp Reminder section ──
+  const todayMatches=getTodayMatches();
+  const reminderHtml=todayMatches.length>0?`
+    <div class="sec">Today's match reminder</div>
+    <div class="card" style="margin-bottom:4px">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Send today's fixture list to your WhatsApp group</div>
+      <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:13px;line-height:1.9;color:var(--text);font-family:monospace;white-space:pre-wrap;margin-bottom:12px">${generateWhatsAppMessage(todayMatches)}</div>
+      <button class="btn btn-gold" onclick="sendWhatsAppReminder()" style="width:auto;padding:10px 20px;font-size:14px">
+        📲 Open in WhatsApp
+      </button>
+    </div>`:`
+    <div class="sec">Today's match reminder</div>
+    <div class="card" style="text-align:center;color:var(--muted);font-size:13px;padding:20px">
+      No matches today — nothing to remind!
+    </div>`;
+
+  let html=reminderHtml+`<div class="sec">Bet amounts by stage</div>
   <div class="card">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div><div class="field-label">Group stage (₹)</div><input id="bet-group" type="number" value="${bGroup}" min="1" style="margin:0" /></div>
