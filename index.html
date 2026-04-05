@@ -493,7 +493,9 @@ function matchStatus(m){
   const day=parseInt(parts[1]);
   const [hh,mm]=m.kickoff_ist.split(':').map(Number);
   // IST = UTC+5:30, create kickoff in UTC
-  const kickoffUTC=new Date(Date.UTC(2026,month,day,hh-5,mm-30));
+  // IST is UTC+5:30, so subtract 330 minutes
+  const kickoffIST=new Date(Date.UTC(2026,month,day,hh,mm));
+  const kickoffUTC=new Date(kickoffIST.getTime()-330*60*1000);
   const openUntil=new Date(kickoffUTC.getTime()-5*60*1000); // 5 min before kickoff
   const now=new Date();
   if(now<openUntil){
@@ -678,11 +680,11 @@ function renderMatchList(){
 
   let html='';
 
-  function renderMatchRow(m){
+  function renderMatchRow(m, forceFuture){
     const arr=PREDS[m.id]||[];
     const myP=arr.find(p=>p.username===ME.username);
     const pot=arr.length*betFor(m);
-    const status=matchStatus(m);
+    const status=forceFuture?'future':matchStatus(m);
     const canPredict=status==='open'&&!myP;
 
     let pickBadge='';
@@ -723,19 +725,23 @@ function renderMatchList(){
     </div>`;
   }
 
-  function renderDateGroup(g,isToday,isPast){
+  function renderDateGroup(g,isToday,isPast,forceFuture){
     const matches=g.matches;
-    const openCount=matches.filter(m=>matchStatus(m)==='open').length;
-    const inProgCount=matches.filter(m=>matchStatus(m)==='inprogress').length;
+    // Only compute status-based counts for today — future dates show match count, past show settled
     const settledCount=matches.filter(m=>m.resolved).length;
     let dateMeta='';
     if(isToday){
+      const openCount=matches.filter(m=>matchStatus(m)==='open').length;
+      const inProgCount=matches.filter(m=>matchStatus(m)==='inprogress').length;
       if(openCount>0) dateMeta=`<span style="font-size:11px;font-weight:600;color:var(--gold)">${openCount} open to predict</span>`;
       else if(inProgCount>0) dateMeta=`<span style="font-size:11px;color:var(--warn)">${inProgCount} in progress</span>`;
       else dateMeta=`<span style="font-size:11px;color:var(--muted)">all settled</span>`;
     } else if(isPast){
       if(settledCount===matches.length) dateMeta=`<span style="font-size:11px;color:var(--muted)">all settled</span>`;
-      else if(inProgCount>0) dateMeta=`<span style="font-size:11px;color:var(--warn)">${inProgCount} in progress</span>`;
+      else {
+        const inProgCount=matches.filter(m=>matchStatus(m)==='inprogress').length;
+        if(inProgCount>0) dateMeta=`<span style="font-size:11px;color:var(--warn)">${inProgCount} in progress</span>`;
+      }
     } else {
       dateMeta=`<span style="font-size:11px;color:var(--muted)">${matches.length} match${matches.length!==1?'es':''}</span>`;
     }
@@ -768,7 +774,7 @@ function renderMatchList(){
         out+=`<div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin:8px 0 4px;${isPast?'opacity:.6':''}">${['R32','R16','QF','SF','Final'].includes(m.grp)?m.grp:'Group '+m.grp}</div>`;
         lastGrp=m.grp;
       }
-      out+=renderMatchRow(m);
+      out+=renderMatchRow(m, forceFuture);
     });
     return out;
   }
@@ -785,7 +791,7 @@ function renderMatchList(){
   if(todayGroup) html+=renderDateGroup(todayGroup,true,false);
   if(futureGroups.length){
     html+=divider('Upcoming','#4a8a4a');
-    futureGroups.forEach(g=>{ html+=renderDateGroup(g,false,false); });
+    futureGroups.forEach(g=>{ html+=renderDateGroup(g,false,false,true); });
   }
   if(pastGroups.length){
     html+=divider('Past results','#3a6a3a');
