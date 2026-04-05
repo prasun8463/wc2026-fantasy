@@ -5,7 +5,111 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#0f1a0f">
 <title>WC2026 Fantasy</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+function renderAbout(){
+  const el=document.getElementById('pane-about');
+  if(el.innerHTML.trim())return;
+  el.innerHTML=`
+  <div class="sec">Built with Claude AI</div>
+
+  <div class="card" style="margin-bottom:10px">
+    <div style="font-size:22px;margin-bottom:10px">🤖⚽</div>
+    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:8px">What is this app?</div>
+    <div style="font-size:13px;line-height:1.8;color:var(--text)">
+      WC2026 Fantasy Predictor is a friend-group betting app built for the FIFA World Cup 2026.
+      Predict scorelines, win pots, track your league — all without touching a casino or a spreadsheet.
+      It started as a simple idea over chai and somehow ended up with a knockout bracket, WhatsApp reminders,
+      and a leaderboard with highlight badges. As these things do.
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:10px">
+    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:8px">How was it made?</div>
+    <div style="font-size:13px;line-height:1.8;color:var(--text)">
+      Every single line of this app — the UI, the scoring engine, the database schema, the SQL resets,
+      the prediction visibility rules, the bracket diagram — was written in conversation with
+      <strong style="color:var(--gold)">Claude</strong> (Anthropic's AI). No traditional coding IDE.
+      No Stack Overflow rabbit holes. Just a long, iterative chat where one person described what they wanted
+      and Claude figured out how to build it.
+    </div>
+    <div style="font-size:13px;line-height:1.8;color:var(--text);margin-top:8px">
+      The entire app lives in a <strong style="color:var(--gold)">single HTML file</strong>. 
+      That was a deliberate choice — zero build tools, zero deployment pipelines, zero DevOps drama.
+      Just one file pushed to GitHub Pages and it's live for everyone.
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:10px">
+    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:12px">The tech stack</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="font-size:20px;flex-shrink:0">🏗️</div>
+        <div><div style="font-size:13px;font-weight:600;color:var(--text)">Single HTML file</div>
+        <div style="font-size:12px;color:var(--muted)">Vanilla JS, CSS variables, no frameworks, no build step. Deployable anywhere that serves static files.</div></div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="font-size:20px;flex-shrink:0">🗄️</div>
+        <div><div style="font-size:13px;font-weight:600;color:var(--text)">Supabase</div>
+        <div style="font-size:12px;color:var(--muted)">Postgres database in the cloud. Handles all match data, user accounts, predictions and league membership. Free tier, no backend server needed.</div></div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="font-size:20px;flex-shrink:0">🚀</div>
+        <div><div style="font-size:13px;font-weight:600;color:var(--text)">GitHub Pages</div>
+        <div style="font-size:12px;color:var(--muted)">Free hosting. Push the HTML file, wait 60 seconds, it's live at a public URL. Every update is a git commit.</div></div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="font-size:20px;flex-shrink:0">🤖</div>
+        <div><div style="font-size:13px;font-weight:600;color:var(--text)">Claude (claude.ai)</div>
+        <div style="font-size:12px;color:var(--muted)">The entire codebase was written through conversation. Requirements described in plain English, code delivered in seconds, bugs fixed by describing the symptom. No prior web dev experience required.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:10px">
+    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:8px">By the numbers</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.2);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:var(--gold)">1</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">HTML file</div>
+      </div>
+      <div style="background:rgba(76,175,80,.08);border:1px solid rgba(76,175,80,.2);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:var(--success)">56</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">Group stage fixtures</div>
+      </div>
+      <div style="background:rgba(55,138,221,.08);border:1px solid rgba(55,138,221,.2);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:var(--info)">0</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">Lines written manually</div>
+      </div>
+      <div style="background:rgba(232,160,32,.08);border:1px solid rgba(232,160,32,.2);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:var(--warn)">∞</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">Fun had building it</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:10px;background:rgba(212,160,23,.06);border-color:rgba(212,160,23,.25)">
+    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:8px">A note on how this works</div>
+    <div style="font-size:13px;line-height:1.8;color:var(--text)">
+      This isn't a product. It's a proof of concept for what AI-assisted development feels like when you just
+      <em>describe what you want</em>. The design went through about 40 iterations. Features were added,
+      removed, debated, and refined — all in plain language. The AI never got tired of the feedback.
+      It never said "that's out of scope." It just built.
+    </div>
+    <div style="font-size:13px;line-height:1.8;color:var(--text);margin-top:8px">
+      The result is a real, working, multi-user web app with authentication, a live database,
+      a scoring engine, a leaderboard, a knockout bracket, and match-day prediction windows —
+      built entirely through conversation. That still feels a little wild.
+    </div>
+  </div>
+
+  <div style="text-align:center;padding:20px 0 10px">
+    <div style="font-size:13px;color:var(--muted)">Made with 🤖 + ☕ + ⚽</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:4px">WC2026 Fantasy Predictor · ${new Date().getFullYear()}</div>
+  </div>
+  `;
+}
+
+</script>
 <style>
   /* ── PASTE YOUR SUPABASE CREDENTIALS BELOW (line ~20 in the script) ── */
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -247,6 +351,7 @@
     <div class="tab"     onclick="goTab('groups')">Tournament</div>
     <div class="tab"     onclick="goTab('league')">League</div>
     <div class="tab"     onclick="goTab('admin')">Admin</div>
+    <div class="tab"     onclick="goTab('about')">About</div>
   </div>
 
   <div id="pane-howto"   class="pane"></div>
@@ -256,6 +361,7 @@
   <div id="pane-groups"  class="pane"><div class="loading"><div class="spinner"></div></div></div>
   <div id="pane-league"  class="pane"><div class="loading"><div class="spinner"></div></div></div>
   <div id="pane-admin"   class="pane"><div class="loading"><div class="spinner"></div></div></div>
+  <div id="pane-about"   class="pane"></div>
 <!-- SCORECARD MODAL -->
 <div class="modal-overlay" id="score-modal" onclick="closeModal(event)">
   <div class="modal-box">
@@ -398,13 +504,9 @@ async function doRegister(){
 }
 
 function doLogout(){
-  ME=null; LEAGUE=null; MEMBERS=[]; MATCHES=[]; PREDS={};
   localStorage.removeItem('wc2026_user');
-  document.getElementById('s-app').classList.remove('on');
-  document.getElementById('s-auth').classList.add('on');
-  document.getElementById('l-u').value='';
-  document.getElementById('l-p').value='';
-  showLogin();
+  // Hard reload — fetches fresh HTML from server, clears all state
+  window.location.reload(true);
 }
 
 // ── Boot app ───────────────────────────────────────────────────
@@ -431,13 +533,16 @@ async function loadAll(){
   // Load matches
   const {data:matches}=await sb.from('matches').select('*');
   // Sort by match_date chronologically, then by id within same date
-  const dateOrder=['Jun 11','Jun 12','Jun 13','Jun 14','Jun 15','Jun 16','Jun 17','Jun 18',
-    'Jun 21','Jun 22','Jun 23','Jun 25','Jun 26','Jun 28','Jun 29','Jun 30',
-    'Jul 1','Jul 2','Jul 4','Jul 5','Jul 9','Jul 10','Jul 12','Jul 13','Jul 15','Jul 16','Jul 19','TBD'];
+  // Sort by date chronologically using month+day numeric key
+  const _mo={Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
+  function _dk(d){if(!d||d==='TBD')return 99999;const p=d.trim().split(' ');return(_mo[p[0]]||0)*100+(parseInt(p[1])||0);}
   MATCHES=(matches||[]).sort((a,b)=>{
-    const di=dateOrder.indexOf(a.match_date)-dateOrder.indexOf(b.match_date);
+    const di=_dk(a.match_date)-_dk(b.match_date);
     if(di!==0)return di;
-    return a.id.localeCompare(b.id);
+    // Within same date sort by kickoff time
+    const ta=(a.kickoff_ist||'99:99').replace(':','');
+    const tb=(b.kickoff_ist||'99:99').replace(':','');
+    return parseInt(ta)-parseInt(tb);
   });
   // Load predictions for this league
   if(MEMBERS.length){
@@ -461,7 +566,7 @@ async function refreshMe(){
 
 // ── Tab routing ────────────────────────────────────────────────
 function goTab(t){
-  const names=['howto','dash','lb','matches','groups','league','admin'];
+  const names=['howto','dash','lb','matches','groups','league','admin','about'];
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('on',names[i]===t));
   document.querySelectorAll('.pane').forEach((el,i)=>el.classList.toggle('on',names[i]===t));
   if(t==='dash')renderDash();
@@ -471,6 +576,7 @@ function goTab(t){
   if(t==='groups')renderGroups();
   if(t==='howto')renderHowTo();
   if(t==='admin')renderAdmin();
+  if(t==='about')renderAbout();
 }
 
 // ── Net balance helper ─────────────────────────────────────────
@@ -1525,20 +1631,20 @@ async function renderGroups(){
     const R32 = [
       {label:'R32 — 1',home:'2nd Group A',away:'2nd Group B'},
       {label:'R32 — 2',home:'1st Group C',away:'2nd Group F'},
-      {label:'R32 — 3',home:'1st Group E',away:'Best 3rd A/B/C/D/F'},
+      {label:'R32 — 3',home:'1st Group E',away:'Best 3rd place'},
       {label:'R32 — 4',home:'1st Group F',away:'2nd Group C'},
       {label:'R32 — 5',home:'2nd Group E',away:'2nd Group I'},
-      {label:'R32 — 6',home:'1st Group I',away:'Best 3rd C/D/F/G/H'},
-      {label:'R32 — 7',home:'1st Group A',away:'Best 3rd C/E/F/H/I'},
-      {label:'R32 — 8',home:'1st Group L',away:'Best 3rd E/H/I/J/K'},
-      {label:'R32 — 9',home:'1st Group G',away:'Best 3rd A/E/H/I/J'},
-      {label:'R32 — 10',home:'1st Group D',away:'Best 3rd B/E/F/I/J'},
+      {label:'R32 — 6',home:'1st Group I',away:'Best 3rd place'},
+      {label:'R32 — 7',home:'1st Group A',away:'Best 3rd place'},
+      {label:'R32 — 8',home:'1st Group L',away:'Best 3rd place'},
+      {label:'R32 — 9',home:'1st Group G',away:'Best 3rd place'},
+      {label:'R32 — 10',home:'1st Group D',away:'Best 3rd place'},
       {label:'R32 — 11',home:'1st Group H',away:'2nd Group J'},
       {label:'R32 — 12',home:'2nd Group K',away:'2nd Group L'},
-      {label:'R32 — 13',home:'1st Group B',away:'Best 3rd E/F/G/I/J'},
+      {label:'R32 — 13',home:'1st Group B',away:'Best 3rd place'},
       {label:'R32 — 14',home:'2nd Group D',away:'2nd Group G'},
       {label:'R32 — 15',home:'1st Group J',away:'2nd Group H'},
-      {label:'R32 — 16',home:'1st Group K',away:'Best 3rd D/E/I/J/L'},
+      {label:'R32 — 16',home:'1st Group K',away:'Best 3rd place'},
     ];
 
     // Try to fill team names from standings
@@ -1555,9 +1661,10 @@ async function renderGroups(){
       const grpLetter = parts[1]==='Group'?parts[2]:null;
       let team = null;
       if(pos && grpLetter) team = getTop(grpLetter, pos);
+      const isBest3rd = label==='Best 3rd place';
       const flag = team?(FLAGS[team.name]||'🏳️'):'';
       const name = team?team.name:label;
-      const nameColor = team?'var(--text)':'var(--muted)';
+      const nameColor = team?'var(--text)':isBest3rd?'#4a6a4a':'var(--muted)';
       return `<div style="display:flex;align-items:center;gap:5px;padding:3px 0">
         <span style="font-size:12px;width:18px;flex-shrink:0">${flag}</span>
         <span style="font-size:11px;font-weight:${team?600:400};color:${nameColor};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
@@ -1793,17 +1900,44 @@ function renderAdmin(){
   </div>
   <div class="sec">Enter results (${unsettled.length} remaining)</div>`;
 
-  unsettled.forEach(m=>{
-    html+=`<div class="admin-row">
-      <div style="font-size:13px;font-weight:600;margin-bottom:7px">${m.home_flag}${m.home} vs ${m.away}${m.away_flag} <span style="font-weight:400;color:var(--muted)">· ${m.match_date}</span></div>
-      <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
-        <input id="ah_${m.id}" type="number" min="0" max="20" placeholder="${m.home.slice(0,4)}" style="width:90px;margin:0" />
-        <div class="score-sep">–</div>
-        <input id="aa_${m.id}" type="number" min="0" max="20" placeholder="${m.away.slice(0,4)}" style="width:90px;margin:0" />
-        <button class="btn btn-outline btn-sm" onclick="settle('${m.id}')">Settle</button>
-      </div>
+  // Group unsettled by settleable vs not
+  const settleable=unsettled.filter(m=>{ const s=matchStatus(m); return s==='inprogress'||s==='settled'; });
+  const notYet=unsettled.filter(m=>{ const s=matchStatus(m); return s==='open'||s==='future'; });
+
+  if(settleable.length){
+    settleable.forEach(m=>{
+      const s=matchStatus(m);
+      html+=`<div class="admin-row">
+        <div style="font-size:13px;font-weight:600;margin-bottom:7px">${m.home_flag}${m.home} vs ${m.away}${m.away_flag}
+          <span style="font-weight:400;color:var(--muted)">· ${m.match_date} · ${m.kickoff_ist||''} IST</span>
+          <span class="badge b-warn" style="margin-left:6px;font-size:10px">${s==='inprogress'?'In progress':'Played'}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+          <input id="ah_${m.id}" type="number" min="0" max="20" placeholder="${m.home.slice(0,4)}" style="width:90px;margin:0" />
+          <div class="score-sep">–</div>
+          <input id="aa_${m.id}" type="number" min="0" max="20" placeholder="${m.away.slice(0,4)}" style="width:90px;margin:0" />
+          <button class="btn btn-gold btn-sm" onclick="settle('${m.id}')" style="width:auto;padding:7px 14px;margin:0">Settle</button>
+        </div>
+      </div>`;
+    });
+  } else {
+    html+=`<div style="text-align:center;padding:16px;color:var(--muted);font-size:13px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;margin-bottom:8px">
+      No matches ready to settle yet — matches become settleable after kickoff
     </div>`;
-  });
+  }
+
+  if(notYet.length){
+    html+=`<div style="font-size:12px;font-weight:600;color:var(--muted);margin:12px 0 6px;letter-spacing:.4px;text-transform:uppercase">Not yet played (${notYet.length})</div>`;
+    notYet.forEach(m=>{
+      const s=matchStatus(m);
+      html+=`<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:10px 13px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;opacity:.7">
+        <div style="font-size:13px;color:var(--muted)">${m.home_flag}${m.home} vs ${m.away}${m.away_flag}
+          <span style="color:var(--muted);font-weight:400"> · ${m.match_date} · ${m.kickoff_ist||''} IST</span>
+        </div>
+        <span class="badge b-future" style="font-size:10px;flex-shrink:0">${s==='open'?'Open to predict':'Upcoming'}</span>
+      </div>`;
+    });
+  }
 
   if(settled.length){
     html+=`<div class="sec">Settled (${settled.length})</div>`;
