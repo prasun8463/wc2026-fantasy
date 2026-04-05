@@ -1305,7 +1305,7 @@ function renderHowTo(){
   if(el.innerHTML.trim())return;
   el.innerHTML=`
 
-  <div class="sec">Welcome to WC2026 Fantasy Predictor</div>
+  <div class="sec">FIFA 2026 Predictor</div>
   <div class="card" style="font-size:13px;line-height:1.8;color:var(--text)">
     Predict the exact scoreline of FIFA World Cup 2026 matches before kickoff. 
     Every prediction goes into a shared pot — the sharper your call, the bigger your share.
@@ -1797,16 +1797,36 @@ function renderAdmin(){
       No matches today — nothing to remind!
     </div>`;
 
+  // Determine which stages have activity (predictions or settled matches) — lock those
+  const stageHasActivity=(grps)=>MATCHES.some(m=>grps.includes(m.grp)&&((PREDS[m.id]&&PREDS[m.id].length>0)||m.resolved||matchStatus(m)==="inprogress"));
+  const groupLocked=stageHasActivity(['A','B','C','D','E','F','G','H','I','J','K','L']);
+  const r32Locked=stageHasActivity(['R32']);
+  const r16Locked=stageHasActivity(['R16']);
+  const qfLocked=stageHasActivity(['QF']);
+  const sfLocked=stageHasActivity(['SF','Final']);
+
+  function betInput(id, val, locked, label){
+    return locked
+      ? `<div><div class="field-label" style="display:flex;align-items:center;gap:5px">${label} <span style="font-size:9px;color:var(--warn);border:1px solid rgba(232,160,23,.3);border-radius:4px;padding:1px 5px">Locked</span></div>
+          <input id="${id}" type="number" value="${val}" min="1" style="margin:0;opacity:.5;pointer-events:none" disabled /></div>`
+      : `<div><div class="field-label">${label}</div><input id="${id}" type="number" value="${val}" min="1" style="margin:0" /></div>`;
+  }
+
+  const anyUnlocked=!groupLocked||!r32Locked||!r16Locked||!qfLocked||!sfLocked;
+
   let html=reminderHtml+`<div class="sec">Bet amounts by stage</div>
   <div class="card">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Locked stages have existing predictions or results and cannot be changed. Changes save to the database for all future calculations.</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-      <div><div class="field-label">Group stage (₹)</div><input id="bet-group" type="number" value="${bGroup}" min="1" style="margin:0" /></div>
-      <div><div class="field-label">Round of 32 (₹)</div><input id="bet-r32" type="number" value="${bR32}" min="1" style="margin:0" /></div>
-      <div><div class="field-label">Round of 16 (₹)</div><input id="bet-r16" type="number" value="${bR16}" min="1" style="margin:0" /></div>
-      <div><div class="field-label">Quarter-finals (₹)</div><input id="bet-qf" type="number" value="${bQF}" min="1" style="margin:0" /></div>
-      <div><div class="field-label">Semi-finals &amp; Final (₹)</div><input id="bet-sf" type="number" value="${bSF}" min="1" style="margin:0" /></div>
+      ${betInput('bet-group', bGroup, groupLocked, 'Group stage (₹)')}
+      ${betInput('bet-r32', bR32, r32Locked, 'Round of 32 (₹)')}
+      ${betInput('bet-r16', bR16, r16Locked, 'Round of 16 (₹)')}
+      ${betInput('bet-qf', bQF, qfLocked, 'Quarter-finals (₹)')}
+      ${betInput('bet-sf', bSF, sfLocked, 'Semi-finals & Final (₹)')}
     </div>
-    <button class="btn btn-gold btn-sm" onclick="updateBet()" style="width:auto;padding:8px 20px">Save bet amounts</button>
+    ${anyUnlocked
+      ? `<button class="btn btn-gold btn-sm" onclick="updateBet()" style="width:auto;padding:8px 20px">Save bet amounts</button>`
+      : `<div style="font-size:12px;color:var(--muted);font-style:italic">All stages are locked — predictions are in progress.</div>`}
   </div>
   <div class="sec">Enter results (${unsettled.length} remaining)</div>`;
 
@@ -1923,7 +1943,7 @@ async function updateBet(){
   const amounts={group:g,r32,r16,qf,sf};
   await sb.from('leagues').update({bet_amount:JSON.stringify(amounts)}).eq('id',LEAGUE.id);
   LEAGUE.bet_amount=amounts;
-  toast('Bet amounts saved!');
+  toast('Bet amounts saved to database!');
   renderAdmin();
 }
 
@@ -1980,11 +2000,11 @@ function renderAbout(){
   const el=document.getElementById('pane-about');
   if(el.innerHTML.trim())return;
   el.innerHTML=`
-  <div class="sec">Built with Claude AI</div>
+  <div class="sec">FIFA 2026 Predictor</div>
 
   <div class="card" style="margin-bottom:10px">
     <div style="font-size:22px;margin-bottom:10px">🤖⚽</div>
-    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:8px">What is this app?</div>
+    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:8px">What is FIFA 2026 Fantasy Predictor?</div>
     <div style="font-size:13px;line-height:1.8;color:var(--text)">
       WC2026 Fantasy Predictor is a friend-group betting app built for the FIFA World Cup 2026.
       Predict scorelines, win pots, track your league — all without touching a casino or a spreadsheet.
@@ -2032,29 +2052,6 @@ function renderAbout(){
       </div>
     </div>
   </div>
-
-  <div class="card" style="margin-bottom:10px">
-    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:8px">By the numbers</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <div style="background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.2);border-radius:10px;padding:12px;text-align:center">
-        <div style="font-size:28px;font-weight:700;color:var(--gold)">1</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:3px">HTML file</div>
-      </div>
-      <div style="background:rgba(76,175,80,.08);border:1px solid rgba(76,175,80,.2);border-radius:10px;padding:12px;text-align:center">
-        <div style="font-size:28px;font-weight:700;color:var(--success)">56</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:3px">Group stage fixtures</div>
-      </div>
-      <div style="background:rgba(55,138,221,.08);border:1px solid rgba(55,138,221,.2);border-radius:10px;padding:12px;text-align:center">
-        <div style="font-size:28px;font-weight:700;color:var(--info)">0</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:3px">Lines written manually</div>
-      </div>
-      <div style="background:rgba(232,160,32,.08);border:1px solid rgba(232,160,32,.2);border-radius:10px;padding:12px;text-align:center">
-        <div style="font-size:28px;font-weight:700;color:var(--warn)">∞</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:3px">Fun had building it</div>
-      </div>
-    </div>
-  </div>
-
 
 
   <div style="text-align:center;padding:20px 0 10px">
