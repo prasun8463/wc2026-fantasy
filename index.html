@@ -1144,11 +1144,10 @@ function renderLeague(){
       <div style="font-size:12px;color:var(--muted);margin-bottom:10px">${MEMBERS.length} member${MEMBERS.length!==1?'s':''} · Admin: ${LEAGUE.admin_username}</div>
       <div class="field-label">Share invite link with friends on WhatsApp</div>
       <div class="inv-box" id="inv-code">${LEAGUE.code}</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px">
-        <button class="btn btn-outline btn-sm" onclick="copyCode()" style="width:auto">Copy code</button>
-        <button class="btn btn-gold btn-sm" onclick="copyLink()" style="width:auto">Copy invite link</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn btn-gold" onclick="inviteOthers()" style="width:auto;padding:10px 20px">📲 Invite others</button>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Friends who open the invite link land straight on sign-up with your league pre-filled.</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Opens WhatsApp with a ready-to-send invite message including your league link.</div>
       <div class="ok-msg" id="copy-ok" style="display:none">Copied!</div>
     </div>
     <div class="card">
@@ -1161,14 +1160,7 @@ function renderLeague(){
       </div>`).join('')}
     </div>`;
   }
-  html+=`<div class="sec">Join a different league</div>
-  <div class="card">
-    <div class="field-label">Invite code</div>
-    <input id="jcode" type="text" placeholder="WC2026-XXXXX" autocomplete="off" />
-    <button class="btn btn-gold" onclick="joinLeague()">Join</button>
-    <div class="err" id="jerr"></div>
-    <div class="ok-msg" id="jok" style="display:none">Joined! Reloading...</div>
-  </div>`;
+
   document.getElementById('pane-league').innerHTML=html;
 }
 
@@ -1184,6 +1176,27 @@ function copyLink(){
   navigator.clipboard?.writeText(url).catch(()=>{});
   const ok=document.getElementById('copy-ok');
   if(ok){ok.textContent='Invite link copied!';ok.style.display='block';setTimeout(()=>ok.style.display='none',2500);}
+}
+
+function inviteOthers(){
+  const code=document.getElementById('inv-code')?.textContent;
+  if(!code){toast('League code not found');return;}
+  const url=window.location.origin+window.location.pathname+'?join='+encodeURIComponent(code);
+  const NL='\n';
+  const lines=[
+    '\u26bd *WC2026 Fantasy Predictor*',
+    '',
+    'Hey! I\'ve set up a fantasy prediction league for the FIFA World Cup 2026.',
+    'Join our group and predict match scorelines — winner takes the pot each match!',
+    '',
+    '\ud83d\udd17 Join here: '+url,
+    '',
+    'Just open the link and create an account — your league is already pre-filled.',
+    '',
+    'Let\'s see who has the sharpest football brain \ud83e\udd87',
+  ];
+  const msg=lines.join(NL);
+  window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
 }
 
 async function joinLeague(){
@@ -1438,7 +1451,7 @@ function renderHowTo(){
   <div style="font-size:12px;color:var(--muted)">The app tracks bets and balances but handles no actual payments. Settlement of real money is an informal arrangement between league members outside the app.</div></div>
 
   <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:4px">How do I invite friends?</div>
-  <div style="font-size:12px;color:var(--muted)">Go to the League tab → tap "Copy invite link" → share on WhatsApp. Friends land on sign-up with your league pre-filled. Easy.</div></div>
+  <div style="font-size:12px;color:var(--muted)">Go to the League tab → tap "Invite others" → WhatsApp opens with a ready-to-send message including your league link. Friends tap the link and land straight on sign-up with your league pre-filled.</div></div>
   `;
 }
 
@@ -1975,8 +1988,6 @@ function renderAbout(){
     <div style="font-size:13px;line-height:1.8;color:var(--text)">
       WC2026 Fantasy Predictor is a friend-group betting app built for the FIFA World Cup 2026.
       Predict scorelines, win pots, track your league — all without touching a casino or a spreadsheet.
-      It started as a simple idea over chai and somehow ended up with a knockout bracket, WhatsApp reminders,
-      and a leaderboard with highlight badges. As these things do.
     </div>
   </div>
 
@@ -2044,20 +2055,7 @@ function renderAbout(){
     </div>
   </div>
 
-  <div class="card" style="margin-bottom:10px;background:rgba(212,160,23,.06);border-color:rgba(212,160,23,.25)">
-    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:8px">A note on how this works</div>
-    <div style="font-size:13px;line-height:1.8;color:var(--text)">
-      This isn't a product. It's a proof of concept for what AI-assisted development feels like when you just
-      <em>describe what you want</em>. The design went through about 40 iterations. Features were added,
-      removed, debated, and refined — all in plain language. The AI never got tired of the feedback.
-      It never said "that's out of scope." It just built.
-    </div>
-    <div style="font-size:13px;line-height:1.8;color:var(--text);margin-top:8px">
-      The result is a real, working, multi-user web app with authentication, a live database,
-      a scoring engine, a leaderboard, a knockout bracket, and match-day prediction windows —
-      built entirely through conversation. That still feels a little wild.
-    </div>
-  </div>
+
 
   <div style="text-align:center;padding:20px 0 10px">
     <div style="font-size:13px;color:var(--muted)">Made with 🤖 + ☕ + ⚽</div>
