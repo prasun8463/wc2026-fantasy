@@ -6,109 +6,6 @@
 <meta name="theme-color" content="#0f1a0f">
 <title>WC2026 Fantasy</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-function renderAbout(){
-  const el=document.getElementById('pane-about');
-  if(el.innerHTML.trim())return;
-  el.innerHTML=`
-  <div class="sec">Built with Claude AI</div>
-
-  <div class="card" style="margin-bottom:10px">
-    <div style="font-size:22px;margin-bottom:10px">🤖⚽</div>
-    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:8px">What is this app?</div>
-    <div style="font-size:13px;line-height:1.8;color:var(--text)">
-      WC2026 Fantasy Predictor is a friend-group betting app built for the FIFA World Cup 2026.
-      Predict scorelines, win pots, track your league — all without touching a casino or a spreadsheet.
-      It started as a simple idea over chai and somehow ended up with a knockout bracket, WhatsApp reminders,
-      and a leaderboard with highlight badges. As these things do.
-    </div>
-  </div>
-
-  <div class="card" style="margin-bottom:10px">
-    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:8px">How was it made?</div>
-    <div style="font-size:13px;line-height:1.8;color:var(--text)">
-      Every single line of this app — the UI, the scoring engine, the database schema, the SQL resets,
-      the prediction visibility rules, the bracket diagram — was written in conversation with
-      <strong style="color:var(--gold)">Claude</strong> (Anthropic's AI). No traditional coding IDE.
-      No Stack Overflow rabbit holes. Just a long, iterative chat where one person described what they wanted
-      and Claude figured out how to build it.
-    </div>
-    <div style="font-size:13px;line-height:1.8;color:var(--text);margin-top:8px">
-      The entire app lives in a <strong style="color:var(--gold)">single HTML file</strong>. 
-      That was a deliberate choice — zero build tools, zero deployment pipelines, zero DevOps drama.
-      Just one file pushed to GitHub Pages and it's live for everyone.
-    </div>
-  </div>
-
-  <div class="card" style="margin-bottom:10px">
-    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:12px">The tech stack</div>
-    <div style="display:flex;flex-direction:column;gap:8px">
-      <div style="display:flex;align-items:flex-start;gap:12px">
-        <div style="font-size:20px;flex-shrink:0">🏗️</div>
-        <div><div style="font-size:13px;font-weight:600;color:var(--text)">Single HTML file</div>
-        <div style="font-size:12px;color:var(--muted)">Vanilla JS, CSS variables, no frameworks, no build step. Deployable anywhere that serves static files.</div></div>
-      </div>
-      <div style="display:flex;align-items:flex-start;gap:12px">
-        <div style="font-size:20px;flex-shrink:0">🗄️</div>
-        <div><div style="font-size:13px;font-weight:600;color:var(--text)">Supabase</div>
-        <div style="font-size:12px;color:var(--muted)">Postgres database in the cloud. Handles all match data, user accounts, predictions and league membership. Free tier, no backend server needed.</div></div>
-      </div>
-      <div style="display:flex;align-items:flex-start;gap:12px">
-        <div style="font-size:20px;flex-shrink:0">🚀</div>
-        <div><div style="font-size:13px;font-weight:600;color:var(--text)">GitHub Pages</div>
-        <div style="font-size:12px;color:var(--muted)">Free hosting. Push the HTML file, wait 60 seconds, it's live at a public URL. Every update is a git commit.</div></div>
-      </div>
-      <div style="display:flex;align-items:flex-start;gap:12px">
-        <div style="font-size:20px;flex-shrink:0">🤖</div>
-        <div><div style="font-size:13px;font-weight:600;color:var(--text)">Claude (claude.ai)</div>
-        <div style="font-size:12px;color:var(--muted)">The entire codebase was written through conversation. Requirements described in plain English, code delivered in seconds, bugs fixed by describing the symptom. No prior web dev experience required.</div></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="card" style="margin-bottom:10px">
-    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:8px">By the numbers</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <div style="background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.2);border-radius:10px;padding:12px;text-align:center">
-        <div style="font-size:28px;font-weight:700;color:var(--gold)">1</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:3px">HTML file</div>
-      </div>
-      <div style="background:rgba(76,175,80,.08);border:1px solid rgba(76,175,80,.2);border-radius:10px;padding:12px;text-align:center">
-        <div style="font-size:28px;font-weight:700;color:var(--success)">56</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:3px">Group stage fixtures</div>
-      </div>
-      <div style="background:rgba(55,138,221,.08);border:1px solid rgba(55,138,221,.2);border-radius:10px;padding:12px;text-align:center">
-        <div style="font-size:28px;font-weight:700;color:var(--info)">0</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:3px">Lines written manually</div>
-      </div>
-      <div style="background:rgba(232,160,32,.08);border:1px solid rgba(232,160,32,.2);border-radius:10px;padding:12px;text-align:center">
-        <div style="font-size:28px;font-weight:700;color:var(--warn)">∞</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:3px">Fun had building it</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="card" style="margin-bottom:10px;background:rgba(212,160,23,.06);border-color:rgba(212,160,23,.25)">
-    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:8px">A note on how this works</div>
-    <div style="font-size:13px;line-height:1.8;color:var(--text)">
-      This isn't a product. It's a proof of concept for what AI-assisted development feels like when you just
-      <em>describe what you want</em>. The design went through about 40 iterations. Features were added,
-      removed, debated, and refined — all in plain language. The AI never got tired of the feedback.
-      It never said "that's out of scope." It just built.
-    </div>
-    <div style="font-size:13px;line-height:1.8;color:var(--text);margin-top:8px">
-      The result is a real, working, multi-user web app with authentication, a live database,
-      a scoring engine, a leaderboard, a knockout bracket, and match-day prediction windows —
-      built entirely through conversation. That still feels a little wild.
-    </div>
-  </div>
-
-  <div style="text-align:center;padding:20px 0 10px">
-    <div style="font-size:13px;color:var(--muted)">Made with 🤖 + ☕ + ⚽</div>
-    <div style="font-size:11px;color:var(--muted);margin-top:4px">WC2026 Fantasy Predictor · ${new Date().getFullYear()}</div>
-  </div>
-  `;
-}
-
 </script>
 <style>
   /* ── PASTE YOUR SUPABASE CREDENTIALS BELOW (line ~20 in the script) ── */
@@ -2065,6 +1962,110 @@ function applyInviteParam(){
     localStorage.removeItem('wc2026_user'); setAuthLoading(false); applyInviteParam();
   }
 })();
+
+function renderAbout(){
+  const el=document.getElementById('pane-about');
+  if(el.innerHTML.trim())return;
+  el.innerHTML=`
+  <div class="sec">Built with Claude AI</div>
+
+  <div class="card" style="margin-bottom:10px">
+    <div style="font-size:22px;margin-bottom:10px">🤖⚽</div>
+    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:8px">What is this app?</div>
+    <div style="font-size:13px;line-height:1.8;color:var(--text)">
+      WC2026 Fantasy Predictor is a friend-group betting app built for the FIFA World Cup 2026.
+      Predict scorelines, win pots, track your league — all without touching a casino or a spreadsheet.
+      It started as a simple idea over chai and somehow ended up with a knockout bracket, WhatsApp reminders,
+      and a leaderboard with highlight badges. As these things do.
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:10px">
+    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:8px">How was it made?</div>
+    <div style="font-size:13px;line-height:1.8;color:var(--text)">
+      Every single line of this app — the UI, the scoring engine, the database schema, the SQL resets,
+      the prediction visibility rules, the bracket diagram — was written in conversation with
+      <strong style="color:var(--gold)">Claude</strong> (Anthropic's AI). No traditional coding IDE.
+      No Stack Overflow rabbit holes. Just a long, iterative chat where one person described what they wanted
+      and Claude figured out how to build it.
+    </div>
+    <div style="font-size:13px;line-height:1.8;color:var(--text);margin-top:8px">
+      The entire app lives in a <strong style="color:var(--gold)">single HTML file</strong>. 
+      That was a deliberate choice — zero build tools, zero deployment pipelines, zero DevOps drama.
+      Just one file pushed to GitHub Pages and it's live for everyone.
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:10px">
+    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:12px">The tech stack</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="font-size:20px;flex-shrink:0">🏗️</div>
+        <div><div style="font-size:13px;font-weight:600;color:var(--text)">Single HTML file</div>
+        <div style="font-size:12px;color:var(--muted)">Vanilla JS, CSS variables, no frameworks, no build step. Deployable anywhere that serves static files.</div></div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="font-size:20px;flex-shrink:0">🗄️</div>
+        <div><div style="font-size:13px;font-weight:600;color:var(--text)">Supabase</div>
+        <div style="font-size:12px;color:var(--muted)">Postgres database in the cloud. Handles all match data, user accounts, predictions and league membership. Free tier, no backend server needed.</div></div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="font-size:20px;flex-shrink:0">🚀</div>
+        <div><div style="font-size:13px;font-weight:600;color:var(--text)">GitHub Pages</div>
+        <div style="font-size:12px;color:var(--muted)">Free hosting. Push the HTML file, wait 60 seconds, it's live at a public URL. Every update is a git commit.</div></div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="font-size:20px;flex-shrink:0">🤖</div>
+        <div><div style="font-size:13px;font-weight:600;color:var(--text)">Claude (claude.ai)</div>
+        <div style="font-size:12px;color:var(--muted)">The entire codebase was written through conversation. Requirements described in plain English, code delivered in seconds, bugs fixed by describing the symptom. No prior web dev experience required.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:10px">
+    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:8px">By the numbers</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.2);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:var(--gold)">1</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">HTML file</div>
+      </div>
+      <div style="background:rgba(76,175,80,.08);border:1px solid rgba(76,175,80,.2);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:var(--success)">56</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">Group stage fixtures</div>
+      </div>
+      <div style="background:rgba(55,138,221,.08);border:1px solid rgba(55,138,221,.2);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:var(--info)">0</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">Lines written manually</div>
+      </div>
+      <div style="background:rgba(232,160,32,.08);border:1px solid rgba(232,160,32,.2);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:var(--warn)">∞</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">Fun had building it</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:10px;background:rgba(212,160,23,.06);border-color:rgba(212,160,23,.25)">
+    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:8px">A note on how this works</div>
+    <div style="font-size:13px;line-height:1.8;color:var(--text)">
+      This isn't a product. It's a proof of concept for what AI-assisted development feels like when you just
+      <em>describe what you want</em>. The design went through about 40 iterations. Features were added,
+      removed, debated, and refined — all in plain language. The AI never got tired of the feedback.
+      It never said "that's out of scope." It just built.
+    </div>
+    <div style="font-size:13px;line-height:1.8;color:var(--text);margin-top:8px">
+      The result is a real, working, multi-user web app with authentication, a live database,
+      a scoring engine, a leaderboard, a knockout bracket, and match-day prediction windows —
+      built entirely through conversation. That still feels a little wild.
+    </div>
+  </div>
+
+  <div style="text-align:center;padding:20px 0 10px">
+    <div style="font-size:13px;color:var(--muted)">Made with 🤖 + ☕ + ⚽</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:4px">WC2026 Fantasy Predictor · ${new Date().getFullYear()}</div>
+  </div>
+  `;
+}
+
 </script>
 </body>
 </html>
