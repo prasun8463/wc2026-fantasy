@@ -209,6 +209,7 @@
         <div class="err" id="l-err"></div>
         <button class="btn btn-gold" onclick="doLogin()">Sign in</button>
         <div class="toggle">No account? <span class="link" onclick="showReg()">Create one</span></div>
+        <div class="toggle" style="margin-top:6px">Forgot password? <span class="link" onclick="showForgot()">Reset it</span></div>
       </div>
 
       <!-- REGISTER FORM -->
@@ -216,10 +217,27 @@
         <div id="invite-banner" style="display:none;background:rgba(76,175,80,.12);border:1px solid rgba(76,175,80,.25);border-radius:8px;padding:9px 12px;font-size:12px;color:#81c784;margin-bottom:12px;text-align:center"></div>
         <div class="field"><div class="field-label">Username</div><input id="r-u" type="text" placeholder="e.g. golazo_king" autocomplete="username" /></div>
         <div class="field"><div class="field-label">Password</div><input id="r-p" type="password" placeholder="••••••" autocomplete="new-password" /></div>
+        <div class="field"><div class="field-label">Email <span style="color:var(--muted);font-size:10px">(needed for password recovery)</span></div><input id="r-e" type="email" placeholder="you@example.com" autocomplete="email" /></div>
         <div id="code-field" class="field"><div class="field-label">League invite code <span style="color:var(--muted)">(optional — leave blank to create a new league)</span></div><input id="r-c" type="text" placeholder="WC2026-XXXXX" autocomplete="off" /></div>
         <div class="err" id="r-err"></div>
         <button class="btn btn-gold" onclick="doRegister()">Create account</button>
         <div class="toggle">Already signed up? <span class="link" onclick="showLogin()">Sign in</span></div>
+      </div>
+
+      <!-- FORGOT PASSWORD FORM -->
+      <div id="frm-forgot" style="display:none">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6">Enter your username and the email you registered with. We'll generate a new password for you.</div>
+        <div class="field"><div class="field-label">Username</div><input id="f-u" type="text" placeholder="your username" autocomplete="username" /></div>
+        <div class="field"><div class="field-label">Email address</div><input id="f-e" type="email" placeholder="you@example.com" autocomplete="email" /></div>
+        <div class="err" id="f-err"></div>
+        <div id="f-ok" style="display:none;background:rgba(76,175,80,.12);border:1px solid rgba(76,175,80,.3);border-radius:10px;padding:14px;margin-bottom:10px">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Your new password is:</div>
+          <div id="f-newpwd" style="font-size:22px;font-weight:700;color:var(--gold);letter-spacing:3px;text-align:center;padding:8px 0;font-family:monospace"></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:8px;text-align:center">Write this down or screenshot it — it won't be shown again</div>
+        </div>
+        <button class="btn btn-gold" id="f-btn" onclick="doForgot()">Verify &amp; reset password</button>
+        <div id="f-done" style="display:none"><button class="btn btn-outline" onclick="showLogin()" style="margin-top:8px">Back to sign in</button></div>
+        <div class="toggle" style="margin-top:8px"><span class="link" onclick="showLogin()">Back to sign in</span></div>
       </div>
 
       <div id="auth-loading" style="display:none" class="loading"><div class="spinner"></div><br>Connecting...</div>
@@ -345,8 +363,24 @@ function toast(msg, dur=2400){
 }
 
 // ── Auth helpers ───────────────────────────────────────────────
-function showReg(){ document.getElementById('frm-login').style.display='none'; document.getElementById('frm-reg').style.display='block'; document.getElementById('auth-loading').style.display='none'; }
-function showLogin(){ document.getElementById('frm-reg').style.display='none'; document.getElementById('frm-login').style.display='block'; document.getElementById('auth-loading').style.display='none'; }
+function showReg(){
+  ['frm-login','frm-forgot','auth-loading'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('frm-reg').style.display='block';
+}
+function showLogin(){
+  ['frm-reg','frm-forgot','auth-loading'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('frm-login').style.display='block';
+  document.getElementById('l-err').textContent='';
+  document.getElementById('f-err').textContent='';
+  document.getElementById('f-ok').style.display='none';
+  document.getElementById('f-done').style.display='none';
+  document.getElementById('f-btn').style.display='block';
+}
+function showForgot(){
+  ['frm-login','frm-reg','auth-loading'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('frm-forgot').style.display='block';
+  document.getElementById('f-err').textContent='';
+}
 function setAuthLoading(on){
   document.getElementById('auth-loading').style.display=on?'block':'none';
   if(on){ document.getElementById('frm-login').style.display='none'; document.getElementById('frm-reg').style.display='none'; }
@@ -375,9 +409,11 @@ async function doLogin(){
 async function doRegister(){
   const u=document.getElementById('r-u').value.trim().toLowerCase();
   const p=document.getElementById('r-p').value;
+  const em=document.getElementById('r-e').value.trim().toLowerCase();
   const code=document.getElementById('r-c').value.trim().toUpperCase();
   const e=document.getElementById('r-err');
   if(!u||!p){e.textContent='Username and password required';return;}
+  if(!em||!em.includes('@')){e.textContent='Please enter a valid email address';return;}
   if(!/^[a-z0-9_]{2,20}$/.test(u)){e.textContent='2-20 chars, letters/numbers/underscore';return;}
   setAuthLoading(true);
   const {data:exists}=await sb.from('users').select('username').eq('username',u).single();
@@ -394,7 +430,7 @@ async function doRegister(){
     leagueId=lg.id;
   }
   const hash=await hashPass(p);
-  const {data:newUser,error:ue}=await sb.from('users').insert({username:u,password_hash:hash,league_id:leagueId,earned:0,spent:0}).select().single();
+  const {data:newUser,error:ue}=await sb.from('users').insert({username:u,password_hash:hash,league_id:leagueId,earned:0,spent:0,email:em}).select().single();
   if(ue){setAuthLoading(false);showReg();e.textContent='Error: '+ue.message;return;}
   e.textContent='';
   await launchApp(newUser);
@@ -404,6 +440,35 @@ function doLogout(){
   localStorage.removeItem('wc2026_user');
   // Hard reload — fetches fresh HTML from server, clears all state
   window.location.reload(true);
+}
+
+async function doForgot(){
+  const u=document.getElementById('f-u').value.trim().toLowerCase();
+  const em=document.getElementById('f-e').value.trim().toLowerCase();
+  const errEl=document.getElementById('f-err');
+  const okEl=document.getElementById('f-ok');
+  const pwdEl=document.getElementById('f-newpwd');
+  const btnEl=document.getElementById('f-btn');
+  const doneEl=document.getElementById('f-done');
+  errEl.textContent='';
+  if(!u||!em){errEl.textContent='Please enter both username and email';return;}
+  // Look up user
+  const {data,error}=await sb.from('users').select('*').eq('username',u).single();
+  if(error||!data){errEl.textContent='Username not found';return;}
+  if((data.email||'').toLowerCase()!==em){errEl.textContent='Email does not match our records';return;}
+  // Generate a random 8-char password: letters + numbers
+  const chars='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let newPwd='';
+  for(let i=0;i<8;i++) newPwd+=chars[Math.floor(Math.random()*chars.length)];
+  // Hash and save
+  const hash=await hashPass(newPwd);
+  const {error:ue}=await sb.from('users').update({password_hash:hash}).eq('username',u);
+  if(ue){errEl.textContent='Error updating password. Try again.';return;}
+  // Show the new password
+  pwdEl.textContent=newPwd;
+  okEl.style.display='block';
+  btnEl.style.display='none';
+  doneEl.style.display='block';
 }
 
 // ── Boot app ───────────────────────────────────────────────────
