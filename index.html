@@ -1959,6 +1959,7 @@ function renderAdmin(){
 }
 
 async function settle(mid){
+  if(!LEAGUE||!ME){toast('Not logged in');return;}
   const h=parseInt(document.getElementById('ah_'+mid)?.value);
   const a=parseInt(document.getElementById('aa_'+mid)?.value);
   if(isNaN(h)||isNaN(a)||h<0||a<0){toast('Enter valid scores');return;}
@@ -1990,7 +1991,8 @@ async function settle(mid){
     const ud=MEMBERS.find(x=>x.username===p.username);
     const curEarned=ud?.earned||0; const curSpent=ud?.spent||0;
     const earnAdd=winnerNames.includes(p.username)?share:0;
-    await sb.from('users').update({spent:curSpent+bet, earned:curEarned+earnAdd}).eq('username',p.username);
+    const betAmt=betFor(m);
+    await sb.from('users').update({spent:curSpent+betAmt, earned:curEarned+earnAdd}).eq('username',p.username);
   }
 
   toast('Match settled!');
@@ -1999,6 +2001,7 @@ async function settle(mid){
 }
 
 async function updateBet(){
+  if(!LEAGUE){toast('No league found');return;}
   const g=parseInt(document.getElementById('bet-group').value);
   const r32=parseInt(document.getElementById('bet-r32').value);
   const r16=parseInt(document.getElementById('bet-r16').value);
@@ -2013,6 +2016,7 @@ async function updateBet(){
 }
 
 async function addMatch(){
+  if(!LEAGUE){toast('No league found');return;}
   const id=document.getElementById('new-id').value.trim().toLowerCase();
   const grp=document.getElementById('new-grp').value.trim();
   const home=document.getElementById('new-home').value.trim();
