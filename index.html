@@ -603,8 +603,21 @@ function betFor(match){
 function parseBetAmount(raw){
   if(!raw) return 100;
   if(typeof raw==='number') return raw;
-  if(typeof raw==='object') return raw;
-  try{ const p=JSON.parse(raw); return p; }catch(e){ return parseInt(raw)||100; }
+  if(typeof raw==='object'){
+    // Ensure all values are integers (JSON from DB may give strings)
+    const out={};
+    for(const k in raw) out[k]=parseInt(raw[k])||100;
+    return out;
+  }
+  try{
+    const p=JSON.parse(raw);
+    if(typeof p==='object'){
+      const out={};
+      for(const k in p) out[k]=parseInt(p[k])||100;
+      return out;
+    }
+    return parseInt(p)||100;
+  }catch(e){ return parseInt(raw)||100; }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1365,9 +1378,9 @@ function closeScorecardSheet(){ document.getElementById('score-modal').classList
 //  HOW TO PLAY
 // ════════════════════════════════════════════════════════════════
 function renderHowTo(){
-  const bet=LEAGUE?.bet_amount?.group||LEAGUE?.bet_amount||100;
   const el=document.getElementById('pane-howto');
-  if(el.innerHTML.trim())return;
+  const ba=parseBetAmount(LEAGUE?.bet_amount);
+  const bet=parseInt(typeof ba==='object'?(ba.group||100):(ba||100));
   el.innerHTML=`
 
   <div class="sec">FIFA 2026 Predictor</div>
@@ -1841,11 +1854,11 @@ function renderAdmin(){
   const unsettled=MATCHES.filter(m=>!m.resolved);
   const settled=MATCHES.filter(m=>m.resolved);
   const ba=parseBetAmount(LEAGUE.bet_amount);
-  const bGroup=typeof ba==='object'?ba.group:ba||100;
-  const bR32=typeof ba==='object'?(ba.r32||ba.group||100):ba||100;
-  const bR16=typeof ba==='object'?(ba.r16||ba.group||100):ba||100;
-  const bQF=typeof ba==='object'?(ba.qf||ba.group||100):ba||100;
-  const bSF=typeof ba==='object'?(ba.sf||ba.group||100):ba||100;
+  const bGroup=typeof ba==='object'?parseInt(ba.group)||100:parseInt(ba)||100;
+  const bR32=typeof ba==='object'?parseInt(ba.r32||ba.group)||100:parseInt(ba)||100;
+  const bR16=typeof ba==='object'?parseInt(ba.r16||ba.group)||100:parseInt(ba)||100;
+  const bQF=typeof ba==='object'?parseInt(ba.qf||ba.group)||100:parseInt(ba)||100;
+  const bSF=typeof ba==='object'?parseInt(ba.sf||ba.group)||100:parseInt(ba)||100;
   // ── WhatsApp Reminder section ──
   const todayMatches=getTodayMatches();
   const reminderHtml=todayMatches.length>0?`
