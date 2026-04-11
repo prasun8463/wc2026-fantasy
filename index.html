@@ -815,14 +815,8 @@ function renderMatchList(){
       const mins=live?.minute?` ${live.minute}'`:'';
       rightHtml=`<div class="badge b-warn" style="animation:pulse 1.5s infinite;font-size:11px">🔴 ${sc}${mins}</div>`;
     } else if(status==='inprogress'){
-      // Past kickoff, no API data yet (April testing / API not live)
-      const fallbackBtn=isAdmin
-        ?`<button onclick="event.stopPropagation();openAdminSettle('${m.id}')" style="background:rgba(232,160,32,.2);color:var(--warn);border:1px solid rgba(232,160,32,.4);border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer;white-space:nowrap">Enter result</button>`
-        :'';
-      rightHtml=`<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-        <div class="badge b-inprogress" style="flex-shrink:0;animation:pulse 1.5s infinite">In progress</div>
-        ${fallbackBtn}
-      </div>`;
+      // Past kickoff but not 105 mins yet — locked
+      rightHtml=`<div class="badge b-inprogress" style="flex-shrink:0;animation:pulse 1.5s infinite">In progress</div>`;
     } else if(status==='open'){
       rightHtml=canPredict
         ?`<button style="background:var(--gold);color:var(--dark);border:none;border-radius:8px;padding:6px 13px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();toggleMatchSheet('${m.id}')">Predict</button>`
@@ -1364,7 +1358,8 @@ function showScorecardModal(type){
 
   document.getElementById('modal-title').textContent=titles[type];
 
-  const totalSpent=matches.length*(LEAGUE?.bet_amount?.group||LEAGUE?.bet_amount||100);
+  const _sba=parseBetAmount(LEAGUE?.bet_amount); const _sbet=typeof _sba==='object'?parseInt(_sba.group)||100:parseInt(_sba)||100;
+  const totalSpent=matches.length*_sbet;
   const totalWon=matches.filter(m=>(m.resolved_winners||[]).includes(ME.username)).reduce((s,m)=>s+(m.resolved_share||0),0);
   let topHtml=`<div class="pot-strip">
     <div class="pot-cell"><div class="pot-lbl">Matches</div><div class="pot-val">${matches.length}</div></div>
@@ -2081,7 +2076,9 @@ function renderAdmin(){
   <div class="sec">Enter results (${unsettled.length} remaining)</div>`;
 
   // Group unsettled by settleable vs not
-  const settleable=unsettled.filter(m=>{ const s=matchStatus(m); return s==='inprogress'||s==='settled'; });
+  // Settleable = API says FT, OR 105 mins have elapsed since kickoff (fallback)
+  const settleable=unsettled.filter(m=>{ const s=matchStatus(m); return s==='finished'; });
+  const inProgress=unsettled.filter(m=>{ const s=matchStatus(m); return s==='inprogress'||s==='live'; });
   const notYet=unsettled.filter(m=>{ const s=matchStatus(m); return s==='open'||s==='future'; });
 
   if(settleable.length){
@@ -2108,6 +2105,18 @@ function renderAdmin(){
     html+=`<div style="text-align:center;padding:16px;color:var(--muted);font-size:13px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;margin-bottom:8px">
       No matches ready to settle yet — matches become settleable after kickoff
     </div>`;
+  }
+
+  if(inProgress.length){
+    html+=`<div style="font-size:12px;font-weight:600;color:var(--warn);margin:12px 0 6px;letter-spacing:.4px;text-transform:uppercase">In progress — settle unlocks after 105 mins (${inProgress.length})</div>`;
+    inProgress.forEach(m=>{
+      html+=`<div style="background:rgba(232,160,32,.04);border:1px solid rgba(232,160,32,.2);border-radius:10px;padding:10px 13px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;opacity:.85">
+        <div style="font-size:13px;color:var(--text)">${m.home_flag}${m.home} vs ${m.away}${m.away_flag}
+          <span style="color:var(--muted);font-weight:400"> · ${m.match_date} · ${m.kickoff_ist||''} IST</span>
+        </div>
+        <span class="badge b-warn" style="font-size:10px;flex-shrink:0;animation:pulse 1.5s infinite">Live</span>
+      </div>`;
+    });
   }
 
   if(notYet.length){
