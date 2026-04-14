@@ -181,6 +181,9 @@
 
   /* ── ADMIN ── */
   .admin-row { background: rgba(255,255,255,.03); border: 1px solid var(--border); border-radius: 10px; padding: 11px 13px; margin-bottom: 8px; }
+  .scorecard-cell { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.09); border-radius: 9px; padding: 10px 6px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+  .scorecard-num { font-size: 22px; font-weight: 700; margin-bottom: 2px; }
+  .scorecard-lbl { font-size: 10px; color: var(--muted); }
 
   /* ── MISC ── */
   .grp-head { font-size: 11px; font-weight: 600; color: var(--muted); padding: 8px 0 4px; border-bottom: 1px solid var(--border); margin-bottom: 5px; letter-spacing: .5px; }
@@ -328,7 +331,6 @@
     <div id="pp-body"><div style="font-size:12px;color:var(--muted);text-align:center;padding:12px 0">Tap a card above to see matches</div></div>
     <button class="sheet-close-btn" onclick="document.getElementById('player-modal').classList.remove('open')">Close</button>
   </div>
-</div>
 </div>
 
 <script>
