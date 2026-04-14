@@ -1186,10 +1186,6 @@ function buildPlayerInline(username){
   const matchListHtml = ppActiveType ? '' : '';
 
   return '<div id="pp-inline-'+username+'" style="background:rgba(212,160,23,.04);border:1px solid rgba(212,160,23,.2);border-radius:10px;padding:12px;margin-bottom:6px;margin-top:-4px">'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
-      +'<div style="font-size:12px;color:var(--muted)">'+settled.length+' played</div>'
-      +'<div style="font-size:18px;font-weight:700;color:'+(pl>0?'var(--success)':pl<0?'var(--red)':'var(--muted)')+'">'+((pl>=0?'+':'')+pl)+'</div>'
-    +'</div>'
     +'<div style="display:flex;gap:6px;margin-bottom:10px">'
       +chip('exact',exact,'var(--success)','Exact')
       +chip('outcome',outcome_win,'var(--warn)','Outcome')
@@ -1304,34 +1300,9 @@ function renderLB(){
     });
   }
 
-  // ── Build accuracy html ──
+  // ── Build accuracy html — just recent results (hit% shown in standings rows) ──
   let accuracyHtml='';
   if(settledMatches.length>0){
-    const accSorted=[...playerStats].sort((a,b)=>b.acc-a.acc);
-    accuracyHtml+=`<div class="sec" style="margin-top:16px">Prediction accuracy</div>
-    <div style="border-radius:10px;border:1px solid var(--border);overflow:hidden">
-    <table style="width:100%;border-collapse:collapse;font-size:12px">
-      <thead><tr style="background:rgba(255,255,255,.04)">
-        <th style="padding:9px 12px;text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Player</th>
-        <th style="padding:9px 6px;text-align:center;color:var(--success);font-weight:600;border-bottom:1px solid var(--border)">Exact</th>
-        <th style="padding:9px 6px;text-align:center;color:var(--warn);font-weight:600;border-bottom:1px solid var(--border)">Out</th>
-        <th style="padding:9px 6px;text-align:center;color:var(--red);font-weight:600;border-bottom:1px solid var(--border)">Wrong</th>
-        <th style="padding:9px 6px;text-align:center;color:var(--info);font-weight:600;border-bottom:1px solid var(--border)">Ref</th>
-        <th style="padding:9px 8px;text-align:center;color:var(--gold);font-weight:700;border-bottom:1px solid var(--border)">Hit%</th>
-      </tr></thead>
-      <tbody>`;
-    accSorted.forEach((s,i)=>{
-      const isMe=s.u.username===ME.username;
-      accuracyHtml+=`<tr style="${isMe?'background:rgba(55,138,221,.08)':i%2===1?'background:rgba(255,255,255,.02)':''}">
-        <td style="padding:9px 12px;font-weight:${isMe?700:600};border-bottom:1px solid var(--border);color:${isMe?'var(--info)':'var(--text)'}">${s.u.username}${isMe?' <span style="font-size:10px;color:var(--muted)">(you)</span>':''}</td>
-        <td style="padding:9px 6px;text-align:center;border-bottom:1px solid var(--border);color:var(--success);font-weight:${s.exact>0?700:400}">${s.exact||'—'}</td>
-        <td style="padding:9px 6px;text-align:center;border-bottom:1px solid var(--border);color:var(--warn);font-weight:${s.outcome_win>0?700:400}">${s.outcome_win||'—'}</td>
-        <td style="padding:9px 6px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted)">${s.wrong||'—'}</td>
-        <td style="padding:9px 6px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted)">${s.skipped||'—'}</td>
-        <td style="padding:9px 8px;text-align:center;border-bottom:1px solid var(--border);color:${s.acc>=50?'var(--success)':s.acc>=30?'var(--warn)':'var(--red)'};font-weight:700">${s.participated>0?s.acc+'%':'—'}</td>
-      </tr>`;
-    });
-    accuracyHtml+=`</tbody></table></div>`;
 
     // Recent results — last 5 settled matches
     const recentMatches=[...settledMatches].sort((a,b)=>{
