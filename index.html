@@ -1269,33 +1269,39 @@ function renderLB(){
     sortedMembers.forEach((u,i)=>{
       const isMe=u.username===ME.username;
       const pc=Object.values(PREDS).filter(arr=>arr.find(p=>p.username===u.username)).length;
-      standingsHtml+=`<div onclick="showPlayerPopup('${u.username}')" style="cursor:pointer;background:${isMe?'rgba(55,138,221,.08)':'var(--card)'};border:1px solid ${isMe?'rgba(55,138,221,.3)':'var(--border)'};${isMe?'border-left:3px solid var(--info);':''}border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:6px">
-        <div style="font-size:${i<3?20:14}px;font-weight:700;color:var(--muted);width:26px;text-align:center">${i<3?medals[i]:i+1}</div>
-        <div class="av" style="background:${avc(u.username)};width:38px;height:38px;font-size:13px">${ini(u.username)}</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:15px;font-weight:700;color:${isMe?'var(--info)':'var(--text)'}">${u.username}${isMe?' <span style="font-size:10px;color:var(--muted)">(you)</span>':''}</div>
-          <div style="font-size:11px;color:var(--muted)">${pc} predictions</div>
-        </div>
-        <div style="color:rgba(255,255,255,.25);font-size:14px">›</div>
-      </div>`;
+      const bgMe0=isMe?'rgba(55,138,221,.08)':'var(--card)';
+      const bdMe0=isMe?'rgba(55,138,221,.3)':'rgba(255,255,255,.09)';
+      const blMe0=isMe?'border-left:3px solid var(--info);':'';
+      standingsHtml+='<div onclick="showPlayerPopup(\''+u.username+'\')" style="cursor:pointer;background:'+bgMe0+';border:1px solid '+bdMe0+';'+blMe0+'border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:6px">'
+        +'<div style="font-size:'+(i<3?20:14)+'px;font-weight:700;color:var(--muted);width:26px;text-align:center">'+(i<3?medals[i]:i+1)+'</div>'
+        +'<div class="av" style="background:'+avc(u.username)+';width:38px;height:38px;font-size:13px">'+ini(u.username)+'</div>'
+        +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:15px;font-weight:700;color:'+(isMe?'var(--info)':'var(--text)')+'">'+u.username+(isMe?' <span style="font-size:10px;color:var(--muted)">(you)</span>':'')+'</div>'
+          +'<div style="font-size:11px;color:var(--muted)">'+pc+' predictions</div>'
+        +'</div>'
+        +'<div style="color:rgba(255,255,255,.25);font-size:14px">›</div>'
+      +'</div>';
     });
   } else {
     sortedMembers.forEach((u,i)=>{
       const isMe=u.username===ME.username;
       const s=calcRoundStats(u.username);
       const ps=playerStats.find(p=>p.u.username===u.username)||{participated:0,acc:0};
-      standingsHtml+=`<div onclick="showPlayerPopup('${u.username}')" style="cursor:pointer;background:${isMe?'rgba(55,138,221,.08)':'var(--card)'};border:1px solid ${isMe?'rgba(55,138,221,.3)':'var(--border)'};${isMe?'border-left:3px solid var(--info);':''}border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:6px;transition:border-color .15s" onmouseover="this.style.borderColor='rgba(212,160,23,.4)'" onmouseout="this.style.borderColor='${isMe?'rgba(55,138,221,.3)':'rgba(255,255,255,.09)'}'">
-        <div style="font-size:${i<3?20:14}px;font-weight:700;color:var(--muted);width:26px;text-align:center;flex-shrink:0">${i<3?medals[i]:i+1}</div>
-        <div class="av" style="background:${avc(u.username)};width:38px;height:38px;font-size:13px;flex-shrink:0">${ini(u.username)}</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:15px;font-weight:700;color:${isMe?'var(--info)':'var(--text)'}">${u.username}${isMe?' <span style="font-size:10px;color:var(--muted)">(you)</span>':''}</div>
-          <div style="font-size:11px;color:var(--muted)">${ps.participated} played · ${ps.participated>0?ps.acc+'% hit':'no data'}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-          <div style="font-size:17px;font-weight:700;color:${plColor(s.overall.pl)}">${fmtPL(s.overall.pl)}</div>
-          <div style="color:rgba(255,255,255,.25);font-size:14px">›</div>
-        </div>
-      </div>`;
+      const bgMe=isMe?'rgba(55,138,221,.08)':'var(--card)';
+      const bdMe=isMe?'rgba(55,138,221,.3)':'rgba(255,255,255,.09)';
+      const blMe=isMe?'border-left:3px solid var(--info);':'';
+      standingsHtml+='<div onclick="showPlayerPopup(\''+u.username+'\')" style="cursor:pointer;background:'+bgMe+';border:1px solid '+bdMe+';'+blMe+'border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:6px">'
+        +'<div style="font-size:'+(i<3?20:14)+'px;font-weight:700;color:var(--muted);width:26px;text-align:center;flex-shrink:0">'+(i<3?medals[i]:i+1)+'</div>'
+        +'<div class="av" style="background:'+avc(u.username)+';width:38px;height:38px;font-size:13px;flex-shrink:0">'+ini(u.username)+'</div>'
+        +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:15px;font-weight:700;color:'+(isMe?'var(--info)':'var(--text)')+'">'+u.username+(isMe?' <span style="font-size:10px;color:var(--muted)">(you)</span>':'')+'</div>'
+          +'<div style="font-size:11px;color:var(--muted)">'+ps.participated+' played · '+(ps.participated>0?ps.acc+'% hit':'no data')+'</div>'
+        +'</div>'
+        +'<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'
+          +'<div style="font-size:17px;font-weight:700;color:'+plColor(s.overall.pl)+'">'+fmtPL(s.overall.pl)+'</div>'
+          +'<div style="color:rgba(255,255,255,.25);font-size:14px">›</div>'
+        +'</div>'
+      +'</div>';
     });
   }
 
