@@ -260,8 +260,7 @@
 
   <div class="tab-bar">
     <div class="tab"     onclick="goTab('howto')">How to Play</div>
-    <div class="tab on"  onclick="goTab('dash')">Dashboard</div>
-    <div class="tab"     onclick="goTab('lb')">Leaderboard</div>
+    <div class="tab on"  onclick="goTab('lb')">Standings</div>
     <div class="tab"     onclick="goTab('matches')">Matches</div>
     <div class="tab"     onclick="goTab('groups')">Tournament</div>
     <div class="tab"     onclick="goTab('league')">League</div>
@@ -270,8 +269,7 @@
   </div>
 
   <div id="pane-howto"   class="pane"></div>
-  <div id="pane-dash"    class="pane on"><div class="loading"><div class="spinner"></div></div></div>
-  <div id="pane-lb"      class="pane"><div class="loading"><div class="spinner"></div></div></div>
+  <div id="pane-lb"      class="pane on"><div class="loading"><div class="spinner"></div></div></div>
   <div id="pane-matches" class="pane"><div class="loading"><div class="spinner"></div></div></div>
   <div id="pane-groups"  class="pane"><div class="loading"><div class="spinner"></div></div></div>
   <div id="pane-league"  class="pane"><div class="loading"><div class="spinner"></div></div></div>
@@ -295,6 +293,40 @@
     </div>
     <div id="ms-body"></div>
     <button class="sheet-close-btn" onclick="closeMatchSheet()">Close</button>
+  </div>
+<!-- PLAYER POPUP MODAL -->
+<div class="modal-overlay" id="player-modal" onclick="closePlayerPopup(event)">
+  <div class="modal-box">
+    <div class="modal-header" style="display:flex;align-items:center;gap:10px">
+      <div id="pp-av" class="av" style="width:42px;height:42px;font-size:14px;flex-shrink:0"></div>
+      <div style="flex:1">
+        <div id="pp-name" style="font-size:15px;font-weight:700;color:var(--text)"></div>
+        <div id="pp-sub" style="font-size:11px;color:var(--muted);margin-top:2px"></div>
+      </div>
+      <div id="pp-net" style="font-size:20px;font-weight:700;flex-shrink:0"></div>
+      <button style="background:transparent;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0;line-height:1;margin-left:4px" onclick="document.getElementById('player-modal').classList.remove('open')">&#x2715;</button>
+    </div>
+    <!-- 4 chips -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:14px 0 12px">
+      <div class="scorecard-cell" id="pp-c-exact" onclick="ppShowType('exact')" style="cursor:pointer">
+        <div id="pp-v-exact" class="scorecard-num" style="color:var(--success)">0</div>
+        <div class="scorecard-lbl">Exact</div>
+      </div>
+      <div class="scorecard-cell" id="pp-c-outcome" onclick="ppShowType('outcome')" style="cursor:pointer">
+        <div id="pp-v-outcome" class="scorecard-num" style="color:var(--warn)">0</div>
+        <div class="scorecard-lbl">Outcome</div>
+      </div>
+      <div class="scorecard-cell" id="pp-c-wrong" onclick="ppShowType('wrong')" style="cursor:pointer">
+        <div id="pp-v-wrong" class="scorecard-num" style="color:var(--red)">0</div>
+        <div class="scorecard-lbl">Wrong</div>
+      </div>
+      <div class="scorecard-cell" id="pp-c-refund" onclick="ppShowType('refund')" style="cursor:pointer">
+        <div id="pp-v-refund" class="scorecard-num" style="color:var(--info)">0</div>
+        <div class="scorecard-lbl">Refund</div>
+      </div>
+    </div>
+    <div id="pp-body"><div style="font-size:12px;color:var(--muted);text-align:center;padding:12px 0">Tap a card above to see matches</div></div>
+    <button class="sheet-close-btn" onclick="document.getElementById('player-modal').classList.remove('open')">Close</button>
   </div>
 </div>
 </div>
@@ -489,7 +521,7 @@ async function launchApp(user){
   const av=document.getElementById('nav-av');
   av.textContent=ini(ME.username); av.style.background=avc(ME.username);
   await loadAll();
-  renderDash();
+  renderLB();
   startLivePolling(); // begin live score polling
 }
 
@@ -537,7 +569,7 @@ async function refreshMe(){
 
 // ── Tab routing ────────────────────────────────────────────────
 function goTab(t){
-  const names=['howto','dash','lb','matches','groups','league','admin','about'];
+  const names=['howto','lb','matches','groups','league','admin','about'];
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('on',names[i]===t));
   document.querySelectorAll('.pane').forEach((el,i)=>el.classList.toggle('on',names[i]===t));
   if(t==='dash')renderDash();
@@ -546,6 +578,7 @@ function goTab(t){
   if(t==='league')renderLeague();
   if(t==='groups')renderGroups();
   if(t==='howto')renderHowTo();
+  if(t==='lb')renderLB();
   if(t==='admin')renderAdmin();
   if(t==='about')renderAbout();
 }
@@ -1092,6 +1125,90 @@ async function cancelPred(mid){
 }
 
 // ════════════════════════════════════════════════════════════════
+//  PLAYER POPUP — tap any standings row to see their breakdown
+// ════════════════════════════════════════════════════════════════
+let ppActiveType=null;
+
+function showPlayerPopup(username){
+  const u=MEMBERS.find(x=>x.username===username);
+  if(!u) return;
+  const settled=MATCHES.filter(m=>m.resolved&&(PREDS[m.id]||[]).find(p=>p.username===username));
+  const isMe=username===ME.username;
+  let exact=0,outcome_win=0,wrong=0,refund=0;
+  settled.forEach(m=>{
+    const won=(m.resolved_winners||[]).includes(username);
+    if(m.resolved_type==='exact'&&won) exact++;
+    else if(m.resolved_type==='outcome'&&won) outcome_win++;
+    else if(m.resolved_type==='refund'&&won) refund++;
+    else wrong++;
+  });
+  const participated=exact+outcome_win+wrong+refund;
+  const acc=participated>0?Math.round(((exact+outcome_win)/participated)*100):0;
+  const pl=(u.earned||0)-(u.spent||0);
+  const sorted=[...MEMBERS].sort((a,b)=>((b.earned||0)-(b.spent||0))-((a.earned||0)-(a.spent||0)));
+  const rank=sorted.findIndex(x=>x.username===username)+1;
+  document.getElementById('pp-av').textContent=ini(username);
+  document.getElementById('pp-av').style.background=avc(username);
+  document.getElementById('pp-name').textContent=username+(isMe?' (you)':'');
+  document.getElementById('pp-name').style.color=isMe?'var(--info)':'var(--text)';
+  document.getElementById('pp-sub').textContent='Rank '+rank+' · '+participated+' played · '+acc+'% hit';
+  const netEl=document.getElementById('pp-net');
+  netEl.textContent=(pl>=0?'+':'')+pl;
+  netEl.style.color=pl>0?'var(--success)':pl<0?'var(--red)':'var(--muted)';
+  document.getElementById('pp-v-exact').textContent=exact;
+  document.getElementById('pp-v-outcome').textContent=outcome_win;
+  document.getElementById('pp-v-wrong').textContent=wrong;
+  document.getElementById('pp-v-refund').textContent=refund;
+  ['exact','outcome','wrong','refund'].forEach(t=>{
+    document.getElementById('pp-c-'+t).style.borderColor='rgba(255,255,255,.09)';
+    document.getElementById('pp-c-'+t).style.background='rgba(255,255,255,.04)';
+  });
+  document.getElementById('pp-body').innerHTML='<div style="font-size:12px;color:var(--muted);text-align:center;padding:12px 0">Tap a card above to see matches</div>';
+  ppActiveType=null;
+  window._ppUsername=username;
+  document.getElementById('player-modal').classList.add('open');
+}
+
+function ppShowType(type){
+  if(ppActiveType===type) return;
+  ppActiveType=type;
+  const username=window._ppUsername;
+  const settled=MATCHES.filter(m=>m.resolved&&(PREDS[m.id]||[]).find(p=>p.username===username));
+  const _sba=parseBetAmount(LEAGUE?.bet_amount);
+  const _sbet=typeof _sba==='object'?parseInt(_sba.group)||100:parseInt(_sba)||100;
+  let matches=[];
+  if(type==='exact') matches=settled.filter(m=>(m.resolved_winners||[]).includes(username)&&m.resolved_type==='exact');
+  else if(type==='outcome') matches=settled.filter(m=>(m.resolved_winners||[]).includes(username)&&m.resolved_type==='outcome');
+  else if(type==='wrong') matches=settled.filter(m=>!(m.resolved_winners||[]).includes(username));
+  else if(type==='refund') matches=settled.filter(m=>(m.resolved_winners||[]).includes(username)&&m.resolved_type==='refund');
+  ['exact','outcome','wrong','refund'].forEach(t=>{
+    const el=document.getElementById('pp-c-'+t);
+    if(t===type){el.style.borderColor='rgba(212,160,23,.5)';el.style.background='rgba(212,160,23,.06)';}
+    else{el.style.borderColor='rgba(255,255,255,.09)';el.style.background='rgba(255,255,255,.04)';}
+  });
+  if(!matches.length){
+    document.getElementById('pp-body').innerHTML='<div style="font-size:12px;color:var(--muted);text-align:center;padding:12px 0">No matches in this category</div>';
+    return;
+  }
+  const payColor={exact:'var(--success)',outcome:'var(--warn)',wrong:'var(--red)',refund:'var(--info)'};
+  let html='';
+  matches.forEach(m=>{
+    const myP=(PREDS[m.id]||[]).find(p=>p.username===username);
+    const won=(m.resolved_winners||[]).includes(username);
+    const pay=won?'+₹'+m.resolved_share:'-₹'+_sbet;
+    html+='<div class="modal-row"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><div>'
+      +'<div style="font-weight:600;font-size:13px;margin-bottom:3px">'+m.home_flag+m.home+' <span style="color:var(--gold)">'+m.result_home+'–'+m.result_away+'</span> '+m.away+m.away_flag+'</div>'
+      +'<div style="font-size:11px;color:var(--muted)">Predicted: <strong style="color:var(--text)">'+(myP?myP.pred_home+'–'+myP.pred_away:'—')+'</strong> · '+m.match_date+' · Grp '+m.grp+'</div>'
+      +'</div><div style="text-align:right;flex-shrink:0;font-size:13px;font-weight:700;color:'+payColor[type]+'">'+pay+'</div></div></div>';
+  });
+  document.getElementById('pp-body').innerHTML=html;
+}
+
+function closePlayerPopup(e){
+  if(e.target.id==='player-modal') document.getElementById('player-modal').classList.remove('open');
+}
+
+// ════════════════════════════════════════════════════════════════
 //  LEADERBOARD — rich per-round table
 // ════════════════════════════════════════════════════════════════
 function renderLB(){
@@ -1150,13 +1267,14 @@ function renderLB(){
     sortedMembers.forEach((u,i)=>{
       const isMe=u.username===ME.username;
       const pc=Object.values(PREDS).filter(arr=>arr.find(p=>p.username===u.username)).length;
-      standingsHtml+=`<div style="background:${isMe?'rgba(55,138,221,.08)':'var(--card)'};border:1px solid ${isMe?'rgba(55,138,221,.3)':'var(--border)'};${isMe?'border-left:3px solid var(--info);':''}border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:6px">
+      standingsHtml+=`<div onclick="showPlayerPopup('${u.username}')" style="cursor:pointer;background:${isMe?'rgba(55,138,221,.08)':'var(--card)'};border:1px solid ${isMe?'rgba(55,138,221,.3)':'var(--border)'};${isMe?'border-left:3px solid var(--info);':''}border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:6px">
         <div style="font-size:${i<3?20:14}px;font-weight:700;color:var(--muted);width:26px;text-align:center">${i<3?medals[i]:i+1}</div>
         <div class="av" style="background:${avc(u.username)};width:38px;height:38px;font-size:13px">${ini(u.username)}</div>
         <div style="flex:1;min-width:0">
           <div style="font-size:15px;font-weight:700;color:${isMe?'var(--info)':'var(--text)'}">${u.username}${isMe?' <span style="font-size:10px;color:var(--muted)">(you)</span>':''}</div>
           <div style="font-size:11px;color:var(--muted)">${pc} predictions</div>
         </div>
+        <div style="color:rgba(255,255,255,.25);font-size:14px">›</div>
       </div>`;
     });
   } else {
@@ -1164,15 +1282,16 @@ function renderLB(){
       const isMe=u.username===ME.username;
       const s=calcRoundStats(u.username);
       const ps=playerStats.find(p=>p.u.username===u.username)||{participated:0,acc:0};
-      standingsHtml+=`<div style="background:${isMe?'rgba(55,138,221,.08)':'var(--card)'};border:1px solid ${isMe?'rgba(55,138,221,.3)':'var(--border)'};${isMe?'border-left:3px solid var(--info);':''}border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:6px">
+      standingsHtml+=`<div onclick="showPlayerPopup('${u.username}')" style="cursor:pointer;background:${isMe?'rgba(55,138,221,.08)':'var(--card)'};border:1px solid ${isMe?'rgba(55,138,221,.3)':'var(--border)'};${isMe?'border-left:3px solid var(--info);':''}border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:6px;transition:border-color .15s" onmouseover="this.style.borderColor='rgba(212,160,23,.4)'" onmouseout="this.style.borderColor='${isMe?'rgba(55,138,221,.3)':'rgba(255,255,255,.09)'}'">
         <div style="font-size:${i<3?20:14}px;font-weight:700;color:var(--muted);width:26px;text-align:center;flex-shrink:0">${i<3?medals[i]:i+1}</div>
         <div class="av" style="background:${avc(u.username)};width:38px;height:38px;font-size:13px;flex-shrink:0">${ini(u.username)}</div>
         <div style="flex:1;min-width:0">
           <div style="font-size:15px;font-weight:700;color:${isMe?'var(--info)':'var(--text)'}">${u.username}${isMe?' <span style="font-size:10px;color:var(--muted)">(you)</span>':''}</div>
           <div style="font-size:11px;color:var(--muted)">${ps.participated} played · ${ps.participated>0?ps.acc+'% hit':'no data'}</div>
         </div>
-        <div style="text-align:right;flex-shrink:0">
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
           <div style="font-size:17px;font-weight:700;color:${plColor(s.overall.pl)}">${fmtPL(s.overall.pl)}</div>
+          <div style="color:rgba(255,255,255,.25);font-size:14px">›</div>
         </div>
       </div>`;
     });
@@ -1207,24 +1326,38 @@ function renderLB(){
     });
     accuracyHtml+=`</tbody></table></div>`;
 
-    // Most debated match
-    let hotMatch=null,hotVar=0;
-    settledMatches.forEach(m=>{
-      const preds=(PREDS[m.id]||[]);
-      if(preds.length<2)return;
-      const unique=new Set(preds.map(p=>outcome(p.pred_home,p.pred_away))).size;
-      if(unique>hotVar){hotVar=unique;hotMatch=m;}
-    });
-    if(hotMatch){
-      const preds=PREDS[hotMatch.id]||[];
-      accuracyHtml+=`<div class="sec" style="margin-top:16px">Most debated match</div>
-      <div class="card">
-        <div style="font-weight:600;font-size:13px;margin-bottom:6px">${hotMatch.home_flag}${hotMatch.home} ${hotMatch.result_home}–${hotMatch.result_away} ${hotMatch.away}${hotMatch.away_flag}</div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">${preds.length} different predictions</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">
-          ${preds.map(p=>{const won=(hotMatch.resolved_winners||[]).includes(p.username);return`<div style="background:${won?'rgba(76,175,80,.15)':'rgba(255,255,255,.04)'};border:1px solid ${won?'rgba(76,175,80,.3)':'var(--border)'};border-radius:7px;padding:4px 9px;font-size:11px"><span style="color:var(--muted)">${p.username}</span> <strong style="color:${won?'var(--success)':'var(--text)'}">${p.pred_home}–${p.pred_away}</strong></div>`;}).join('')}
-        </div>
-      </div>`;
+    // Recent results — last 5 settled matches
+    const recentMatches=[...settledMatches].sort((a,b)=>{
+      const mo={Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
+      function dk(d){const p=(d||'').trim().split(' ');return(mo[p[0]]||0)*100+(parseInt(p[1])||0);}
+      return dk(b.match_date)-dk(a.match_date);
+    }).slice(0,5);
+    if(recentMatches.length){
+      accuracyHtml+=`<div class="sec" style="margin-top:16px">Recent results</div>`;
+      recentMatches.forEach(m=>{
+        const allPreds=PREDS[m.id]||[];
+        const typeColor={exact:'var(--success)',outcome:'var(--warn)',refund:'var(--info)',wrong:'var(--red)'};
+        const typeLabel={exact:'Exact',outcome:'Outcome',refund:'Refund',wrong:'Wrong'};
+        accuracyHtml+=`<div class="card" style="margin-bottom:7px;padding:10px 13px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <div style="font-weight:700;font-size:13px">${m.home_flag}${m.home} <span style="color:var(--gold)">${m.result_home}–${m.result_away}</span> ${m.away}${m.away_flag}</div>
+            <div style="font-size:11px;color:var(--muted)">${m.match_date}</div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px">
+            ${allPreds.map(p=>{
+              const won=(m.resolved_winners||[]).includes(p.username);
+              const isMe2=p.username===ME.username;
+              const col=won?(m.resolved_type==='exact'?'var(--success)':'var(--warn)'):'var(--red)';
+              const bdr=won?'rgba(76,175,80,.3)':'rgba(255,255,255,.08)';
+              const namecol=isMe2?'var(--info)':'var(--muted)';
+              const namewt=isMe2?700:400;
+              return '<div style="background:rgba(255,255,255,.04);border:1px solid '+bdr+';border-radius:7px;padding:3px 8px;font-size:11px;display:flex;gap:5px;align-items:center">'
+                +'<span style="color:'+namecol+';font-weight:'+namewt+'">'+p.username+'</span>'
+                +'<span style="color:'+col+';font-weight:600">'+p.pred_home+'–'+p.pred_away+'</span></div>';
+            }).join('')}
+          </div>
+        </div>`;
+      });
     }
   }
 
@@ -1320,7 +1453,7 @@ async function joinLeague(){
   setTimeout(async()=>{await loadAll();renderAll();},1200);
 }
 
-function renderAll(){ renderDash(); renderMatches(); renderLB(); renderGroups(); renderLeague(); renderAdmin(); }
+function renderAll(){ renderLB(); renderMatches(); renderGroups(); renderLeague(); renderAdmin(); }
 
 // ════════════════════════════════════════════════════════════════
 //  SCORECARD MODAL
