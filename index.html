@@ -1315,24 +1315,27 @@ function renderLB(){
 
     // Header row 1 — stage names
     const dimStyle='color:rgba(255,255,255,.25)';
-    let thCells='<th rowspan="2" style="padding:7px 10px;text-align:left;font-size:11px;font-weight:500;color:var(--muted);border-bottom:1px solid var(--border);position:sticky;left:0;background:#1a2a1a;z-index:2;white-space:nowrap">Player</th>';
-    ROUND_DEFS.forEach(r=>{
+    // Player spans 2 rows, Overall spans 3 cols (Bet+Won+P/L)
+    let thCells='<th rowspan="2" style="padding:7px 10px;text-align:left;font-size:11px;font-weight:500;color:var(--muted);border-bottom:1px solid var(--border);position:sticky;left:0;background:#1a2a1a;z-index:2;white-space:nowrap;min-width:70px">Player</th>';
+    ROUND_DEFS.forEach((r,ri)=>{
       const active=stageActive[r.key];
-      thCells+=`<th colspan="2" style="padding:6px 4px;text-align:center;font-size:10px;font-weight:600;border-bottom:1px solid rgba(255,255,255,.05);border-left:1px solid rgba(255,255,255,.07);${active?'color:var(--gold)':dimStyle}">${r.label}</th>`;
+      const bl=ri===0?'':'border-left:1px solid rgba(255,255,255,.09);';
+      thCells+=`<th colspan="2" style="padding:6px 5px;text-align:center;font-size:10px;font-weight:600;border-bottom:1px solid rgba(255,255,255,.06);${bl}${active?'color:var(--gold)':dimStyle}">${r.label}</th>`;
     });
-    thCells+=`<th colspan="3" style="padding:6px 4px;text-align:center;font-size:10px;font-weight:700;color:var(--gold);border-bottom:1px solid rgba(255,255,255,.05);border-left:1px solid rgba(212,160,23,.3)">Overall</th>`;
+    thCells+=`<th colspan="3" style="padding:6px 5px;text-align:center;font-size:10px;font-weight:700;color:var(--gold);border-bottom:1px solid rgba(255,255,255,.06);border-left:2px solid rgba(212,160,23,.4)">Overall</th>`;
 
-    // Header row 2 — Bet/Won sub-labels
+    // Header row 2 — Bet/Won sub-labels (no extra border-left, rely on row1 separators)
     let subCells='<th style="border-bottom:1px solid var(--border);position:sticky;left:0;background:#1a2a1a;z-index:2"></th>';
-    ROUND_DEFS.forEach(r=>{
+    ROUND_DEFS.forEach((r,ri)=>{
       const active=stageActive[r.key];
       const c=active?'color:var(--muted)':dimStyle;
-      subCells+=`<th style="padding:3px 4px;text-align:center;font-size:10px;font-weight:400;border-bottom:1px solid var(--border);border-left:1px solid rgba(255,255,255,.07);${c}">Bet</th>`;
-      subCells+=`<th style="padding:3px 4px;text-align:center;font-size:10px;font-weight:400;border-bottom:1px solid var(--border);${c}">Won</th>`;
+      const bl=ri===0?'':'border-left:1px solid rgba(255,255,255,.09);';
+      subCells+=`<th style="padding:4px 5px;text-align:center;font-size:10px;font-weight:400;border-bottom:1px solid var(--border);${bl}${c}">Bet</th>`;
+      subCells+=`<th style="padding:4px 5px;text-align:center;font-size:10px;font-weight:400;border-bottom:1px solid var(--border);${c}">Won</th>`;
     });
-    subCells+=`<th style="padding:3px 4px;text-align:center;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border);border-left:1px solid rgba(212,160,23,.3)">Bet</th>`;
-    subCells+=`<th style="padding:3px 4px;text-align:center;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">Won</th>`;
-    subCells+=`<th style="padding:3px 4px;text-align:center;font-size:10px;color:var(--gold);font-weight:600;border-bottom:1px solid var(--border)">P/L</th>`;
+    subCells+=`<th style="padding:4px 5px;text-align:center;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border);border-left:2px solid rgba(212,160,23,.4)">Bet</th>`;
+    subCells+=`<th style="padding:4px 5px;text-align:center;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">Won</th>`;
+    subCells+=`<th style="padding:4px 5px;text-align:center;font-size:10px;color:var(--gold);font-weight:700;border-bottom:1px solid var(--border)">P/L</th>`;
 
     // Data rows
     let rows='';
@@ -1343,25 +1346,25 @@ function renderLB(){
       const nameBg=isMe?'rgba(55,138,221,.12)':'#1a2a1a';
       let cells=`<td style="padding:7px 10px;font-size:12px;font-weight:700;color:${nameCol};white-space:nowrap;border-bottom:1px solid rgba(255,255,255,.04);position:sticky;left:0;background:${nameBg};z-index:1">${ts.u.username}${isMe?' ★':''}</td>`;
 
-      ROUND_DEFS.forEach(r=>{
+      ROUND_DEFS.forEach((r,ri)=>{
         const s=ts.rounds[r.key];
         const active=stageActive[r.key];
         const hasBet=s&&s.bet>0;
+        const bl=ri===0?'':'border-left:1px solid rgba(255,255,255,.09);';
         if(!active){
-          // Future stage — show dim dashes
-          cells+=`<td style="padding:7px 4px;text-align:center;font-size:10px;color:rgba(255,255,255,.18);border-bottom:1px solid rgba(255,255,255,.04);border-left:1px solid rgba(255,255,255,.06)">—</td>`;
-          cells+=`<td style="padding:7px 4px;text-align:center;font-size:10px;color:rgba(255,255,255,.18);border-bottom:1px solid rgba(255,255,255,.04)">—</td>`;
+          cells+=`<td style="padding:7px 5px;text-align:center;font-size:10px;color:rgba(255,255,255,.18);border-bottom:1px solid rgba(255,255,255,.04);${bl}">—</td>`;
+          cells+=`<td style="padding:7px 5px;text-align:center;font-size:10px;color:rgba(255,255,255,.18);border-bottom:1px solid rgba(255,255,255,.04)">—</td>`;
         } else {
-          cells+=`<td style="padding:7px 4px;text-align:center;font-size:11px;color:${hasBet?'var(--text)':'var(--muted)'};border-bottom:1px solid rgba(255,255,255,.04);border-left:1px solid rgba(255,255,255,.06)">${hasBet?s.bet:'—'}</td>`;
-          cells+=`<td style="padding:7px 4px;text-align:center;font-size:11px;color:${s.won>0?'var(--success)':'var(--muted)'};font-weight:${s.won>0?700:400};border-bottom:1px solid rgba(255,255,255,.04)">${hasBet?(s.won||'—'):'—'}</td>`;
+          cells+=`<td style="padding:7px 5px;text-align:center;font-size:11px;color:${hasBet?'var(--text)':'var(--muted)'};border-bottom:1px solid rgba(255,255,255,.04);${bl}">${hasBet?s.bet:'—'}</td>`;
+          cells+=`<td style="padding:7px 5px;text-align:center;font-size:11px;color:${s.won>0?'var(--success)':'var(--muted)'};font-weight:${s.won>0?700:400};border-bottom:1px solid rgba(255,255,255,.04)">${hasBet?(s.won||'—'):'—'}</td>`;
         }
       });
 
       const ov=ts.rounds.overall;
       const plc=plColor(ov.pl);
-      cells+=`<td style="padding:7px 4px;text-align:center;font-size:11px;color:var(--text);border-bottom:1px solid rgba(255,255,255,.04);border-left:1px solid rgba(212,160,23,.3)">${ov.bet||'—'}</td>`;
-      cells+=`<td style="padding:7px 4px;text-align:center;font-size:11px;color:${ov.won>0?'var(--success)':'var(--muted)'};font-weight:${ov.won>0?700:400};border-bottom:1px solid rgba(255,255,255,.04)">${ov.won||'—'}</td>`;
-      cells+=`<td style="padding:7px 6px;text-align:center;font-size:12px;font-weight:700;color:${plc};border-bottom:1px solid rgba(255,255,255,.04)">${ov.pl!==0?fmtPL(ov.pl):'—'}</td>`;
+      cells+=`<td style="padding:7px 5px;text-align:center;font-size:11px;color:var(--text);border-bottom:1px solid rgba(255,255,255,.04);border-left:2px solid rgba(212,160,23,.4)">${ov.bet||'—'}</td>`;
+      cells+=`<td style="padding:7px 5px;text-align:center;font-size:11px;color:${ov.won>0?'var(--success)':'var(--muted)'};font-weight:${ov.won>0?700:400};border-bottom:1px solid rgba(255,255,255,.04)">${ov.won||'—'}</td>`;
+      cells+=`<td style="padding:7px 7px;text-align:center;font-size:12px;font-weight:700;color:${plc};border-bottom:1px solid rgba(255,255,255,.04)">${ov.pl!==0?fmtPL(ov.pl):'—'}</td>`;
       rows+=`<tr style="background:${rowBg}">${cells}</tr>`;
     });
 
