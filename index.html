@@ -1300,11 +1300,72 @@ function renderLB(){
     });
   }
 
-  // ── Build accuracy html — just recent results (hit% shown in standings rows) ──
+  // ── Stage P&L table ──
   let accuracyHtml='';
-  if(settledMatches.length>0){
 
-    // Recent results — last 5 settled matches
+  // Only show stages that have at least one settled match
+  const activeRounds=ROUND_DEFS.filter(r=>
+    MATCHES.some(m=>r.grps.includes(m.grp)&&m.resolved)
+  );
+
+  if(activeRounds.length>0){
+    // Build per-player stats for each active round
+    const tableStats=sortedMembers.map(u=>({
+      u, rounds:calcRoundStats(u.username)
+    }));
+
+    // Table header
+    let thCells='<th style="padding:8px 10px;text-align:left;color:var(--muted);font-size:11px;font-weight:500;border-bottom:1px solid var(--border);position:sticky;left:0;background:#162616;z-index:1">Player</th>';
+    activeRounds.forEach(r=>{
+      thCells+=`<th colspan="2" style="padding:8px 6px;text-align:center;color:var(--gold);font-size:11px;font-weight:600;border-bottom:1px solid var(--border);border-left:1px solid rgba(255,255,255,.06)">${r.label}</th>`;
+    });
+    thCells+=`<th colspan="3" style="padding:8px 6px;text-align:center;color:var(--gold);font-size:11px;font-weight:700;border-bottom:1px solid var(--border);border-left:1px solid rgba(212,160,23,.3)">Overall</th>`;
+
+    // Sub-header Bet/Won per stage
+    let subCells='<th style="padding:4px 10px;border-bottom:1px solid var(--border);position:sticky;left:0;background:#162616;z-index:1"></th>';
+    activeRounds.forEach(()=>{
+      subCells+=`<th style="padding:4px 4px;text-align:center;font-size:10px;color:var(--muted);font-weight:400;border-bottom:1px solid var(--border);border-left:1px solid rgba(255,255,255,.06)">Bet</th>`;
+      subCells+=`<th style="padding:4px 4px;text-align:center;font-size:10px;color:var(--muted);font-weight:400;border-bottom:1px solid var(--border)">Won</th>`;
+    });
+    subCells+=`<th style="padding:4px 4px;text-align:center;font-size:10px;color:var(--muted);font-weight:400;border-bottom:1px solid var(--border);border-left:1px solid rgba(212,160,23,.3)">Bet</th>`;
+    subCells+=`<th style="padding:4px 4px;text-align:center;font-size:10px;color:var(--muted);font-weight:400;border-bottom:1px solid var(--border)">Won</th>`;
+    subCells+=`<th style="padding:4px 4px;text-align:center;font-size:10px;color:var(--gold);font-weight:600;border-bottom:1px solid var(--border)">P/L</th>`;
+
+    // Rows
+    let rows='';
+    tableStats.forEach((ts,i)=>{
+      const isMe=ts.u.username===ME.username;
+      const rowBg=isMe?'rgba(55,138,221,.08)':i%2===1?'rgba(255,255,255,.02)':'';
+      const nameCol=isMe?'var(--info)':'var(--text)';
+      let cells=`<td style="padding:8px 10px;font-size:12px;font-weight:700;color:${nameCol};white-space:nowrap;border-bottom:1px solid rgba(255,255,255,.05);position:sticky;left:0;background:${isMe?'rgba(55,138,221,.12)':'#162616'};z-index:1">${ts.u.username}${isMe?' ★':''}</td>`;
+      activeRounds.forEach(r=>{
+        const s=ts.rounds[r.key];
+        const hasBet=s.bet>0;
+        cells+=`<td style="padding:8px 4px;text-align:center;font-size:11px;color:${hasBet?'var(--text)':'var(--muted)'};border-bottom:1px solid rgba(255,255,255,.05);border-left:1px solid rgba(255,255,255,.06)">${hasBet?s.bet:'—'}</td>`;
+        cells+=`<td style="padding:8px 4px;text-align:center;font-size:11px;color:${s.won>0?'var(--success)':'var(--muted)'};font-weight:${s.won>0?700:400};border-bottom:1px solid rgba(255,255,255,.05)">${hasBet?(s.won>0?s.won:'—'):'—'}</td>`;
+      });
+      const ov=ts.rounds.overall;
+      const plCol=plColor(ov.pl);
+      cells+=`<td style="padding:8px 4px;text-align:center;font-size:11px;color:var(--text);border-bottom:1px solid rgba(255,255,255,.05);border-left:1px solid rgba(212,160,23,.3)">${ov.bet||'—'}</td>`;
+      cells+=`<td style="padding:8px 4px;text-align:center;font-size:11px;color:${ov.won>0?'var(--success)':'var(--muted)'};font-weight:${ov.won>0?700:400};border-bottom:1px solid rgba(255,255,255,.05)">${ov.won||'—'}</td>`;
+      cells+=`<td style="padding:8px 6px;text-align:center;font-size:12px;font-weight:700;color:${plCol};border-bottom:1px solid rgba(255,255,255,.05)">${ov.pl!==0?fmtPL(ov.pl):'—'}</td>`;
+      rows+=`<tr style="background:${rowBg}">${cells}</tr>`;
+    });
+
+    accuracyHtml+=`<div class="sec" style="margin-top:16px">Stage breakdown</div>
+    <div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border);margin-bottom:4px">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:340px">
+      <thead>
+        <tr>${thCells}</tr>
+        <tr>${subCells}</tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:14px">Only stages with settled matches are shown · Scroll right for more stages</div>`;
+  }
+
+  // ── Recent results — last 5 settled matches ──
+  if(settledMatches.length>0){
     const recentMatches=[...settledMatches].sort((a,b)=>{
       const mo={Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
       function dk(d){const p=(d||'').trim().split(' ');return(mo[p[0]]||0)*100+(parseInt(p[1])||0);}
@@ -1314,8 +1375,6 @@ function renderLB(){
       accuracyHtml+=`<div class="sec" style="margin-top:16px">Recent results</div>`;
       recentMatches.forEach(m=>{
         const allPreds=PREDS[m.id]||[];
-        const typeColor={exact:'var(--success)',outcome:'var(--warn)',refund:'var(--info)',wrong:'var(--red)'};
-        const typeLabel={exact:'Exact',outcome:'Outcome',refund:'Refund',wrong:'Wrong'};
         accuracyHtml+=`<div class="card" style="margin-bottom:7px;padding:10px 13px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
             <div style="font-weight:700;font-size:13px">${m.home_flag}${m.home} <span style="color:var(--gold)">${m.result_home}–${m.result_away}</span> ${m.away}${m.away_flag}</div>
@@ -1327,11 +1386,9 @@ function renderLB(){
               const isMe2=p.username===ME.username;
               const col=won?(m.resolved_type==='exact'?'var(--success)':'var(--warn)'):'var(--red)';
               const bdr=won?'rgba(76,175,80,.3)':'rgba(255,255,255,.08)';
-              const namecol=isMe2?'var(--info)':'var(--muted)';
-              const namewt=isMe2?700:400;
               return '<div style="background:rgba(255,255,255,.04);border:1px solid '+bdr+';border-radius:7px;padding:3px 8px;font-size:11px;display:flex;gap:5px;align-items:center">'
-                +'<span style="color:'+namecol+';font-weight:'+namewt+'">'+p.username+'</span>'
-                +'<span style="color:'+col+';font-weight:600">'+p.pred_home+'–'+p.pred_away+'</span></div>';
+                +'<span style="color:'+(isMe2?'var(--info)':'var(--muted)')+';font-weight:'+(isMe2?700:400)+'">'+p.username+'</span>'
+                +'<span style="color:'+col+';font-weight:600">'+p.pred_home+'\u2013'+p.pred_away+'</span></div>';
             }).join('')}
           </div>
         </div>`;
