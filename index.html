@@ -489,7 +489,7 @@ async function launchApp(user){
   const av=document.getElementById('nav-av');
   av.textContent=ini(ME.username); av.style.background=avc(ME.username);
   await loadAll();
-  renderMatches();
+  goTab('matches'); // land on Matches tab showing today's open predictions
   startLivePolling(); // begin live score polling
 }
 
@@ -546,7 +546,6 @@ function goTab(t){
   if(t==='league')renderLeague();
   if(t==='groups')renderGroups();
   if(t==='howto')renderHowTo();
-  if(t==='lb')renderLB();
   if(t==='admin')renderAdmin();
   if(t==='about')renderAbout();
 }
@@ -1227,7 +1226,7 @@ function renderLB(){
     return {u,exact,outcome_win,wrong,participated,skipped,acc,biggestWin,streak};
   });
 
-  // ── Build highlights badges ──
+  // ── Build highlights badges — 2×2 grid ──
   let highlightsHtml='';
   if(settledMatches.length>0&&playerStats.length>0){
     const mostExact=playerStats.reduce((a,b)=>b.exact>a.exact?b:a,playerStats[0]);
@@ -1236,17 +1235,17 @@ function renderLB(){
     const bestStreak=playerStats.reduce((a,b)=>b.streak>a.streak?b:a,playerStats[0]);
     const boldest=playerStats.reduce((a,b)=>b.participated>a.participated?b:a,playerStats[0]);
     const badges=[];
-    if(mostExact.exact>0) badges.push({icon:'🎯',title:'Sharpshooter',desc:`${mostExact.u.username}<br>${mostExact.exact} exact score${mostExact.exact!==1?'s':''}`});
-    if(bestStreak.streak>1) badges.push({icon:'🔥',title:'Hot streak',desc:`${bestStreak.u.username}<br>${bestStreak.streak} wins in a row`});
-    if(bigWinner.biggestWin>0) badges.push({icon:'💰',title:'Biggest win',desc:`${bigWinner.u.username}<br>₹${bigWinner.biggestWin}`});
-    if(boldest.participated>0) badges.push({icon:'⚡',title:'Most active',desc:`${boldest.u.username}<br>${boldest.participated} match${boldest.participated!==1?'es':''}`});
-    if(mostSkipped.skipped>0) badges.push({icon:'👻',title:'Most skipped',desc:`${mostSkipped.u.username}<br>${mostSkipped.skipped} skipped`});
+    if(mostExact.exact>0) badges.push({icon:'🎯',title:'Sharpshooter',desc:`${mostExact.u.username} · ${mostExact.exact} exact${mostExact.exact!==1?'s':''}`});
+    if(bestStreak.streak>1) badges.push({icon:'🔥',title:'Hot streak',desc:`${bestStreak.u.username} · ${bestStreak.streak} in a row`});
+    if(bigWinner.biggestWin>0) badges.push({icon:'💰',title:'Biggest win',desc:`${bigWinner.u.username} · ₹${bigWinner.biggestWin}`});
+    if(boldest.participated>0) badges.push({icon:'⚡',title:'Most active',desc:`${boldest.u.username} · ${boldest.participated} played`});
+    if(mostSkipped.skipped>0) badges.push({icon:'👻',title:'Most skipped',desc:`${mostSkipped.u.username} · ${mostSkipped.skipped} skipped`});
     if(badges.length){
       highlightsHtml+=`<div class="sec" style="margin-top:16px">Highlights</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:4px">`;
       badges.forEach(b=>{
         highlightsHtml+=`<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 10px;text-align:center">
-          <div style="font-size:22px;margin-bottom:5px">${b.icon}</div>
+          <div style="font-size:20px;margin-bottom:5px">${b.icon}</div>
           <div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:3px">${b.title}</div>
           <div style="font-size:11px;color:var(--muted);line-height:1.4">${b.desc}</div>
         </div>`;
@@ -1256,7 +1255,7 @@ function renderLB(){
   }
 
   // ── Build standings html ──
-  let standingsHtml=`<div class="sec">Standings <span style="font-size:12px;font-weight:400;color:var(--muted)">· ${LEAGUE.name} · ${MEMBERS.length} members</span></div>`;
+  let standingsHtml=`<div class="sec">Leaderboard <span style="font-size:12px;font-weight:400;color:var(--muted)">· ${LEAGUE.name} · ${MEMBERS.length} members</span></div>`;
   if(settledMatches.length===0){
     standingsHtml+=`<div class="card" style="text-align:center;color:var(--muted);font-size:13px;padding:20px">No settled matches yet.</div>`;
     sortedMembers.forEach((u,i)=>{
@@ -1302,81 +1301,95 @@ function renderLB(){
     });
   }
 
-  // ── Stage P&L table ──
+  // ── Stage P&L table — A1 layout, all stages always shown ──
   let accuracyHtml='';
 
-  // Only show stages that have at least one settled match
-  const activeRounds=ROUND_DEFS.filter(r=>
-    MATCHES.some(m=>r.grps.includes(m.grp)&&m.resolved)
-  );
+  {
+    const tableStats=sortedMembers.map(u=>({u,rounds:calcRoundStats(u.username)}));
 
-  if(activeRounds.length>0){
-    // Build per-player stats for each active round
-    const tableStats=sortedMembers.map(u=>({
-      u, rounds:calcRoundStats(u.username)
-    }));
+    // Check which stages have ANY settled data (to style active vs future)
+    const stageActive=ROUND_DEFS.reduce((acc,r)=>{
+      acc[r.key]=MATCHES.some(m=>r.grps.includes(m.grp)&&m.resolved);
+      return acc;
+    },{});
 
-    // Table header
-    let thCells='<th style="padding:8px 10px;text-align:left;color:var(--muted);font-size:11px;font-weight:500;border-bottom:1px solid var(--border);position:sticky;left:0;background:#162616;z-index:1">Player</th>';
-    activeRounds.forEach(r=>{
-      thCells+=`<th colspan="2" style="padding:8px 6px;text-align:center;color:var(--gold);font-size:11px;font-weight:600;border-bottom:1px solid var(--border);border-left:1px solid rgba(255,255,255,.06)">${r.label}</th>`;
+    // Header row 1 — stage names
+    const dimStyle='color:rgba(255,255,255,.25)';
+    let thCells='<th rowspan="2" style="padding:7px 10px;text-align:left;font-size:11px;font-weight:500;color:var(--muted);border-bottom:1px solid var(--border);position:sticky;left:0;background:#1a2a1a;z-index:2;white-space:nowrap">Player</th>';
+    ROUND_DEFS.forEach(r=>{
+      const active=stageActive[r.key];
+      thCells+=`<th colspan="2" style="padding:6px 4px;text-align:center;font-size:10px;font-weight:600;border-bottom:1px solid rgba(255,255,255,.05);border-left:1px solid rgba(255,255,255,.07);${active?'color:var(--gold)':dimStyle}">${r.label}</th>`;
     });
-    thCells+=`<th colspan="3" style="padding:8px 6px;text-align:center;color:var(--gold);font-size:11px;font-weight:700;border-bottom:1px solid var(--border);border-left:1px solid rgba(212,160,23,.3)">Overall</th>`;
+    thCells+=`<th colspan="2" style="padding:6px 4px;text-align:center;font-size:10px;font-weight:700;color:var(--gold);border-bottom:1px solid rgba(255,255,255,.05);border-left:1px solid rgba(212,160,23,.3)">Overall</th>`;
+    thCells+=`<th style="padding:6px 4px;text-align:center;font-size:10px;font-weight:700;color:var(--gold);border-bottom:1px solid rgba(255,255,255,.05)">P/L</th>`;
 
-    // Sub-header Bet/Won per stage
-    let subCells='<th style="padding:4px 10px;border-bottom:1px solid var(--border);position:sticky;left:0;background:#162616;z-index:1"></th>';
-    activeRounds.forEach(()=>{
-      subCells+=`<th style="padding:4px 4px;text-align:center;font-size:10px;color:var(--muted);font-weight:400;border-bottom:1px solid var(--border);border-left:1px solid rgba(255,255,255,.06)">Bet</th>`;
-      subCells+=`<th style="padding:4px 4px;text-align:center;font-size:10px;color:var(--muted);font-weight:400;border-bottom:1px solid var(--border)">Won</th>`;
+    // Header row 2 — Bet/Won sub-labels
+    let subCells='<th style="border-bottom:1px solid var(--border);position:sticky;left:0;background:#1a2a1a;z-index:2"></th>';
+    ROUND_DEFS.forEach(r=>{
+      const active=stageActive[r.key];
+      const c=active?'color:var(--muted)':dimStyle;
+      subCells+=`<th style="padding:3px 4px;text-align:center;font-size:10px;font-weight:400;border-bottom:1px solid var(--border);border-left:1px solid rgba(255,255,255,.07);${c}">Bet</th>`;
+      subCells+=`<th style="padding:3px 4px;text-align:center;font-size:10px;font-weight:400;border-bottom:1px solid var(--border);${c}">Won</th>`;
     });
-    subCells+=`<th style="padding:4px 4px;text-align:center;font-size:10px;color:var(--muted);font-weight:400;border-bottom:1px solid var(--border);border-left:1px solid rgba(212,160,23,.3)">Bet</th>`;
-    subCells+=`<th style="padding:4px 4px;text-align:center;font-size:10px;color:var(--muted);font-weight:400;border-bottom:1px solid var(--border)">Won</th>`;
-    subCells+=`<th style="padding:4px 4px;text-align:center;font-size:10px;color:var(--gold);font-weight:600;border-bottom:1px solid var(--border)">P/L</th>`;
+    subCells+=`<th style="padding:3px 4px;text-align:center;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border);border-left:1px solid rgba(212,160,23,.3)">Bet</th>`;
+    subCells+=`<th style="padding:3px 4px;text-align:center;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">Won</th>`;
+    subCells+=`<th style="padding:3px 4px;text-align:center;font-size:10px;color:var(--gold);border-bottom:1px solid var(--border)">P/L</th>`;
 
-    // Rows
+    // Data rows
     let rows='';
     tableStats.forEach((ts,i)=>{
       const isMe=ts.u.username===ME.username;
-      const rowBg=isMe?'rgba(55,138,221,.08)':i%2===1?'rgba(255,255,255,.02)':'';
+      const rowBg=isMe?'rgba(55,138,221,.07)':i%2===1?'rgba(255,255,255,.02)':'';
       const nameCol=isMe?'var(--info)':'var(--text)';
-      let cells=`<td style="padding:8px 10px;font-size:12px;font-weight:700;color:${nameCol};white-space:nowrap;border-bottom:1px solid rgba(255,255,255,.05);position:sticky;left:0;background:${isMe?'rgba(55,138,221,.12)':'#162616'};z-index:1">${ts.u.username}${isMe?' ★':''}</td>`;
-      activeRounds.forEach(r=>{
+      const nameBg=isMe?'rgba(55,138,221,.12)':'#1a2a1a';
+      let cells=`<td style="padding:7px 10px;font-size:12px;font-weight:700;color:${nameCol};white-space:nowrap;border-bottom:1px solid rgba(255,255,255,.04);position:sticky;left:0;background:${nameBg};z-index:1">${ts.u.username}${isMe?' ★':''}</td>`;
+
+      ROUND_DEFS.forEach(r=>{
         const s=ts.rounds[r.key];
-        const hasBet=s.bet>0;
-        cells+=`<td style="padding:8px 4px;text-align:center;font-size:11px;color:${hasBet?'var(--text)':'var(--muted)'};border-bottom:1px solid rgba(255,255,255,.05);border-left:1px solid rgba(255,255,255,.06)">${hasBet?s.bet:'—'}</td>`;
-        cells+=`<td style="padding:8px 4px;text-align:center;font-size:11px;color:${s.won>0?'var(--success)':'var(--muted)'};font-weight:${s.won>0?700:400};border-bottom:1px solid rgba(255,255,255,.05)">${hasBet?(s.won>0?s.won:'—'):'—'}</td>`;
+        const active=stageActive[r.key];
+        const hasBet=s&&s.bet>0;
+        if(!active){
+          // Future stage — show dim dashes
+          cells+=`<td style="padding:7px 4px;text-align:center;font-size:10px;color:rgba(255,255,255,.18);border-bottom:1px solid rgba(255,255,255,.04);border-left:1px solid rgba(255,255,255,.06)">—</td>`;
+          cells+=`<td style="padding:7px 4px;text-align:center;font-size:10px;color:rgba(255,255,255,.18);border-bottom:1px solid rgba(255,255,255,.04)">—</td>`;
+        } else {
+          cells+=`<td style="padding:7px 4px;text-align:center;font-size:11px;color:${hasBet?'var(--text)':'var(--muted)'};border-bottom:1px solid rgba(255,255,255,.04);border-left:1px solid rgba(255,255,255,.06)">${hasBet?s.bet:'—'}</td>`;
+          cells+=`<td style="padding:7px 4px;text-align:center;font-size:11px;color:${s.won>0?'var(--success)':'var(--muted)'};font-weight:${s.won>0?700:400};border-bottom:1px solid rgba(255,255,255,.04)">${hasBet?(s.won||'—'):'—'}</td>`;
+        }
       });
+
       const ov=ts.rounds.overall;
-      const plCol=plColor(ov.pl);
-      cells+=`<td style="padding:8px 4px;text-align:center;font-size:11px;color:var(--text);border-bottom:1px solid rgba(255,255,255,.05);border-left:1px solid rgba(212,160,23,.3)">${ov.bet||'—'}</td>`;
-      cells+=`<td style="padding:8px 4px;text-align:center;font-size:11px;color:${ov.won>0?'var(--success)':'var(--muted)'};font-weight:${ov.won>0?700:400};border-bottom:1px solid rgba(255,255,255,.05)">${ov.won||'—'}</td>`;
-      cells+=`<td style="padding:8px 6px;text-align:center;font-size:12px;font-weight:700;color:${plCol};border-bottom:1px solid rgba(255,255,255,.05)">${ov.pl!==0?fmtPL(ov.pl):'—'}</td>`;
+      const plc=plColor(ov.pl);
+      cells+=`<td style="padding:7px 4px;text-align:center;font-size:11px;color:var(--text);border-bottom:1px solid rgba(255,255,255,.04);border-left:1px solid rgba(212,160,23,.3)">${ov.bet||'—'}</td>`;
+      cells+=`<td style="padding:7px 4px;text-align:center;font-size:11px;color:${ov.won>0?'var(--success)':'var(--muted)'};font-weight:${ov.won>0?700:400};border-bottom:1px solid rgba(255,255,255,.04)">${ov.won||'—'}</td>`;
+      cells+=`<td style="padding:7px 6px;text-align:center;font-size:12px;font-weight:700;color:${plc};border-bottom:1px solid rgba(255,255,255,.04)">${ov.pl!==0?fmtPL(ov.pl):'—'}</td>`;
       rows+=`<tr style="background:${rowBg}">${cells}</tr>`;
     });
 
     accuracyHtml+=`<div class="sec" style="margin-top:16px">Stage breakdown</div>
+    <div style="font-size:10px;color:var(--muted);text-align:right;margin-bottom:3px">← scroll for later stages →</div>
     <div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border);margin-bottom:4px">
-    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:340px">
-      <thead>
+    <table style="width:100%;border-collapse:collapse;min-width:480px">
+      <thead style="background:rgba(255,255,255,.03)">
         <tr>${thCells}</tr>
         <tr>${subCells}</tr>
       </thead>
       <tbody>${rows}</tbody>
     </table></div>
-    <div style="font-size:10px;color:var(--muted);margin-bottom:14px">Only stages with settled matches are shown · Scroll right for more stages</div>`;
+    <div style="font-size:10px;color:var(--muted);margin-bottom:14px">Dimmed columns = stages not yet started · Tap any player row to see match details</div>`;
   }
 
-  // ── Recent results — last 5 settled matches ──
+
+  // ── Recent results — matches from yesterday (IST) only ──
   if(settledMatches.length>0){
-    // Only show matches from previous days (not today)
     const _nowIST=new Date(new Date().getTime()+5.5*60*60*1000);
     const _mo={Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
-    const _todayKey=(_nowIST.getUTCMonth()+1)*100+_nowIST.getUTCDate();
+    const _mnames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     function _rdk(d){const p=(d||'').trim().split(' ');return(_mo[p[0]]||0)*100+(parseInt(p[1])||0);}
-    const recentMatches=[...settledMatches]
-      .filter(m=>_rdk(m.match_date)<_todayKey)
-      .sort((a,b)=>_rdk(b.match_date)-_rdk(a.match_date))
-      .slice(0,5);
+    const _yday=new Date(_nowIST.getTime()-24*60*60*1000);
+    const _ydayStr=_mnames[_yday.getUTCMonth()]+' '+_yday.getUTCDate();
+    const _ydayKey=_rdk(_ydayStr);
+    const recentMatches=settledMatches.filter(m=>_rdk(m.match_date)===_ydayKey);
     if(recentMatches.length){
       accuracyHtml+=`<div class="sec" style="margin-top:16px">Recent results</div>`;
       recentMatches.forEach(m=>{
@@ -1403,6 +1416,7 @@ function renderLB(){
   }
 
   // ── Assemble: A1 full-width stacked layout ──
+  // ── A1 layout: full-width stacked — standings → table → highlights → recent ──
   const html=standingsHtml+accuracyHtml+highlightsHtml;
 
   document.getElementById('pane-lb').innerHTML=html;
