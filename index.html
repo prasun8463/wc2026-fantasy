@@ -1320,8 +1320,7 @@ function renderLB(){
       const active=stageActive[r.key];
       thCells+=`<th colspan="2" style="padding:6px 4px;text-align:center;font-size:10px;font-weight:600;border-bottom:1px solid rgba(255,255,255,.05);border-left:1px solid rgba(255,255,255,.07);${active?'color:var(--gold)':dimStyle}">${r.label}</th>`;
     });
-    thCells+=`<th colspan="2" style="padding:6px 4px;text-align:center;font-size:10px;font-weight:700;color:var(--gold);border-bottom:1px solid rgba(255,255,255,.05);border-left:1px solid rgba(212,160,23,.3)">Overall</th>`;
-    thCells+=`<th style="padding:6px 4px;text-align:center;font-size:10px;font-weight:700;color:var(--gold);border-bottom:1px solid rgba(255,255,255,.05)">P/L</th>`;
+    thCells+=`<th colspan="3" style="padding:6px 4px;text-align:center;font-size:10px;font-weight:700;color:var(--gold);border-bottom:1px solid rgba(255,255,255,.05);border-left:1px solid rgba(212,160,23,.3)">Overall</th>`;
 
     // Header row 2 — Bet/Won sub-labels
     let subCells='<th style="border-bottom:1px solid var(--border);position:sticky;left:0;background:#1a2a1a;z-index:2"></th>';
@@ -1333,7 +1332,7 @@ function renderLB(){
     });
     subCells+=`<th style="padding:3px 4px;text-align:center;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border);border-left:1px solid rgba(212,160,23,.3)">Bet</th>`;
     subCells+=`<th style="padding:3px 4px;text-align:center;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">Won</th>`;
-    subCells+=`<th style="padding:3px 4px;text-align:center;font-size:10px;color:var(--gold);border-bottom:1px solid var(--border)">P/L</th>`;
+    subCells+=`<th style="padding:3px 4px;text-align:center;font-size:10px;color:var(--gold);font-weight:600;border-bottom:1px solid var(--border)">P/L</th>`;
 
     // Data rows
     let rows='';
