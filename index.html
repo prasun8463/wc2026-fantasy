@@ -2283,10 +2283,11 @@ function renderAdmin(){
           ${liveScore?`<span style="font-size:11px;color:var(--success);margin-left:4px">· ${liveScore}</span>`:''}
         </div>
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
-          <input id="ah_${m.id}" type="number" min="0" max="20" placeholder="${m.home.slice(0,4)}" value="${liveM&&liveM.home!=null?liveM.home:''}" style="width:90px;margin:0" />
+          <input id="ah_${m.id}" type="number" min="0" max="20" placeholder="${m.home.slice(0,4)}" value="${liveM&&liveM.home!=null?liveM.home:''}" style="width:80px;margin:0" />
           <div class="score-sep">–</div>
-          <input id="aa_${m.id}" type="number" min="0" max="20" placeholder="${m.away.slice(0,4)}" value="${liveM&&liveM.away!=null?liveM.away:''}" style="width:90px;margin:0" />
-          <button class="btn btn-gold btn-sm" onclick="settle('${m.id}')" style="width:auto;padding:7px 14px;margin:0">Settle</button>
+          <input id="aa_${m.id}" type="number" min="0" max="20" placeholder="${m.away.slice(0,4)}" value="${liveM&&liveM.away!=null?liveM.away:''}" style="width:80px;margin:0" />
+          <button class="btn btn-gold btn-sm" onclick="settle('${m.id}')" style="width:auto;padding:7px 12px;margin:0">Settle</button>
+          <button class="btn btn-outline btn-sm" onclick="settleRandom('${m.id}')" style="width:auto;padding:7px 10px;margin:0;font-size:11px" title="Pick a random score and settle">🎲 Random</button>
         </div>
       </div>`;
     });
@@ -2346,6 +2347,31 @@ function renderAdmin(){
 }
 
 // Quick settle from match row (admin only, score from API)
+// Realistic football score generator for testing
+function randomScore(){
+  // Weighted distribution — most football matches are low scoring
+  const weights=[
+    [0,0,9],[1,0,12],[0,1,12],[1,1,15],[2,0,10],[0,2,10],
+    [2,1,11],[1,2,11],[3,0,6],[0,3,6],[2,2,7],[3,1,5],
+    [1,3,5],[3,2,3],[2,3,3],[4,0,2],[0,4,2],[4,1,1],[1,4,1]
+  ];
+  const total=weights.reduce((s,w)=>s+w[2],0);
+  let r=Math.floor(Math.random()*total);
+  for(const [h,a,w] of weights){r-=w;if(r<0)return[h,a];}
+  return[1,0];
+}
+
+async function settleRandom(mid){
+  const m=MATCHES.find(x=>x.id===mid); if(!m)return;
+  const[h,a]=randomScore();
+  // Pre-fill the inputs so admin can see what was picked
+  const hEl=document.getElementById('ah_'+mid);
+  const aEl=document.getElementById('aa_'+mid);
+  if(hEl)hEl.value=h;
+  if(aEl)aEl.value=a;
+  toast('Random score: '+h+'–'+a+' · Press Settle to confirm');
+}
+
 async function quickSettle(mid, h, a){
   if(!confirm(`Settle match with score ${h}–${a}?`)) return;
   await settleWithScore(mid, parseInt(h), parseInt(a));
