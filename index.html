@@ -525,9 +525,10 @@ async function loadAll(){
       PREDS[p.match_id].push(p);
     });
   }
+  groupsLastFetched = 0; // mark groups as needing re-render with fresh MATCHES
 }
 
-// ── Refresh current user balance from DB ───────────────────────
+// ── Refresh current user balance from DB ─────────────────────────
 async function refreshMe(){
   const {data}=await sb.from('users').select('*').eq('username',ME.username).single();
   if(data)ME=data;
@@ -1763,8 +1764,14 @@ let groupsLastFetched = 0;
 
 async function renderGroups(){
   const el = document.getElementById('pane-groups');
+  el.innerHTML = ''; // clear immediately so no stale spinner shows
   const now = Date.now();
-  if(now - groupsLastFetched > 24 * 60 * 60 * 1000){
+  // Only re-fetch if explicitly refreshed — MATCHES already loaded at login
+  if(groupsLastFetched === 0){
+    // First render — MATCHES already in memory from loadAll(), just mark as fetched
+    groupsLastFetched = now;
+  } else if(now - groupsLastFetched > 24 * 60 * 60 * 1000){
+    // Stale after 24h — re-fetch
     const {data:freshMatches} = await sb.from('matches').select('*');
     if(freshMatches) MATCHES = freshMatches.sort((a,b)=>{
       const mo={Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
