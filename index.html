@@ -1401,27 +1401,61 @@ function renderLB(){
     const _ydayKey=_rdk(_ydayStr);
     const recentMatches=settledMatches.filter(m=>_rdk(m.match_date)===_ydayKey);
     if(recentMatches.length){
-      accuracyHtml+=`<div class="sec" style="margin-top:16px">Recent results</div>`;
+      accuracyHtml+=`<div class="sec" style="margin-top:16px">Recent results <span style="font-size:12px;font-weight:400;color:var(--muted)">· ${_ydayStr}</span></div>`;
       recentMatches.forEach(m=>{
         const allPreds=PREDS[m.id]||[];
-        accuracyHtml+=`<div class="card" style="margin-bottom:7px;padding:10px 13px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-            <div style="font-weight:700;font-size:13px">${m.home_flag}${m.home} <span style="color:var(--gold)">${m.result_home}–${m.result_away}</span> ${m.away}${m.away_flag}</div>
-            <div style="font-size:11px;color:var(--muted)">${m.match_date}</div>
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:5px">
-            ${allPreds.map(p=>{
+        const isOpen=window._rrOpen===m.id;
+        const typeLabel={exact:'Exact',outcome:'Outcome',refund:'Refund'};
+        const _sba=parseBetAmount(LEAGUE?.bet_amount);
+        const _sbet=typeof _sba==='object'?parseInt(_sba.group)||100:parseInt(_sba)||100;
+
+        // Tappable header row
+        accuracyHtml+='<div onclick="rrToggle(\''+m.id+'\')" style="cursor:pointer;background:var(--card);border:1px solid '+(isOpen?'rgba(212,160,23,.4)':'rgba(255,255,255,.09)')+';border-radius:'+(isOpen?'10px 10px 0 0':'10px')+';padding:11px 13px;margin-bottom:'+(isOpen?'0':'7px')+';display:flex;align-items:center;justify-content:space-between;gap:8px">'
+          +'<div style="flex:1;min-width:0">'
+            +'<div style="font-weight:700;font-size:13px">'+m.home_flag+m.home+' <span style="color:var(--gold)">'+m.result_home+'\u2013'+m.result_away+'</span> '+m.away+m.away_flag+'</div>'
+            +'<div style="font-size:11px;color:var(--muted);margin-top:2px">Grp '+m.grp+' · '+allPreds.length+' prediction'+(allPreds.length!==1?'s':'')+' · '+(m.resolved_type?typeLabel[m.resolved_type]||m.resolved_type:'')+'</div>'
+          +'</div>'
+          +'<div style="color:rgba(255,255,255,.25);font-size:14px;flex-shrink:0">'+(isOpen?'&#x2227;':'&#x203a;')+'</div>'
+        +'</div>';
+
+        // Expandable detail panel
+        if(isOpen){
+          accuracyHtml+='<div style="background:rgba(212,160,23,.04);border:1px solid rgba(212,160,23,.3);border-top:none;border-radius:0 0 10px 10px;padding:10px 13px;margin-bottom:7px">';
+          if(!allPreds.length){
+            accuracyHtml+='<div style="font-size:12px;color:var(--muted);text-align:center;padding:6px 0">No predictions were placed</div>';
+          } else {
+            // Pot summary
+            const pot=allPreds.length*_sbet;
+            accuracyHtml+='<div style="display:flex;gap:10px;margin-bottom:10px;font-size:12px">'
+              +'<div style="color:var(--muted)">Pot: <span style="color:var(--text);font-weight:600">\u20b9'+pot+'</span></div>'
+              +'<div style="color:var(--muted)">Bet: <span style="color:var(--text);font-weight:600">\u20b9'+_sbet+' each</span></div>'
+              +'<div style="color:var(--muted)">Type: <span style="color:var(--gold);font-weight:600">'+(typeLabel[m.resolved_type]||m.resolved_type||'')+'</span></div>'
+            +'</div>';
+            // Per-player rows
+            allPreds.forEach(p=>{
               const won=(m.resolved_winners||[]).includes(p.username);
               const isMe2=p.username===ME.username;
-              const col=won?(m.resolved_type==='exact'?'var(--success)':'var(--warn)'):'var(--red)';
-              const bdr=won?'rgba(76,175,80,.3)':'rgba(255,255,255,.08)';
-              return '<div style="background:rgba(255,255,255,.04);border:1px solid '+bdr+';border-radius:7px;padding:3px 8px;font-size:11px;display:flex;gap:5px;align-items:center">'
-                +'<span style="color:'+(isMe2?'var(--info)':'var(--muted)')+';font-weight:'+(isMe2?700:400)+'">'+p.username+'</span>'
-                +'<span style="color:'+col+';font-weight:600">'+p.pred_home+'\u2013'+p.pred_away+'</span></div>';
-            }).join('')}
-          </div>
-        </div>`;
+              const predCol=won?(m.resolved_type==='exact'?'var(--success)':'var(--warn)'):'var(--red)';
+              const pay=won?'+\u20b9'+m.resolved_share:'-\u20b9'+_sbet;
+              const payCol=won?'var(--success)':'var(--red)';
+              accuracyHtml+='<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06)">'
+                +'<div style="display:flex;align-items:center;gap:8px">'
+                  +'<div class="av" style="background:'+avc(p.username)+';width:26px;height:26px;font-size:10px;flex-shrink:0">'+ini(p.username)+'</div>'
+                  +'<div>'
+                    +'<div style="font-size:12px;font-weight:'+(isMe2?700:600)+';color:'+(isMe2?'var(--info)':'var(--text)')+'">'+p.username+'</div>'
+                    +'<div style="font-size:11px;color:'+predCol+'">Predicted: '+p.pred_home+'\u2013'+p.pred_away+(won?' \u2713':' \u2717')+'</div>'
+                  +'</div>'
+                +'</div>'
+                +'<div style="font-size:13px;font-weight:700;color:'+payCol+'">'+pay+'</div>'
+              +'</div>';
+            });
+          }
+          accuracyHtml+='</div>';
+        }
       });
+    } else {
+      accuracyHtml+=`<div class="sec" style="margin-top:16px">Recent results</div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;color:var(--muted);font-size:13px">No matches settled yesterday</div>`;
     }
   }
 
@@ -1430,6 +1464,22 @@ function renderLB(){
   const html=standingsHtml+accuracyHtml+highlightsHtml;
 
   document.getElementById('pane-lb').innerHTML=html;
+}
+
+// ── Recent results toggle ──────────────────────────────────────
+function rrToggle(mid){
+  window._rrOpen=(window._rrOpen===mid)?null:mid;
+  renderLB();
+  // Scroll expanded row into view
+  setTimeout(()=>{
+    const pane=document.getElementById('pane-lb');
+    const rows=pane ? pane.querySelectorAll('[onclick]') : [];
+    rows.forEach(el=>{
+      if(el.getAttribute('onclick')&&el.getAttribute('onclick').includes(mid)){
+        el.scrollIntoView({behavior:'smooth',block:'nearest'});
+      }
+    });
+  },50);
 }
 
 // ════════════════════════════════════════════════════════════════
