@@ -1122,47 +1122,45 @@ function showPlayerPopup(username){
 
 function ppShowType(type){
   ppActiveType=(ppActiveType===type)?null:type;
-  const el=document.getElementById('pp-match-list');
-  if(!el) return;
-  if(!ppActiveType){el.innerHTML='';return;}
-
   const username=ppActiveUser;
+
+  // Re-render to update chip highlights
+  renderLB();
+
+  if(!ppActiveType) return;
+
   const settled=MATCHES.filter(m=>m.resolved&&(PREDS[m.id]||[]).find(p=>p.username===username));
-  const _sba=parseBetAmount(LEAGUE?.bet_amount);
-  const _sbet=typeof _sba==='object'?parseInt(_sba.group)||100:parseInt(_sba)||100;
   let matches=[];
   if(ppActiveType==='exact') matches=settled.filter(m=>(m.resolved_winners||[]).includes(username)&&m.resolved_type==='exact');
   else if(ppActiveType==='outcome') matches=settled.filter(m=>(m.resolved_winners||[]).includes(username)&&m.resolved_type==='outcome');
   else if(ppActiveType==='wrong') matches=settled.filter(m=>!(m.resolved_winners||[]).includes(username));
   else if(ppActiveType==='refund') matches=settled.filter(m=>(m.resolved_winners||[]).includes(username)&&m.resolved_type==='refund');
 
-  // Update chip highlights
-  ['exact','outcome','wrong','refund'].forEach(t=>{
-    const c=document.getElementById('pp-chip-'+t);
-    if(!c) return;
-    c.style.borderColor=t===ppActiveType?'rgba(212,160,23,.5)':'rgba(255,255,255,.09)';
-    c.style.background=t===ppActiveType?'rgba(212,160,23,.08)':'rgba(255,255,255,.04)';
-  });
+  if(!matches.length) return;
 
-  if(!matches.length){
-    el.innerHTML='<div style="font-size:12px;color:var(--muted);text-align:center;padding:10px 0">No matches in this category</div>';
+  // Single match — open sheet immediately
+  if(matches.length===1){
+    setTimeout(()=>toggleMatchSheet(matches[0].id), 50);
     return;
   }
-  const payColor={exact:'var(--success)',outcome:'var(--warn)',wrong:'var(--red)',refund:'var(--info)'};
-  let html='';
-  matches.forEach(m=>{
-    const myP=(PREDS[m.id]||[]).find(p=>p.username===username);
-    const won=(m.resolved_winners||[]).includes(username);
-    const pay=won?'+₹'+m.resolved_share:'-₹'+_sbet;
-    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);gap:8px">'
-      +'<div>'
-        +'<div style="font-weight:600;font-size:12px;margin-bottom:2px">'+m.home_flag+m.home+' <span style="color:var(--gold)">'+m.result_home+'–'+m.result_away+'</span> '+m.away+m.away_flag+'</div>'
-        +'<div style="font-size:11px;color:var(--muted)">Pick: '+(myP?myP.pred_home+'–'+myP.pred_away:'—')+' · '+m.match_date+'</div>'
-      +'</div>'
-      +'<div style="font-size:13px;font-weight:700;color:'+payColor[ppActiveType]+';flex-shrink:0">'+pay+'</div>'
-    +'</div>';
-  });
-  el.innerHTML=html;
+
+  // Multiple matches — show tappable list below chips
+  setTimeout(()=>{
+    const el=document.getElementById('pp-match-list');
+    if(!el) return;
+    let html='<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Tap a match to see details</div>';
+    matches.forEach(m=>{
+      const myP=(PREDS[m.id]||[]).find(p=>p.username===username);
+      html+='<div onclick="toggleMatchSheet(\''+m.id+'\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06)">'
+        +'<div style="font-size:12px;font-weight:600">'+m.home_flag+m.home+' <span style="color:var(--gold)">'+m.result_home+'\u2013'+m.result_away+'</span> '+m.away+m.away_flag+'</div>'
+        +'<div style="display:flex;align-items:center;gap:6px">'
+          +'<span style="font-size:11px;color:var(--muted)">'+(myP?myP.pred_home+'\u2013'+myP.pred_away:'')+'</span>'
+          +'<span style="color:rgba(255,255,255,.25);font-size:13px">&#x203a;</span>'
+        +'</div>'
+      +'</div>';
+    });
+    el.innerHTML=html;
+  }, 50);
 }
 
 function buildPlayerInline(username){
@@ -1417,54 +1415,16 @@ function renderLB(){
       accuracyHtml+=`<div class="sec" style="margin-top:16px">Recent results <span style="font-size:12px;font-weight:400;color:var(--muted)">· ${_ydayStr}</span></div>`;
       recentMatches.forEach(m=>{
         const allPreds=PREDS[m.id]||[];
-        const isOpen=window._rrOpen===m.id;
         const typeLabel={exact:'Exact',outcome:'Outcome',refund:'Refund'};
-        const _sba=parseBetAmount(LEAGUE?.bet_amount);
-        const _sbet=typeof _sba==='object'?parseInt(_sba.group)||100:parseInt(_sba)||100;
 
-        // Tappable header row
-        accuracyHtml+='<div onclick="rrToggle(\''+m.id+'\')" style="cursor:pointer;background:var(--card);border:1px solid '+(isOpen?'rgba(212,160,23,.4)':'rgba(255,255,255,.09)')+';border-radius:'+(isOpen?'10px 10px 0 0':'10px')+';padding:11px 13px;margin-bottom:'+(isOpen?'0':'7px')+';display:flex;align-items:center;justify-content:space-between;gap:8px">'
+        // Tappable row — opens the same match sheet as the matches tab
+        accuracyHtml+='<div onclick="rrToggle(\''+m.id+'\')" style="cursor:pointer;background:var(--card);border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:11px 13px;margin-bottom:7px;display:flex;align-items:center;justify-content:space-between;gap:8px">'
           +'<div style="flex:1;min-width:0">'
             +'<div style="font-weight:700;font-size:13px">'+m.home_flag+m.home+' <span style="color:var(--gold)">'+m.result_home+'\u2013'+m.result_away+'</span> '+m.away+m.away_flag+'</div>'
             +'<div style="font-size:11px;color:var(--muted);margin-top:2px">Grp '+m.grp+' · '+allPreds.length+' prediction'+(allPreds.length!==1?'s':'')+' · '+(m.resolved_type?typeLabel[m.resolved_type]||m.resolved_type:'')+'</div>'
           +'</div>'
-          +'<div style="color:rgba(255,255,255,.25);font-size:14px;flex-shrink:0">'+(isOpen?'&#x2227;':'&#x203a;')+'</div>'
+          +'<div style="color:rgba(255,255,255,.25);font-size:14px;flex-shrink:0">&#x203a;</div>'
         +'</div>';
-
-        // Expandable detail panel
-        if(isOpen){
-          accuracyHtml+='<div style="background:rgba(212,160,23,.04);border:1px solid rgba(212,160,23,.3);border-top:none;border-radius:0 0 10px 10px;padding:10px 13px;margin-bottom:7px">';
-          if(!allPreds.length){
-            accuracyHtml+='<div style="font-size:12px;color:var(--muted);text-align:center;padding:6px 0">No predictions were placed</div>';
-          } else {
-            // Pot summary
-            const pot=allPreds.length*_sbet;
-            accuracyHtml+='<div style="display:flex;gap:10px;margin-bottom:10px;font-size:12px">'
-              +'<div style="color:var(--muted)">Pot: <span style="color:var(--text);font-weight:600">\u20b9'+pot+'</span></div>'
-              +'<div style="color:var(--muted)">Bet: <span style="color:var(--text);font-weight:600">\u20b9'+_sbet+' each</span></div>'
-              +'<div style="color:var(--muted)">Type: <span style="color:var(--gold);font-weight:600">'+(typeLabel[m.resolved_type]||m.resolved_type||'')+'</span></div>'
-            +'</div>';
-            // Per-player rows
-            allPreds.forEach(p=>{
-              const won=(m.resolved_winners||[]).includes(p.username);
-              const isMe2=p.username===ME.username;
-              const predCol=won?(m.resolved_type==='exact'?'var(--success)':'var(--warn)'):'var(--red)';
-              const pay=won?'+\u20b9'+m.resolved_share:'-\u20b9'+_sbet;
-              const payCol=won?'var(--success)':'var(--red)';
-              accuracyHtml+='<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06)">'
-                +'<div style="display:flex;align-items:center;gap:8px">'
-                  +'<div class="av" style="background:'+avc(p.username)+';width:26px;height:26px;font-size:10px;flex-shrink:0">'+ini(p.username)+'</div>'
-                  +'<div>'
-                    +'<div style="font-size:12px;font-weight:'+(isMe2?700:600)+';color:'+(isMe2?'var(--info)':'var(--text)')+'">'+p.username+'</div>'
-                    +'<div style="font-size:11px;color:'+predCol+'">Predicted: '+p.pred_home+'\u2013'+p.pred_away+(won?' \u2713':' \u2717')+'</div>'
-                  +'</div>'
-                +'</div>'
-                +'<div style="font-size:13px;font-weight:700;color:'+payCol+'">'+pay+'</div>'
-              +'</div>';
-            });
-          }
-          accuracyHtml+='</div>';
-        }
       });
     } else {
       accuracyHtml+=`<div class="sec" style="margin-top:16px">Recent results</div>
@@ -1479,20 +1439,9 @@ function renderLB(){
   document.getElementById('pane-lb').innerHTML=html;
 }
 
-// ── Recent results toggle ──────────────────────────────────────
+// ── Recent results — tap opens same match sheet as matches tab ──
 function rrToggle(mid){
-  window._rrOpen=(window._rrOpen===mid)?null:mid;
-  renderLB();
-  // Scroll expanded row into view
-  setTimeout(()=>{
-    const pane=document.getElementById('pane-lb');
-    const rows=pane ? pane.querySelectorAll('[onclick]') : [];
-    rows.forEach(el=>{
-      if(el.getAttribute('onclick')&&el.getAttribute('onclick').includes(mid)){
-        el.scrollIntoView({behavior:'smooth',block:'nearest'});
-      }
-    });
-  },50);
+  toggleMatchSheet(mid);
 }
 
 // ════════════════════════════════════════════════════════════════
