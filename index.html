@@ -1277,7 +1277,7 @@ function renderLB(){
       const bdMe0=active0?'rgba(212,160,23,.4)':(isMe?'rgba(55,138,221,.3)':'rgba(255,255,255,.09)');
       const blMe0=isMe?'border-left:3px solid var(--info);':'';
       standingsHtml+='<div onclick="showPlayerPopup(\''+u.username+'\')" style="cursor:pointer;background:'+bgMe0+';border:1px solid '+bdMe0+';'+blMe0+'border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:6px">'
-        +'<div style="font-size:'+(i<3?20:14)+'px;font-weight:700;color:var(--muted);width:26px;text-align:center">'+(i<3?medals[i]:i+1)+'</div>'
+        +'<div style="font-size:'+(i<3?26:14)+'px;font-weight:700;color:var(--muted);width:28px;text-align:center">'+(i<3?medals[i]:i+1)+'</div>'
         +'<div class="av" style="background:'+avc(u.username)+';width:38px;height:38px;font-size:13px">'+ini(u.username)+'</div>'
         +'<div style="flex:1;min-width:0">'
           +'<div style="font-size:15px;font-weight:700;color:'+(isMe?'var(--info)':'var(--text)')+'">'+u.username+(isMe?' <span style="font-size:10px;color:var(--muted)">(you)</span>':'')+'</div>'
@@ -1297,16 +1297,16 @@ function renderLB(){
       const bdMe=active?'rgba(212,160,23,.4)':(isMe?'rgba(55,138,221,.3)':'rgba(255,255,255,.09)');
       const blMe=isMe?'border-left:3px solid var(--info);':'';
       standingsHtml+='<div onclick="showPlayerPopup(\''+u.username+'\')" style="cursor:pointer;background:'+bgMe+';border:1px solid '+bdMe+';'+blMe+'border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:6px">'
-        +'<div style="font-size:'+(i<3?20:14)+'px;font-weight:700;color:var(--muted);width:26px;text-align:center;flex-shrink:0">'+(i<3?medals[i]:i+1)+'</div>'
+        +'<div style="font-size:'+(i<3?26:14)+'px;font-weight:700;color:var(--muted);width:28px;text-align:center;flex-shrink:0">'+(i<3?medals[i]:i+1)+'</div>'
         +'<div class="av" style="background:'+avc(u.username)+';width:38px;height:38px;font-size:13px;flex-shrink:0">'+ini(u.username)+'</div>'
         +'<div style="flex:1;min-width:0">'
           +'<div style="font-size:15px;font-weight:700;color:'+(isMe?'var(--info)':'var(--text)')+'">'+u.username+(isMe?' <span style="font-size:10px;color:var(--muted)">(you)</span>':'')+'</div>'
-          +'<div style="font-size:11px;color:var(--muted)">'+ps.participated+' played · '+(ps.participated>0?ps.acc+'% hit':'no data')+' · <span style="color:'+plColor(s.overall.pl)+'">'+fmtPct(plPct(s.overall.bet,s.overall.won))+'</span></div>'
+          +'<div style="font-size:11px;color:var(--muted)">'+ps.participated+' played · '+(ps.participated>0?ps.acc+'% hit':'no data')+'</div>'
         +'</div>'
         +'<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'
           +'<div style="text-align:right">'
             +'<div style="font-size:16px;font-weight:700;color:'+plColor(s.overall.pl)+'">'+fmtPct(plPct(s.overall.bet,s.overall.won))+'</div>'
-            +(s.overall.bet>0?'<div style="font-size:10px;color:var(--muted);margin-top:1px">'+fmtPL(s.overall.pl)+' P/L</div>':'')
+            +(s.overall.bet>0?'<div style="font-size:10px;color:'+plColor(s.overall.pl)+';opacity:.65;margin-top:1px">'+fmtPL(s.overall.pl)+' P/L</div>':'')
           +'</div>'
           +'<div style="color:rgba(255,255,255,.25);font-size:14px">'+(active?'&#x2227;':'&#x203a;')+'</div>'
         +'</div>'
@@ -1385,8 +1385,7 @@ function renderLB(){
       const plc=plColor(ov.pl);
       cells+=`<td style="padding:7px 5px;text-align:center;font-size:11px;color:var(--text);border-bottom:1px solid rgba(255,255,255,.04);border-left:2px solid rgba(212,160,23,.4)">${ov.bet||'—'}</td>`;
       cells+=`<td style="padding:7px 5px;text-align:center;font-size:11px;color:${ov.won>0?'var(--success)':'var(--muted)'};font-weight:${ov.won>0?700:400};border-bottom:1px solid rgba(255,255,255,.04)">${ov.won||'—'}</td>`;
-      const pct=plPct(ov.bet,ov.won);
-      cells+=`<td style="padding:5px 7px;text-align:center;border-bottom:1px solid rgba(255,255,255,.04)"><div style="font-size:12px;font-weight:700;color:${plc}">${ov.bet?fmtPct(pct):'—'}</div>${ov.bet?`<div style="font-size:9px;color:var(--muted)">${fmtPL(ov.pl)}</div>`:''}</td>`;
+      cells+=`<td style="padding:7px 7px;text-align:center;font-size:12px;font-weight:700;color:${plc};border-bottom:1px solid rgba(255,255,255,.04)">${ov.bet?fmtPL(ov.pl):'—'}</td>`;
       rows+=`<tr style="background:${rowBg}">${cells}</tr>`;
     });
 
