@@ -544,7 +544,6 @@ function goTab(t){
   const names=['howto','lb','matches','groups','league','admin','about'];
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('on',names[i]===t));
   document.querySelectorAll('.pane').forEach((el,i)=>el.classList.toggle('on',names[i]===t));
-  if(t==='dash')renderDash();
   if(t==='matches')renderMatches();
   if(t==='lb')renderLB();
   if(t==='league')renderLeague();
@@ -929,7 +928,12 @@ function toggleMatchSheet(mid){
   document.querySelectorAll('.mrow').forEach(r=>r.style.borderColor='');
   const row=document.getElementById('mr_'+mid);
   if(row) row.style.borderColor='rgba(212,160,23,.5)';
-  openMatchSheet(mid);
+  // Show sheet immediately with spinner, then fill content
+  // This makes the tap feel instant on iOS Safari
+  document.getElementById('match-sheet').classList.add('open');
+  document.getElementById('ms-title').textContent='Loading...';
+  document.getElementById('ms-body').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  setTimeout(()=>openMatchSheet(mid), 0);
 }
 function closeMatchSheet(){
   activeMatchId=null;
@@ -1064,14 +1068,14 @@ async function submitPredFromSheet(mid){
   PREDS[mid].push({match_id:mid,username:ME.username,pred_home:h,pred_away:a});
   toast('Prediction saved!');
   closeMatchSheet();
-  renderMatchList(); renderDash(); renderLB();
+  renderMatchList(); renderLB();
 }
 
 async function cancelPredFromSheet(mid){
   await sb.from('predictions').delete().eq('mid',mid).eq('username',ME.username);
   if(PREDS[mid])PREDS[mid]=PREDS[mid].filter(p=>p.username!==ME.username);
   closeMatchSheet();
-  renderMatchList(); renderDash();
+  renderMatchList();
 }
 
 
@@ -1086,13 +1090,13 @@ async function submitPred(mid){
   PREDS[mid]=PREDS[mid].filter(p=>p.username!==ME.username);
   PREDS[mid].push({match_id:mid,username:ME.username,pred_home:h,pred_away:a});
   toast('Prediction saved!');
-  renderMatchList(); renderDash(); renderLB();
+  renderMatchList(); renderLB();
 }
 
 async function cancelPred(mid){
   await sb.from('predictions').delete().eq('match_id',mid).eq('username',ME.username);
   if(PREDS[mid])PREDS[mid]=PREDS[mid].filter(p=>p.username!==ME.username);
-  renderMatchList(); renderDash();
+  renderMatchList();
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1301,10 +1305,9 @@ function renderLB(){
         +'</div>'
         +'<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'
           +'<div style="text-align:right">'
-          +'<div style="font-size:16px;font-weight:700;color:'+plColor(s.overall.pl)+'">'+fmtPct(plPct(s.overall.bet,s.overall.won))+'</div>'
-          +'<div style="font-size:10px;color:var(--muted);margin-top:1px">'+fmtPL(s.overall.pl)+' P/L</div>'
-        +'</div>'
-        +
+            +'<div style="font-size:16px;font-weight:700;color:'+plColor(s.overall.pl)+'">'+fmtPct(plPct(s.overall.bet,s.overall.won))+'</div>'
+            +(s.overall.bet>0?'<div style="font-size:10px;color:var(--muted);margin-top:1px">'+fmtPL(s.overall.pl)+' P/L</div>':'')
+          +'</div>'
           +'<div style="color:rgba(255,255,255,.25);font-size:14px">'+(active?'&#x2227;':'&#x203a;')+'</div>'
         +'</div>'
       +'</div>'
