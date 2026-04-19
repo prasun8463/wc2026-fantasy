@@ -1069,10 +1069,12 @@ async function submitPredFromSheet(mid){
   const h=parseInt(document.getElementById('sh_ph_'+mid)?.value);
   const a=parseInt(document.getElementById('sh_pa_'+mid)?.value);
   if(isNaN(h)||isNaN(a)||h<0||a<0){toast('Enter valid scores');return;}
-  // upsert: insert or update on (match_id, username) conflict
+  // delete existing prediction first (if any), then insert fresh
+  // this avoids upsert RLS issues — delete+insert works with standard policies
+  await sb.from('predictions').delete()
+    .eq('match_id',mid).eq('username',ME.username);
   const {error}=await sb.from('predictions')
-    .upsert({match_id:mid,username:ME.username,pred_home:h,pred_away:a},
-            {onConflict:'match_id,username'});
+    .insert({match_id:mid,username:ME.username,pred_home:h,pred_away:a});
   if(error){toast('Error: '+error.message);return;}
   if(!PREDS[mid])PREDS[mid]=[];
   PREDS[mid]=PREDS[mid].filter(p=>p.username!==ME.username);
@@ -1093,10 +1095,11 @@ async function submitPred(mid){
   const aEl=document.getElementById('pa_'+mid);
   const h=parseInt(hEl?.value); const a=parseInt(aEl?.value);
   if(isNaN(h)||isNaN(a)||h<0||a<0){toast('Enter valid scores (0 or above)');return;}
-  // upsert: insert or update on (match_id, username) conflict
+  // delete existing prediction first (if any), then insert fresh
+  await sb.from('predictions').delete()
+    .eq('match_id',mid).eq('username',ME.username);
   const {error}=await sb.from('predictions')
-    .upsert({match_id:mid,username:ME.username,pred_home:h,pred_away:a},
-            {onConflict:'match_id,username'});
+    .insert({match_id:mid,username:ME.username,pred_home:h,pred_away:a});
   if(error){toast('Error saving prediction: '+error.message);return;}
   if(!PREDS[mid])PREDS[mid]=[];
   PREDS[mid]=PREDS[mid].filter(p=>p.username!==ME.username);
