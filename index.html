@@ -1012,21 +1012,25 @@ function openMatchSheet(mid){
     }
   }
 
-  // Predict form (only if open and no prediction yet)
-  if(canPredict){
+  // Predict form — show when open+no prediction, OR when editing existing prediction
+  const isEditing=window._editPred===mid;
+  if(isEditing) window._editPred=null; // consume the flag
+  if(canPredict||isEditing){
+    const existingH=isEditing&&myP?myP.pred_home:'';
+    const existingA=isEditing&&myP?myP.pred_away:'';
     html+=`<div style="background:rgba(212,160,23,.06);border:1px solid rgba(212,160,23,.25);border-radius:10px;padding:14px;margin-bottom:10px">
-      <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:10px">Place your prediction (₹${betFor(m)})</div>
+      <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:10px">${isEditing?'Change your prediction':'Place your prediction'} (₹${betFor(m)})</div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="text-align:center">
           <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${m.home_flag} ${m.home}</div>
-          <input id="sh_ph_${mid}" type="number" min="0" max="20" placeholder="0" style="width:70px;margin:0;font-size:18px;text-align:center" />
+          <input id="sh_ph_${mid}" type="number" min="0" max="20" placeholder="0" value="${existingH}" style="width:70px;margin:0;font-size:18px;text-align:center" />
         </div>
         <div style="font-size:20px;color:var(--muted);padding-top:16px">–</div>
         <div style="text-align:center">
           <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${m.away_flag} ${m.away}</div>
-          <input id="sh_pa_${mid}" type="number" min="0" max="20" placeholder="0" style="width:70px;margin:0;font-size:18px;text-align:center" />
+          <input id="sh_pa_${mid}" type="number" min="0" max="20" placeholder="0" value="${existingA}" style="width:70px;margin:0;font-size:18px;text-align:center" />
         </div>
-        <button class="btn btn-gold btn-sm" style="width:auto;padding:10px 20px;margin:0;margin-top:16px;font-size:14px" onclick="submitPredFromSheet('${mid}')">Predict</button>
+        <button class="btn btn-gold btn-sm" style="width:auto;padding:10px 20px;margin:0;margin-top:16px;font-size:14px;touch-action:manipulation" onclick="submitPredFromSheet('${mid}')">${isEditing?'Update':'Predict'}</button>
       </div>
     </div>`;
   }
@@ -1065,7 +1069,10 @@ async function submitPredFromSheet(mid){
   const h=parseInt(document.getElementById('sh_ph_'+mid)?.value);
   const a=parseInt(document.getElementById('sh_pa_'+mid)?.value);
   if(isNaN(h)||isNaN(a)||h<0||a<0){toast('Enter valid scores');return;}
-  const {error}=await sb.from('predictions').insert({match_id:mid,username:ME.username,pred_home:h,pred_away:a});
+  // upsert: insert or update on (match_id, username) conflict
+  const {error}=await sb.from('predictions')
+    .upsert({match_id:mid,username:ME.username,pred_home:h,pred_away:a},
+            {onConflict:'match_id,username'});
   if(error){toast('Error: '+error.message);return;}
   if(!PREDS[mid])PREDS[mid]=[];
   PREDS[mid]=PREDS[mid].filter(p=>p.username!==ME.username);
@@ -1076,19 +1083,20 @@ async function submitPredFromSheet(mid){
 }
 
 async function cancelPredFromSheet(mid){
-  await sb.from('predictions').delete().eq('mid',mid).eq('username',ME.username);
-  if(PREDS[mid])PREDS[mid]=PREDS[mid].filter(p=>p.username!==ME.username);
-  closeMatchSheet();
-  renderMatchList();
+  // "Change" — don't delete, just reopen sheet in edit mode with scores pre-filled
+  window._editPred=mid;
+  openMatchSheet(mid); // re-render sheet with edit form shown
 }
-
 
 async function submitPred(mid){
   const hEl=document.getElementById('ph_'+mid);
   const aEl=document.getElementById('pa_'+mid);
   const h=parseInt(hEl?.value); const a=parseInt(aEl?.value);
   if(isNaN(h)||isNaN(a)||h<0||a<0){toast('Enter valid scores (0 or above)');return;}
-  const {error}=await sb.from('predictions').insert({match_id:mid,username:ME.username,pred_home:h,pred_away:a});
+  // upsert: insert or update on (match_id, username) conflict
+  const {error}=await sb.from('predictions')
+    .upsert({match_id:mid,username:ME.username,pred_home:h,pred_away:a},
+            {onConflict:'match_id,username'});
   if(error){toast('Error saving prediction: '+error.message);return;}
   if(!PREDS[mid])PREDS[mid]=[];
   PREDS[mid]=PREDS[mid].filter(p=>p.username!==ME.username);
