@@ -2383,12 +2383,8 @@ function randomScore(){
 async function settleRandom(mid){
   const m=MATCHES.find(x=>x.id===mid); if(!m)return;
   const[h,a]=randomScore();
-  // Pre-fill the inputs so admin can see what was picked
-  const hEl=document.getElementById('ah_'+mid);
-  const aEl=document.getElementById('aa_'+mid);
-  if(hEl)hEl.value=h;
-  if(aEl)aEl.value=a;
-  toast('Random score: '+h+'–'+a+' · Press Settle to confirm');
+  if(!confirm('Settle '+m.home+' vs '+m.away+' with random score '+h+'\u2013'+a+'?')) return;
+  await settleWithScore(mid,h,a);
 }
 
 async function quickSettle(mid, h, a){
@@ -2441,9 +2437,12 @@ async function settleWithScore(mid, h, a){
 
 async function settle(mid){
   if(!LEAGUE||!ME){toast('Not logged in');return;}
-  const h=parseInt(document.getElementById('ah_'+mid)?.value);
-  const a=parseInt(document.getElementById('aa_'+mid)?.value);
-  if(isNaN(h)||isNaN(a)||h<0||a<0){toast('Enter valid scores');return;}
+  const _hraw=document.getElementById('ah_'+mid)?.value;
+  const _araw=document.getElementById('aa_'+mid)?.value;
+  if(_hraw===''||_hraw===undefined||_araw===''||_araw===undefined){toast('Enter scores first');return;}
+  const h=parseInt(_hraw);
+  const a=parseInt(_araw);
+  if(isNaN(h)||isNaN(a)||h<0||a<0){toast('Enter valid scores (0 or above)');return;}
   const m=MATCHES.find(x=>x.id===mid); if(!m)return;
   const act=outcome(h,a);
   const arr=PREDS[mid]||[];
