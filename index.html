@@ -309,6 +309,10 @@ const SUPABASE_URL = 'https://wxolmlxphwieqvyfuyfu.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4b2xtbHhwaHdpZXF2eWZ1eWZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0OTY4NDgsImV4cCI6MjA4OTA3Mjg0OH0.XGijPeimB3QiGaikuiBkwgdgVOLYBJO-m6eBNvE7JG8';
 
 // ════════════════════════════════════════════════════════════════
+// PROD_MODE: read from leagues.prod_mode in DB (set via SQL before June go-live)
+// Controls: hides random settle buttons, enables auto-settle via API
+let PROD_MODE = false; // overwritten after loadAll() reads league
+// ════════════════════════════════════════════════════════════════
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -502,6 +506,7 @@ async function loadAll(){
   if(ME.league_id){
     const {data:lg}=await sb.from('leagues').select('*').eq('id',ME.league_id).single();
     LEAGUE=lg;
+    PROD_MODE=!!(lg && lg.prod_mode); // read from DB — flip to true via SQL before June
     const {data:mem}=await sb.from('users').select('username,earned,spent').eq('league_id',ME.league_id);
     MEMBERS=mem||[];
   }
@@ -809,8 +814,10 @@ function renderMatchList(){
       const sc=hasLiveScore?`${live.home}–${live.away}`:'FT';
       const qsBtn=isAdmin
         ? hasLiveScore
-          ? `<button onclick="event.stopPropagation();quickSettle('${m.id}',${live.home},${live.away})" style="background:var(--gold);color:var(--dark);border:none;border-radius:6px;padding:4px 9px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">Settle</button>`
-          : `<button onclick="event.stopPropagation();settleRandom('${m.id}')" style="background:var(--gold);color:var(--dark);border:none;border-radius:6px;padding:4px 9px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">Settle</button>`
+          ? `<button onclick="event.stopPropagation();quickSettle('${m.id}',${live.home},${live.away})" style="background:var(--gold);color:var(--dark);border:none;border-radius:6px;padding:4px 9px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;touch-action:manipulation">Settle</button>`
+          : PROD_MODE
+            ? `<span style="font-size:11px;color:var(--success)">⚡ Auto-settling</span>`
+            : `<button onclick="event.stopPropagation();settleRandom('${m.id}')" style="background:var(--gold);color:var(--dark);border:none;border-radius:6px;padding:4px 9px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;touch-action:manipulation">Settle</button>`
         : '';
       rightHtml=`<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
         <span class="badge" style="background:rgba(76,175,80,.18);border:1px solid rgba(76,175,80,.35);color:var(--success);font-size:11px;font-weight:700">FT · ${sc}</span>
@@ -1030,7 +1037,10 @@ function openMatchSheet(mid){
           <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${m.away_flag} ${m.away}</div>
           <input id="sh_pa_${mid}" type="number" min="0" max="20" placeholder="0" value="${existingA}" style="width:70px;margin:0;font-size:18px;text-align:center" />
         </div>
-        <button class="btn btn-gold btn-sm" style="width:auto;padding:10px 20px;margin:0;margin-top:16px;font-size:14px;touch-action:manipulation" onclick="submitPredFromSheet('${mid}')">${isEditing?'Update':'Predict'}</button>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:16px">
+          <button class="btn btn-gold btn-sm" style="width:auto;padding:10px 20px;margin:0;font-size:14px;touch-action:manipulation" onclick="submitPredFromSheet('${mid}')">${isEditing?'Update':'Predict'}</button>
+          <button style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:7px;color:var(--muted);font-size:11px;padding:5px 10px;cursor:pointer;touch-action:manipulation;white-space:nowrap" onclick="randomFillPred('${mid}')">🎲 Random</button>
+        </div>
       </div>
     </div>`;
   }
@@ -2092,11 +2102,20 @@ async function fetchLiveScores(){
     // Re-render live areas
     renderMatchList();
     if(document.getElementById('pane-admin').innerHTML) renderAdmin();
-    if(hadNewFT){
-      // Auto-settle any finished matches with live scores
+
+    // Always check auto-settle — needed to catch 60-min window expiry
+    // even if no new FT detected in this poll cycle
+    const hasAnyFT=MATCHES.some(m=>{
+      if(m.resolved) return false;
+      const live=LIVE_SCORES[m.home+'_'+m.away];
+      return live&&['FT','AET','PEN'].includes(live.status);
+    });
+    const hasPendingWindows=Object.keys(FT_TIMESTAMPS).some(mid=>{
+      const m=MATCHES.find(x=>x.id===mid);
+      return m&&!m.resolved;
+    });
+    if(hadNewFT||hasAnyFT||hasPendingWindows){
       await autoSettleFinished();
-      await loadAll();
-      renderAll();
     }
   }catch(e){
     console.warn('Live score fetch failed:',e);
@@ -2135,10 +2154,19 @@ function checkForNewFinished(newScores){
   return false;
 }
 
-// Auto-settle matches the API says are FT and we have a live score for
+// Track when each match first hit FT — auto-settle fires after delay
+const FT_TIMESTAMPS={};
+// PROD_MODE: 15 min delay (covers VAR, extra time wrap-up)
+// Testing: 10 min delay
+const AUTO_SETTLE_DELAY=PROD_MODE ? 15*60*1000 : 10*60*1000;
+
+// Auto-settle matches the API says are FT, 60 min after FT confirmed
 async function autoSettleFinished(){
   if(!LEAGUE||!ME||ME.username!==LEAGUE.admin_username) return;
   const finishedStatuses=['FT','AET','PEN'];
+  const now=Date.now();
+  let anySettled=false;
+
   for(const m of MATCHES){
     if(m.resolved) continue;
     const liveKey=m.home+'_'+m.away;
@@ -2146,23 +2174,46 @@ async function autoSettleFinished(){
     if(!live) continue;
     if(!finishedStatuses.includes(live.status)) continue;
     if(live.home==null||live.away==null) continue;
-    // Auto-settle with API score
+
+    // Record when we first saw this match as FT
+    if(!FT_TIMESTAMPS[m.id]) FT_TIMESTAMPS[m.id]=now;
+
+    // Only settle after delay elapsed
+    const elapsed=now-FT_TIMESTAMPS[m.id];
+    if(elapsed<AUTO_SETTLE_DELAY){
+      const minsLeft=Math.ceil((AUTO_SETTLE_DELAY-elapsed)/60000);
+      console.log(`Auto-settle waiting: ${m.home} vs ${m.away} — ${minsLeft} min remaining`);
+      continue;
+    }
+
+    // 60 min elapsed — settle now
     await settleWithScore(m.id, live.home, live.away);
-    toast(`Auto-settled: ${m.home} ${live.home}–${live.away} ${m.away}`);
+    toast(`✓ Auto-settled: ${m.home} ${live.home}–${live.away} ${m.away}`);
+    anySettled=true;
+  }
+
+  if(anySettled){
+    await loadAll();
+    renderAll();
   }
 }
 
-// Start polling — only during match windows
+// Start polling — runs during match windows, continues until all settled
 function startLivePolling(){
   if(livePoller) return;
   fetchLiveScores(); // immediate first fetch
   livePoller=setInterval(()=>{
-    // Only poll if there are unsettled matches past kickoff today
-    const haslive=MATCHES.some(m=>{
+    // Poll if any match is live, in-progress, finished-but-unsettled,
+    // or recently FT (still in 60-min settle window)
+    const hasActivity=MATCHES.some(m=>{
+      if(m.resolved) return false;
       const s=matchStatus(m);
-      return s==='inprogress'||s==='live'||s==='finished';
+      if(s==='inprogress'||s==='live'||s==='finished') return true;
+      // Keep polling if we're in a settle window for this match
+      if(FT_TIMESTAMPS[m.id]) return true;
+      return false;
     });
-    if(haslive) fetchLiveScores();
+    if(hasActivity) fetchLiveScores();
     else stopLivePolling();
   }, 5*60*1000); // every 5 minutes
 }
@@ -2323,6 +2374,8 @@ function renderAdmin(){
           <div class="score-sep">–</div>
           <input id="aa_${m.id}" type="number" min="0" max="20" placeholder="${m.away.slice(0,4)}" value="${liveM.away}" style="width:80px;margin:0" />
           <button class="btn btn-gold btn-sm" onclick="settle('${m.id}')" style="width:auto;padding:7px 12px;margin:0">Settle</button>
+          ` : PROD_MODE ? `
+          <span style="font-size:12px;color:var(--success);font-style:italic">⚡ Will auto-settle via API after match ends</span>
           ` : `
           <span style="font-size:12px;color:var(--muted);font-style:italic">No live score · random score will be used</span>
           <button class="btn btn-gold btn-sm" onclick="settleRandom('${m.id}')" style="width:auto;padding:7px 14px;margin:0">Settle</button>
@@ -2371,6 +2424,18 @@ function renderAdmin(){
     });
   }
 
+  html+=`<div class="sec">Import real fixtures from API</div>
+  <div class="card" style="margin-bottom:8px">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+      Fetches all WC2026 fixtures (group stage + knockouts) from api-football and populates your database. Safe to run multiple times — existing rows are updated, not duplicated.<br>
+      <span style="color:var(--warn);font-size:11px">⚠ Run SQL reset first to clear April test data before importing real fixtures.</span>
+    </div>
+    <div id="import-status" style="font-size:12px;color:var(--muted);margin-bottom:10px;min-height:18px"></div>
+    <button class="btn btn-gold" onclick="importFixturesFromAPI()" style="width:auto;padding:10px 20px;font-size:14px">
+      ⬇ Import WC2026 fixtures
+    </button>
+  </div>`;
+
   html+=`<div class="sec">Add/edit knockout fixture</div>
   <div class="card">
     <div class="field-label">Match ID (e.g. r05, qf1)</div><input id="new-id" placeholder="r05" />
@@ -2398,6 +2463,21 @@ function randomScore(){
   let r=Math.floor(Math.random()*total);
   for(const [h,a,w] of weights){r-=w;if(r<0)return[h,a];}
   return[1,0];
+}
+
+// Fill predict form inputs with a random score (does not submit)
+function randomFillPred(mid){
+  const[h,a]=randomScore();
+  const hEl=document.getElementById('sh_ph_'+mid);
+  const aEl=document.getElementById('sh_pa_'+mid);
+  if(hEl) hEl.value=h;
+  if(aEl) aEl.value=a;
+  // Flash inputs briefly to confirm
+  [hEl,aEl].forEach(el=>{
+    if(!el) return;
+    el.style.borderColor='rgba(212,160,23,.7)';
+    setTimeout(()=>el.style.borderColor='',600);
+  });
 }
 
 async function settleRandom(mid){
@@ -2516,6 +2596,117 @@ async function updateBet(){
   LEAGUE.bet_amount=amounts;
   toast('Bet amounts saved to database!');
   renderAdmin();
+}
+
+// ════════════════════════════════════════════════════════════════
+//  FIXTURE IMPORT — fetch all WC2026 fixtures from api-football
+// ════════════════════════════════════════════════════════════════
+async function importFixturesFromAPI(){
+  const statusEl=document.getElementById('import-status');
+  if(!statusEl) return;
+  statusEl.style.color='var(--warn)';
+  statusEl.textContent='Fetching fixtures from api-football...';
+
+  const RAPIDAPI_KEY='9ccccda5ebmsh35908237b362fe4p12568cjsn6a49fb26955c';
+  const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // Group mapping: api-football round string → our grp code
+  // WC2026 groups are A–L, knockouts are named rounds
+  function parseRound(round){
+    if(!round) return null;
+    const r=round.trim();
+    if(/^Group Stage/.test(r)){
+      // "Group Stage - A" etc
+      const m=r.match(/Group Stage - ([A-L])/);
+      return m?m[1]:null;
+    }
+    if(/Round of 32/i.test(r)) return 'R32';
+    if(/Round of 16/i.test(r)) return 'R16';
+    if(/Quarter-final/i.test(r)) return 'QF';
+    if(/Semi-final/i.test(r)) return 'SF';
+    if(/Final/i.test(r)&&!/Semi/i.test(r)) return 'Final';
+    return null;
+  }
+
+  // Flag emoji from country code
+  function flagEmoji(code){
+    if(!code||code.length!==2) return '🏳';
+    return String.fromCodePoint(...[...code.toUpperCase()].map(c=>0x1F1E6-65+c.charCodeAt(0)));
+  }
+
+  try {
+    // Fetch all fixtures for WC2026 (league=1, season=2026)
+    const resp=await fetch('https://api-football-v1.p.rapidapi.com/v3/fixtures?league=1&season=2026',{
+      headers:{
+        'x-rapidapi-key': RAPIDAPI_KEY,
+        'x-rapidapi-host': 'api-football-v1.p.rapidapi.com'
+      }
+    });
+    const data=await resp.json();
+    const fixtures=data.response||[];
+
+    if(!fixtures.length){
+      statusEl.style.color='var(--red)';
+      statusEl.textContent='No fixtures returned — API may not have WC2026 data yet.';
+      return;
+    }
+
+    statusEl.textContent=`Got ${fixtures.length} fixtures. Importing...`;
+
+    let imported=0, skipped=0, errors=0;
+
+    for(const f of fixtures){
+      const grp=parseRound(f.league?.round);
+      if(!grp){skipped++;continue;}
+
+      // Parse date and kickoff in IST (UTC+5:30)
+      const kickoffUTC=new Date(f.fixture?.date);
+      if(isNaN(kickoffUTC)){skipped++;continue;}
+      const kickoffIST=new Date(kickoffUTC.getTime()+5.5*60*60*1000);
+      const matchDate=monthNames[kickoffIST.getUTCMonth()]+' '+kickoffIST.getUTCDate();
+      const hh=String(kickoffIST.getUTCHours()).padStart(2,'0');
+      const mm=String(kickoffIST.getUTCMinutes()).padStart(2,'0');
+      const kickoffISTStr=hh+':'+mm;
+
+      const homeName=f.teams?.home?.name||'TBD';
+      const awayName=f.teams?.away?.name||'TBD';
+      const homeCode=f.teams?.home?.country||f.teams?.home?.name?.slice(0,2)||'';
+      const awayCode=f.teams?.away?.country||f.teams?.away?.name?.slice(0,2)||'';
+
+      // Use api-football fixture id as our match id
+      const mid='api_'+f.fixture.id;
+
+      const row={
+        id: mid,
+        grp: grp,
+        home: homeName,
+        away: awayName,
+        home_flag: flagEmoji(f.teams?.home?.code||homeCode),
+        away_flag: flagEmoji(f.teams?.away?.code||awayCode),
+        match_date: matchDate,
+        kickoff_ist: kickoffISTStr,
+        resolved: false
+      };
+
+      // Upsert — safe to re-run
+      const {error}=await sb.from('matches').upsert(row,{onConflict:'id'});
+      if(error){errors++;console.error('Import error',mid,error.message);}
+      else imported++;
+    }
+
+    // Reload data
+    await loadAll();
+    groupsLastFetched=0;
+    renderAll();
+
+    statusEl.style.color='var(--success)';
+    statusEl.textContent=`✓ Imported ${imported} fixtures · ${skipped} skipped · ${errors} errors`;
+    toast('Fixtures imported! '+imported+' matches loaded.');
+
+  } catch(e){
+    statusEl.style.color='var(--red)';
+    statusEl.textContent='Error: '+e.message;
+  }
 }
 
 async function addMatch(){
