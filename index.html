@@ -1638,14 +1638,232 @@ function closeScorecardSheet(){ document.getElementById('score-modal').classList
 //  HOW TO PLAY
 // ════════════════════════════════════════════════════════════════
 function renderHowTo(){
+  if(window._htpClassic){ renderHowToClassic(); return; }
+  const el=document.getElementById('pane-howto');
+  const ba=parseBetAmount(LEAGUE?.bet_amount);
+  const bet=parseInt(typeof ba==='object'?(ba.group||100):(ba||100));
+
+  // ── Stepper state ──
+  if(window._htpStep===undefined) window._htpStep=0;
+  const step=window._htpStep;
+  const totalSteps=4;
+
+  const steps=[
+    {
+      title:'Pick a score, join the pot',
+      sub:'How predicting works',
+      body:`
+        <div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+          On match day, tap any open match and enter the score you think will happen.
+          Your <strong style="color:var(--text)">₹${bet}</strong> goes into that match's shared pot.
+          The window closes <strong style="color:var(--text)">5 minutes before kickoff</strong> — you can change your pick any time before that.
+        </div>
+        <div style="background:rgba(212,160,23,.06);border:1px solid rgba(212,160,23,.2);border-radius:10px;padding:13px;margin-bottom:10px">
+          <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:8px">Brazil vs France · Group I · Today</div>
+          <div style="display:flex;justify-content:center;align-items:center;gap:18px;margin-bottom:8px">
+            <div style="text-align:center">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:4px">🇧🇷 Brazil</div>
+              <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;width:56px;height:44px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700">2</div>
+            </div>
+            <div style="font-size:18px;color:var(--muted);margin-top:14px">–</div>
+            <div style="text-align:center">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:4px">🇫🇷 France</div>
+              <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;width:56px;height:44px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700">1</div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:center;gap:16px;font-size:11px;color:var(--muted)">
+            <span>Pot: ₹${bet*4}</span><span>·</span><span>4 players</span><span>·</span><span>₹${bet} each</span>
+          </div>
+        </div>
+        <div style="background:rgba(55,138,221,.06);border:1px solid rgba(55,138,221,.2);border-radius:8px;padding:10px 13px;font-size:12px;color:var(--muted)">
+          💡 <strong style="color:var(--text)">Predictions are hidden</strong> until the match settles — you can see your own pick but not others'. No peeking for advantage.
+        </div>`
+    },
+    {
+      title:'How payouts work',
+      sub:'Exact beats outcome beats nothing',
+      body:`
+        <div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+          After the match ends, the admin enters the result. Payouts happen instantly.
+          Result: <strong style="color:var(--gold)">Brazil 2–1 France</strong> · Pot: <strong style="color:var(--text)">₹${bet*4}</strong>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px">
+          <div style="display:grid;grid-template-columns:1fr auto auto;gap:0">
+            <div style="padding:8px 12px;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);background:rgba(255,255,255,.03)">Player · Pick</div>
+            <div style="padding:8px 10px;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);background:rgba(255,255,255,.03);text-align:center">Result</div>
+            <div style="padding:8px 12px;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);background:rgba(255,255,255,.03);text-align:right">Payout</div>
+
+            <div style="padding:9px 12px;font-size:12px;border-bottom:1px solid var(--border);background:rgba(76,175,80,.04)">You · <strong style="color:var(--success)">2–1 ✓</strong></div>
+            <div style="padding:9px 10px;text-align:center;border-bottom:1px solid var(--border);background:rgba(76,175,80,.04)"><span style="background:rgba(76,175,80,.2);color:var(--success);border-radius:20px;padding:2px 8px;font-size:10px;font-weight:600">Exact</span></div>
+            <div style="padding:9px 12px;text-align:right;color:var(--success);font-weight:700;border-bottom:1px solid var(--border);background:rgba(76,175,80,.04)">+₹${bet*4}</div>
+
+            <div style="padding:9px 12px;font-size:12px;border-bottom:1px solid var(--border)">Rahul · <span style="color:var(--warn)">3–0 ✓</span></div>
+            <div style="padding:9px 10px;text-align:center;border-bottom:1px solid var(--border)"><span style="background:rgba(232,160,32,.15);color:var(--warn);border-radius:20px;padding:2px 8px;font-size:10px">Outcome</span></div>
+            <div style="padding:9px 12px;text-align:right;color:var(--muted);border-bottom:1px solid var(--border)">—</div>
+
+            <div style="padding:9px 12px;font-size:12px;border-bottom:1px solid var(--border)">Ankit · <span style="color:var(--red)">1–2 ✗</span></div>
+            <div style="padding:9px 10px;text-align:center;border-bottom:1px solid var(--border)"><span style="background:rgba(226,75,74,.15);color:var(--red);border-radius:20px;padding:2px 8px;font-size:10px">Wrong</span></div>
+            <div style="padding:9px 12px;text-align:right;color:var(--red);font-weight:600;border-bottom:1px solid var(--border)">-₹${bet}</div>
+
+            <div style="padding:9px 12px;font-size:12px">Vikram · <span style="color:var(--red)">0–0 ✗</span></div>
+            <div style="padding:9px 10px;text-align:center"><span style="background:rgba(226,75,74,.15);color:var(--red);border-radius:20px;padding:2px 8px;font-size:10px">Wrong</span></div>
+            <div style="padding:9px 12px;text-align:right;color:var(--red);font-weight:600">-₹${bet}</div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.6">
+          You got exact → full pot. Rahul got outcome right but exact takes priority. If <em>nobody</em> gets exact, outcome winners split the pot. If everyone gets the same outcome, all stakes are refunded.
+        </div>`
+    },
+    {
+      title:'Reading the matches tab',
+      sub:'What each badge means',
+      body:`
+        <div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+          Every match row shows its current state at a glance.
+        </div>
+        <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px">
+          ${[
+            ['background:rgba(212,160,23,.15);color:var(--gold);border:1px solid rgba(212,160,23,.4)','Predict','Today\'s match, window open. Tap to place your pick.'],
+            ['background:rgba(76,175,80,.15);color:var(--success);border:1px solid rgba(76,175,80,.3)','Predicted','You\'ve locked in a pick. Tap to view or change it.'],
+            ['background:rgba(232,160,32,.15);color:var(--warn);border:1px solid rgba(232,160,32,.35)','In progress','Window closed. Match being played — result soon.'],
+            ['background:rgba(255,255,255,.06);color:var(--muted);border:1px solid var(--border)','20:30 IST','Future match. Opens for prediction on match day only.'],
+            ['background:var(--gold);color:var(--dark);border:none','2–1','Settled. Tap to see result and everyone\'s predictions.'],
+          ].map(([style,label,desc])=>`
+            <div style="display:grid;grid-template-columns:100px 1fr;align-items:center;border-bottom:1px solid var(--border)">
+              <div style="padding:11px 12px;display:flex;align-items:center;justify-content:center">
+                <span style="${style};padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600">${label}</span>
+              </div>
+              <div style="padding:11px 12px;font-size:12px;color:var(--muted);border-left:1px solid var(--border)">${desc}</div>
+            </div>`).join('')}
+          <div style="display:grid;grid-template-columns:100px 1fr;align-items:center">
+            <div style="padding:11px 12px;display:flex;align-items:center;justify-content:center">
+              <span style="background:rgba(55,138,221,.15);color:var(--info);border:1px solid rgba(55,138,221,.3);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600">Change</span>
+            </div>
+            <div style="padding:11px 12px;font-size:12px;color:var(--muted);border-left:1px solid var(--border)">Tap this inside a match sheet to update your prediction before cutoff.</div>
+          </div>
+        </div>`
+    },
+    {
+      title:'Leaderboard & your stats',
+      sub:'How ranking works',
+      body:`
+        <div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+          The leaderboard ranks everyone by <strong style="color:var(--text)">P/L%</strong> — profit or loss as a percentage of what you staked. Fairer than raw profit since everyone plays different numbers of matches.
+        </div>
+        <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid var(--border);background:rgba(212,160,23,.04)">
+            <div style="font-size:22px;width:26px;text-align:center">🥇</div>
+            <div style="width:34px;height:34px;border-radius:50%;background:#378ADD;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff">PR</div>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:600;color:var(--info)">prasun84 (you)</div>
+              <div style="font-size:11px;color:var(--muted)">12 played · 50% hit</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:16px;font-weight:700;color:var(--success)">+60%</div>
+              <div style="font-size:10px;color:var(--muted)">+₹${bet*6} P/L</div>
+            </div>
+          </div>
+          <div style="padding:11px 13px;font-size:12px;color:var(--muted);line-height:1.6">
+            Tap any player row → see their Exact / Outcome / Wrong / Refund breakdown.<br>
+            The <strong style="color:var(--text)">Stage breakdown</strong> table below shows P/L by tournament stage — group, R32, R16, QF, SF/Final.
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          <div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:9px;padding:10px 12px;text-align:center">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">P/L%</div>
+            <div style="font-size:13px;font-weight:600;color:var(--text)">(Won − Bet) ÷ Bet</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:3px">Your ranking metric</div>
+          </div>
+          <div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:9px;padding:10px 12px;text-align:center">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Hit %</div>
+            <div style="font-size:13px;font-weight:600;color:var(--text)">Exact + Outcome wins</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:3px">Your prediction accuracy</div>
+          </div>
+        </div>
+        <div style="background:rgba(55,138,221,.06);border:1px solid rgba(55,138,221,.2);border-radius:8px;padding:10px 13px;font-size:12px;color:var(--muted)">
+          💡 <strong style="color:var(--text)">Invite friends</strong> via the League tab → Invite others → WhatsApp message opens with your league link ready to send.
+        </div>`
+    }
+  ];
+
+  const s=steps[step];
+  const isFirst=step===0, isLast=step===totalSteps-1;
+
+  // Progress dots
+  const dots=Array.from({length:totalSteps},(_,i)=>{
+    const col=i<step?'var(--success)':i===step?'var(--gold)':'rgba(255,255,255,.2)';
+    return `<div style="width:7px;height:7px;border-radius:50%;background:${col};transition:background .2s"></div>`;
+  }).join('');
+
+  // FAQs collapsible at bottom (only on last step)
+  const faqHTML=isLast?`
+    <div style="margin-top:16px">
+      <div style="font-size:12px;color:var(--muted);font-weight:600;margin-bottom:8px;letter-spacing:.3px">COMMON QUESTIONS</div>
+      ${[
+        ['What if I skip a match?','No cost — you simply don\'t join that pot. Skipping doesn\'t affect other matches.'],
+        ['When does the pot pay out?','After the admin enters the final score. Balances update instantly on the Leaderboard.'],
+        ['Is this real money?','The app tracks bets and balances but handles no actual payments. Real money settlement is informal between league members.'],
+        ['Can I see others\' predictions?','Only after the match settles. Before that, you see pot size and player count only.'],
+      ].map(([q,a])=>`
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:9px;padding:11px 13px;margin-bottom:7px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px">${q}</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.5">${a}</div>
+        </div>`).join('')}
+    </div>`:''
+
+  el.innerHTML=`
+    <div style="margin-bottom:14px">
+      <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:3px">${s.title}</div>
+      <div style="font-size:12px;color:var(--muted)">${s.sub}</div>
+    </div>
+
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:14px">
+      <div style="padding:16px">${s.body}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-top:1px solid var(--border);background:rgba(255,255,255,.02)">
+        <div style="display:flex;gap:6px;align-items:center">${dots}</div>
+        <div style="display:flex;gap:8px">
+          ${!isFirst?`<button onclick="htpNav(-1)" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-size:13px;color:var(--muted);cursor:pointer">← Back</button>`:''}
+          ${!isLast?`<button onclick="htpNav(1)" style="background:var(--gold);color:var(--dark);border:none;border-radius:8px;padding:6px 18px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation">Next →</button>`
+          :`<button onclick="goTab('matches')" style="background:var(--gold);color:var(--dark);border:none;border-radius:8px;padding:6px 18px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation">Let's play 🏆</button>`}
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="font-size:11px;color:var(--muted)">Step ${step+1} of ${totalSteps}</div>
+      <button onclick="htpClassic()" style="background:transparent;border:none;font-size:11px;color:rgba(255,255,255,.3);cursor:pointer;padding:0">View full guide</button>
+    </div>
+    ${faqHTML}
+  `;
+}
+
+function htpNav(dir){
+  const total=4;
+  window._htpStep=Math.max(0,Math.min(total-1,(window._htpStep||0)+dir));
+  renderHowTo();
+  document.getElementById('pane-howto').scrollTop=0;
+}
+
+function htpClassic(){
+  // Fallback to the original full-text guide
+  window._htpClassic=true;
+  renderHowToClassic();
+}
+
+
+// ════════════════════════════════════════════════════════════════
+//  CLASSIC HOW TO PLAY — full text guide (fallback)
+// ════════════════════════════════════════════════════════════════
+function renderHowToClassic(){
   const el=document.getElementById('pane-howto');
   const ba=parseBetAmount(LEAGUE?.bet_amount);
   const bet=parseInt(typeof ba==='object'?(ba.group||100):(ba||100));
   el.innerHTML=`
+    <button onclick="window._htpClassic=false;window._htpStep=0;renderHowTo()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-size:12px;color:var(--muted);cursor:pointer;margin-bottom:14px">← Back to guide</button>
 
   <div class="sec">FIFA 2026 Predictor</div>
   <div class="card" style="font-size:13px;line-height:1.8;color:var(--text)">
-    Predict the exact scoreline of FIFA World Cup 2026 matches before kickoff. 
+    Predict the exact scoreline of FIFA World Cup 2026 matches before kickoff.
     Every prediction goes into a shared pot — the sharper your call, the bigger your share.
     Track your balance, hit rate and league rankings in real time.
   </div>
@@ -1661,7 +1879,7 @@ function renderHowTo(){
       <div style="padding:14px;background:rgba(76,175,80,.08);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px">🎯</div>
       <div style="padding:12px 14px;border-bottom:1px solid var(--border)">
         <div style="font-size:13px;font-weight:600;color:var(--success);margin-bottom:3px">Pick the exact scoreline</div>
-        <div style="font-size:12px;color:var(--muted)">Enter the final score you think will happen — e.g. Brazil 2, France 1. Each prediction costs ₹${bet} which goes into the shared pot for that match.</div>
+        <div style="font-size:12px;color:var(--muted)">Enter the final score you think will happen — e.g. Brazil 2, France 1. Each prediction costs ₹\${bet} which goes into the shared pot for that match.</div>
       </div>
       <div style="padding:14px;background:rgba(55,138,221,.08);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px">🔒</div>
       <div style="padding:12px 14px;border-bottom:1px solid var(--border)">
@@ -1692,107 +1910,27 @@ function renderHowTo(){
       <div style="padding:14px;background:rgba(55,138,221,.08);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px">🔄</div>
       <div style="padding:12px 14px;border-bottom:1px solid var(--border)">
         <div style="font-size:13px;font-weight:600;color:var(--info);margin-bottom:3px">All same outcome → refund</div>
-        <div style="font-size:12px;color:var(--muted)">Everyone predicted the same outcome and it happened. No winner, no loser — everyone gets their ₹${bet} back.</div>
+        <div style="font-size:12px;color:var(--muted)">Everyone predicted the same outcome and it happened. No winner, no loser — everyone gets their ₹\${bet} back.</div>
       </div>
       <div style="padding:14px;background:rgba(226,75,74,.08);display:flex;align-items:center;justify-content:center;font-size:20px">❌</div>
       <div style="padding:12px 14px">
         <div style="font-size:13px;font-weight:600;color:var(--red);margin-bottom:3px">Wrong prediction → lose your stake</div>
-        <div style="font-size:12px;color:var(--muted)">You got the outcome wrong. Your ₹${bet} goes into the pot for the winners to collect.</div>
+        <div style="font-size:12px;color:var(--muted)">You got the outcome wrong. Your ₹\${bet} goes into the pot for the winners to collect.</div>
       </div>
-    </div>
-  </div>
-
-  <div class="sec">Quick example</div>
-  <div class="card">
-    <div style="font-size:13px;font-weight:600;margin-bottom:3px;color:var(--text)">Brazil vs France — 4 players, ₹${bet} each → ₹${bet*4} pot</div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Final result: Brazil 2–1 France</div>
-    <div style="overflow-x:auto">
-    <table style="width:100%;border-collapse:collapse;font-size:12px">
-      <tr style="border-bottom:1px solid var(--border)">
-        <th style="padding:7px 10px;text-align:left;color:var(--muted);font-weight:500">Player</th>
-        <th style="padding:7px 8px;text-align:center;color:var(--muted);font-weight:500">Predicted</th>
-        <th style="padding:7px 8px;text-align:center;color:var(--muted);font-weight:500">Result</th>
-        <th style="padding:7px 8px;text-align:center;color:var(--muted);font-weight:500">Payout</th>
-      </tr>
-      <tr style="background:rgba(76,175,80,.07);border-bottom:1px solid var(--border)">
-        <td style="padding:8px 10px;font-weight:600;color:var(--text)">Prasun</td>
-        <td style="padding:8px 8px;text-align:center;color:var(--success);font-weight:600">2–1 ✓</td>
-        <td style="padding:8px 8px;text-align:center"><span style="font-size:10px;background:rgba(76,175,80,.2);color:var(--success);padding:2px 7px;border-radius:20px;font-weight:600">Exact</span></td>
-        <td style="padding:8px 8px;text-align:center;color:var(--success);font-weight:700">+₹${bet*4}</td>
-      </tr>
-      <tr style="border-bottom:1px solid var(--border)">
-        <td style="padding:8px 10px;color:var(--text)">Rahul</td>
-        <td style="padding:8px 8px;text-align:center;color:var(--warn)">3–0 ✓</td>
-        <td style="padding:8px 8px;text-align:center"><span style="font-size:10px;background:rgba(255,255,255,.06);color:var(--muted);padding:2px 7px;border-radius:20px">No exact winner</span></td>
-        <td style="padding:8px 8px;text-align:center;color:var(--muted)">—</td>
-      </tr>
-      <tr style="border-bottom:1px solid var(--border)">
-        <td style="padding:8px 10px;color:var(--text)">Ankit</td>
-        <td style="padding:8px 8px;text-align:center;color:var(--red)">1–2 ✗</td>
-        <td style="padding:8px 8px;text-align:center"><span style="font-size:10px;background:rgba(226,75,74,.15);color:var(--red);padding:2px 7px;border-radius:20px;font-weight:600">Wrong</span></td>
-        <td style="padding:8px 8px;text-align:center;color:var(--red);font-weight:600">-₹${bet}</td>
-      </tr>
-      <tr>
-        <td style="padding:8px 10px;color:var(--text)">Vikram</td>
-        <td style="padding:8px 8px;text-align:center;color:var(--red)">0–0 ✗</td>
-        <td style="padding:8px 8px;text-align:center"><span style="font-size:10px;background:rgba(226,75,74,.15);color:var(--red);padding:2px 7px;border-radius:20px;font-weight:600">Wrong</span></td>
-        <td style="padding:8px 8px;text-align:center;color:var(--red);font-weight:600">-₹${bet}</td>
-      </tr>
-    </table>
-    </div>
-    <div style="font-size:11px;color:var(--muted);margin-top:10px">Prasun got the exact score so takes the full ₹${bet*4} pot. Rahul predicted Brazil win (correct outcome) but since Prasun got it exact, the outcome fallback doesn't apply — exact score takes priority.</div>
-  </div>
-
-  <div class="sec">Reading the Matches tab</div>
-  <div class="card" style="padding:0;overflow:hidden">
-    <div style="display:grid;grid-template-columns:auto 1fr;gap:0">
-      <div style="padding:12px 14px;background:rgba(212,160,23,.1);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center">
-        <div style="background:var(--gold);color:var(--dark);border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700">Predict</div>
-      </div>
-      <div style="padding:12px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)">Today's match, window open. Tap to place your prediction.</div>
-      <div style="padding:12px 14px;background:rgba(76,175,80,.06);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center">
-        <div style="background:rgba(76,175,80,.15);color:#4caf50;border:1px solid rgba(76,175,80,.3);border-radius:20px;padding:3px 9px;font-size:11px;font-weight:600">Predicted</div>
-      </div>
-      <div style="padding:12px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)">You've locked in your pick for this match.</div>
-      <div style="padding:12px 14px;background:rgba(232,160,32,.06);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center">
-        <div style="background:rgba(232,160,32,.15);color:#e8a020;border:1px solid rgba(232,160,32,.35);border-radius:20px;padding:3px 9px;font-size:11px;font-weight:600">In progress</div>
-      </div>
-      <div style="padding:12px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)">Window closed, match being played. Result coming soon.</div>
-      <div style="padding:12px 14px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center">
-        <div style="background:rgba(255,255,255,.05);color:#7a9a7a;border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:3px 9px;font-size:11px">20:30 IST</div>
-      </div>
-      <div style="padding:12px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)">Future match — opens for prediction on match day only.</div>
-      <div style="padding:12px 14px;background:rgba(255,255,255,.02);display:flex;align-items:center;justify-content:center">
-        <div style="font-size:16px;font-weight:700;color:var(--gold)">2–1</div>
-      </div>
-      <div style="padding:12px 14px;font-size:12px;color:var(--muted)">Match settled. Tap to see full results and everyone's predictions.</div>
     </div>
   </div>
 
   <div class="sec">FAQs</div>
   <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:4px">What if I skip a match?</div>
-  <div style="font-size:12px;color:var(--muted)">No problem — you simply don't participate in that pot. Your money isn't added and you can't win it. Skipping doesn't affect other matches.</div></div>
-
+  <div style="font-size:12px;color:var(--muted)">No problem — you simply don't participate in that pot. Your money isn't added and you can't win it.</div></div>
   <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:4px">Can I see what others predicted?</div>
-  <div style="font-size:12px;color:var(--muted)">Only after the match is settled. Before and during a match, predictions are hidden — you'll only see how many people have predicted and the pot size.</div></div>
-
-  <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:4px">When does the pot pay out?</div>
-  <div style="font-size:12px;color:var(--muted)">The league admin enters the final score after each match. The app instantly calculates winners and updates everyone's balance on the Leaderboard.</div></div>
-
-  <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:4px">What is P/L on the Leaderboard?</div>
-  <div style="font-size:12px;color:var(--muted)">Profit/Loss — total winnings minus total amount staked. Green means you're up, red means you're down. Your net balance on the Dashboard is the same number.</div></div>
-
-  <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:4px">What does Hit % mean?</div>
-  <div style="font-size:12px;color:var(--muted)">The percentage of your predictions that resulted in an exact score or correct outcome (excludes refunds and skipped matches). Higher is sharper.</div></div>
-
+  <div style="font-size:12px;color:var(--muted)">Only after the match is settled. Before and during a match, predictions are hidden.</div></div>
   <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:4px">Is this real money?</div>
-  <div style="font-size:12px;color:var(--muted)">The app tracks bets and balances but handles no actual payments. Settlement of real money is an informal arrangement between league members outside the app.</div></div>
-
+  <div style="font-size:12px;color:var(--muted)">The app tracks bets and balances but handles no actual payments. Settlement is informal between league members.</div></div>
   <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:4px">How do I invite friends?</div>
-  <div style="font-size:12px;color:var(--muted)">Go to the League tab → tap "Invite others" → WhatsApp opens with a ready-to-send message including your league link. Friends tap the link and land straight on sign-up with your league pre-filled.</div></div>
+  <div style="font-size:12px;color:var(--muted)">League tab → Invite others → WhatsApp opens with a ready-to-send message including your league link.</div></div>
   `;
 }
-
 
 // ════════════════════════════════════════════════════════════════
 //  GROUPS — live standings computed from Supabase match results
