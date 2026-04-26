@@ -1393,8 +1393,103 @@ function renderLB(){
     });
   }
 
-  const html=bannerHtml+storyHtml+standingsHtml+accuracyHtml;
+  // ── Stage P&L table ──
+  let tableHtml='';
+  {
+    const tableStats=sortedMembers.map(u=>({u,rounds:calcRoundStats(u.username)}));
+    const stageActive=ROUND_DEFS.reduce((acc,r)=>{
+      acc[r.key]=MATCHES.some(m=>r.grps.includes(m.grp)&&m.resolved);
+      return acc;
+    },{});
+    const dimStyle='color:rgba(255,255,255,.22)';
+    const thS='padding:7px 5px;text-align:center;font-size:10px;font-weight:600;border-bottom:1px solid var(--border);white-space:nowrap';
+    const subS='padding:4px 5px;text-align:center;font-size:10px;font-weight:400;border-bottom:1px solid var(--border);white-space:nowrap';
+    const blS='border-left:1px solid rgba(255,255,255,.09)';
+    const blGold='border-left:2px solid rgba(212,160,23,.4)';
+    let thRow='<th style="'+thS+';text-align:left;padding-left:10px;position:sticky;left:0;background:#1a2a1a;z-index:2;color:var(--muted);font-weight:500;min-width:72px">Player</th>';
+    ROUND_DEFS.forEach((r,ri)=>{
+      const active=stageActive[r.key];
+      const col=active?'var(--gold)':'rgba(255,255,255,.22)';
+      const bl=ri===0?'':blS+';';
+      thRow+='<th style="'+thS+';'+bl+'color:'+col+'" colspan="2">'+r.label+'</th>';
+    });
+    thRow+='<th style="'+thS+';'+blGold+';color:var(--gold)" colspan="3">Overall</th>';
+    let subRow='<th style="'+subS+';text-align:left;padding-left:10px;position:sticky;left:0;background:#1a2a1a;z-index:2;color:var(--muted)"></th>';
+    ROUND_DEFS.forEach((r,ri)=>{
+      const active=stageActive[r.key];
+      const col=active?'var(--muted)':dimStyle;
+      const bl=ri===0?'':blS+';';
+      subRow+='<th style="'+subS+';'+bl+'color:'+col+'">Bet</th>';
+      subRow+='<th style="'+subS+';color:'+col+'">Won</th>';
+    });
+    subRow+='<th style="'+subS+';'+blGold+';color:var(--muted)">Bet</th>';
+    subRow+='<th style="'+subS+';color:var(--muted)">Won</th>';
+    subRow+='<th style="'+subS+';color:var(--gold);font-weight:700">P/L</th>';
+    let rows='';
+    tableStats.forEach((ts,i)=>{
+      const isMe=ts.u.username===ME.username;
+      const rowBg=isMe?'rgba(55,138,221,.07)':i%2===1?'rgba(255,255,255,.02)':'';
+      const nameCol=isMe?'var(--info)':'var(--text)';
+      const nameBg=isMe?'rgba(55,138,221,.12)':'#1a2a1a';
+      let cells='<td style="padding:7px 10px;font-size:12px;font-weight:700;color:'+nameCol+';white-space:nowrap;border-bottom:1px solid rgba(255,255,255,.04);position:sticky;left:0;background:'+nameBg+';z-index:1">'+ts.u.username+(isMe?' ★':'')+'</td>';
+      ROUND_DEFS.forEach((r,ri)=>{
+        const s=ts.rounds[r.key];
+        const active=stageActive[r.key];
+        const hasBet=s&&s.bet>0;
+        const bl=ri===0?'':';border-left:1px solid rgba(255,255,255,.06)';
+        if(!active){
+          cells+='<td style="padding:7px 4px;text-align:center;font-size:10px;color:rgba(255,255,255,.18);border-bottom:1px solid rgba(255,255,255,.04)'+bl+'">—</td>';
+          cells+='<td style="padding:7px 4px;text-align:center;font-size:10px;color:rgba(255,255,255,.18);border-bottom:1px solid rgba(255,255,255,.04)">—</td>';
+        } else {
+          cells+='<td style="padding:7px 4px;text-align:center;font-size:11px;color:'+(hasBet?'var(--text)':'var(--muted)')+';border-bottom:1px solid rgba(255,255,255,.04)'+bl+'">'+(hasBet?s.bet:'—')+'</td>';
+          cells+='<td style="padding:7px 4px;text-align:center;font-size:11px;color:'+(s&&s.won>0?'var(--success)':'var(--muted)')+';font-weight:'+(s&&s.won>0?700:400)+';border-bottom:1px solid rgba(255,255,255,.04)">'+(hasBet?(s.won||'—'):'—')+'</td>';
+        }
+      });
+      const ov=ts.rounds.overall;
+      const plc=plColor(ov.pl);
+      cells+='<td style="padding:7px 4px;text-align:center;font-size:11px;color:var(--text);border-bottom:1px solid rgba(255,255,255,.04);border-left:2px solid rgba(212,160,23,.3)">'+(ov.bet||'—')+'</td>';
+      cells+='<td style="padding:7px 4px;text-align:center;font-size:11px;color:'+(ov.won>0?'var(--success)':'var(--muted)')+';font-weight:'+(ov.won>0?700:400)+';border-bottom:1px solid rgba(255,255,255,.04)">'+(ov.won||'—')+'</td>';
+      cells+='<td style="padding:7px 6px;text-align:center;font-size:12px;font-weight:700;color:'+plc+';border-bottom:1px solid rgba(255,255,255,.04)">'+(ov.pl!==0?fmtPL(ov.pl):'—')+'</td>';
+      rows+='<tr style="background:'+rowBg+'">'+cells+'</tr>';
+    });
+    tableHtml='<div class="sec" style="margin-top:16px">Stage breakdown</div>'
+      +'<div style="font-size:10px;color:var(--muted);text-align:right;margin-bottom:3px">← scroll for later stages →</div>'
+      +'<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border);margin-bottom:4px">'
+      +'<table style="width:100%;border-collapse:collapse;min-width:480px">'
+      +'<thead style="background:rgba(255,255,255,.03)"><tr>'+thRow+'</tr><tr>'+subRow+'</tr></thead>'
+      +'<tbody>'+rows+'</tbody>'
+      +'</table></div>'
+      +'<div style="font-size:10px;color:var(--muted);margin-bottom:14px">Dimmed = not yet started · Tap any player row to see match details</div>';
+  }
 
+  // ── Recent results ──
+  let recentHtml='';
+  {
+    const _nowIST=new Date(new Date().getTime()+5.5*60*60*1000);
+    const _mo={Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
+    const _mnames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function _rdk(d){const p=(d||'').trim().split(' ');return(_mo[p[0]]||0)*100+(parseInt(p[1])||0);}
+    const _yday=new Date(_nowIST.getTime()-24*60*60*1000);
+    const _ydayStr=_mnames[_yday.getUTCMonth()]+' '+_yday.getUTCDate();
+    const _ydayKey=_rdk(_ydayStr);
+    const recentMatches=settledMatches.filter(m=>_rdk(m.match_date)===_ydayKey);
+    if(recentMatches.length){
+      const typeLabel={exact:'Exact',outcome:'Outcome',refund:'Refund'};
+      recentHtml='<div class="sec" style="margin-top:4px">Recent results <span style="font-size:12px;font-weight:400;color:var(--muted)">· '+_ydayStr+'</span></div>';
+      recentMatches.forEach(m=>{
+        const allPreds=PREDS[m.id]||[];
+        recentHtml+='<div onclick="rrToggle(\''+m.id+'\')" style="cursor:pointer;background:var(--card);border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:11px 13px;margin-bottom:7px;display:flex;align-items:center;justify-content:space-between;gap:8px">'
+          +'<div style="flex:1;min-width:0">'
+            +'<div style="font-weight:700;font-size:13px">'+m.home_flag+m.home+' <span style="color:var(--gold)">'+m.result_home+'\u2013'+m.result_away+'</span> '+m.away+m.away_flag+'</div>'
+            +'<div style="font-size:11px;color:var(--muted);margin-top:2px">Grp '+m.grp+' · '+allPreds.length+' prediction'+(allPreds.length!==1?'s':'')+' · '+(m.resolved_type?typeLabel[m.resolved_type]||m.resolved_type:'')+'</div>'
+          +'</div>'
+          +'<div style="color:rgba(255,255,255,.25);font-size:14px;flex-shrink:0">&#x203a;</div>'
+        +'</div>';
+      });
+    }
+  }
+
+  const html=bannerHtml+storyHtml+standingsHtml+tableHtml+recentHtml;
   document.getElementById('pane-lb').innerHTML=html;
 }
 
