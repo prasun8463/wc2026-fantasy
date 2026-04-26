@@ -492,15 +492,8 @@ function smartLanding(){
   // First ever login → How to Play stepper
   const seen = localStorage.getItem('wc2026_seen');
   if(!seen){ localStorage.setItem('wc2026_seen','1'); return 'howto'; }
-
-  // Any open or live matches today → Matches tab
-  const hasAction = MATCHES.some(m => {
-    const s = matchStatus(m);
-    return s === 'open' || s === 'live' || s === 'inprogress';
-  });
-  if(hasAction) return 'matches';
-
-  // Nothing actionable → Leaderboard
+  // Returning user → always Leaderboard
+  // (action banner on leaderboard links to Matches when needed)
   return 'lb';
 }
 
@@ -1326,14 +1319,25 @@ function renderLB(){
     const bigWinner=playerStats.reduce((a,b)=>b.biggestWin>a.biggestWin?b:a,playerStats[0]);
     const boldest=playerStats.reduce((a,b)=>b.participated>a.participated?b:a,playerStats[0]);
     const mostSkipped=playerStats.reduce((a,b)=>b.skipped>a.skipped?b:a,playerStats[0]);
-    if(bestStreak.streak>1) stories.push({icon:'🔥',text:'<strong>'+bestStreak.u.username+'</strong> is on a <strong>'+bestStreak.streak+'-match winning streak</strong>'});
-    if(mostExact.exact>0) stories.push({icon:'🎯',text:'<strong>'+mostExact.u.username+'</strong> has '+mostExact.exact+' exact score'+(mostExact.exact!==1?'s':'')+' — the hardest call in football'});
-    if(bigWinner.biggestWin>0) stories.push({icon:'💰',text:'<strong>'+bigWinner.u.username+'</strong> won the biggest single pot: <strong>₹'+bigWinner.biggestWin+'</strong>'});
-    if(boldest.participated>0&&sortedMembers.length>1&&boldest.participated===Math.max(...playerStats.map(p=>p.participated))) stories.push({icon:'\u26a1',text:'<strong>'+boldest.u.username+'</strong> hasn\u2019t missed a match \u2014 '+boldest.participated+' predictions placed'});
-    if(mostSkipped.skipped>2) stories.push({icon:'👻',text:'<strong>'+mostSkipped.u.username+'</strong> has skipped '+mostSkipped.skipped+' matches'});
+    // Build candidate stories, then pick 2 with different players where possible
+    const candidates=[];
+    if(bestStreak.streak>1) candidates.push({icon:'🔥',text:'<strong>'+bestStreak.u.username+'</strong> is on a <strong>'+bestStreak.streak+'-match winning streak</strong>',player:bestStreak.u.username,priority:1});
+    if(mostExact.exact>0) candidates.push({icon:'🎯',text:'<strong>'+mostExact.u.username+'</strong> has '+mostExact.exact+' exact score'+(mostExact.exact!==1?'s':'')+' — the hardest call in football',player:mostExact.u.username,priority:2});
+    if(bigWinner.biggestWin>0) candidates.push({icon:'💰',text:'<strong>'+bigWinner.u.username+'</strong> won the biggest single pot: <strong>₹'+bigWinner.biggestWin+'</strong>',player:bigWinner.u.username,priority:3});
+    if(boldest.participated>0&&sortedMembers.length>1&&boldest.participated===Math.max(...playerStats.map(p=>p.participated))) candidates.push({icon:'⚡',text:'<strong>'+boldest.u.username+'</strong> hasn’t missed a match — '+boldest.participated+' predictions placed',player:boldest.u.username,priority:4});
+    if(mostSkipped.skipped>2) candidates.push({icon:'👻',text:'<strong>'+mostSkipped.u.username+'</strong> has skipped '+mostSkipped.skipped+' matches',player:mostSkipped.u.username,priority:5});
+    // Pick top 2, preferring different players
+    const seen=new Set();
+    for(const c of candidates){
+      if(stories.length>=2) break;
+      if(!seen.has(c.player)||stories.length===1&&seen.size===1) {seen.add(c.player);stories.push(c);}
+    }
+    // If still only 1 story (all same player), allow a second from same player
+    if(stories.length<2&&candidates.length>1) stories.push(candidates[1]);
     if(stories.length){
+      const top=stories.slice(0,2); // max 2 stories
       storyHtml='<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px">'
-        +stories.map((s,i)=>'<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;'+(i<stories.length-1?'border-bottom:1px solid var(--border)':'')+'">'
+        +top.map((s,i)=>'<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;'+(i<top.length-1?'border-bottom:1px solid var(--border)':'')+'">'
           +'<div style="font-size:18px;flex-shrink:0">'+s.icon+'</div>'
           +'<div style="font-size:12px;color:var(--muted);line-height:1.5">'+s.text+'</div>'
         +'</div>').join('')
