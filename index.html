@@ -171,6 +171,13 @@
   /* ── LOADING ── */
   .loading { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 13px; }
   .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin .7s linear infinite; margin-bottom: 10px; }
+  /* Skeleton screens — shape matches final content for perceived speed */
+  @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+  .skel { background: linear-gradient(90deg, rgba(255,255,255,.04) 0%, rgba(255,255,255,.08) 50%, rgba(255,255,255,.04) 100%); background-size: 800px 100%; animation: shimmer 1.4s linear infinite; border-radius: 6px; }
+  .skel-row { display: flex; align-items: center; gap: 11px; padding: 11px 13px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px; }
+  .skel-circ { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; }
+  .skel-line { height: 12px; }
+  .skel-stack { flex: 1; display: flex; flex-direction: column; gap: 6px; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
   /* ── TOAST ── */
@@ -273,8 +280,17 @@
   </div>
 
   <div id="pane-howto"   class="pane"></div>
-  <div id="pane-lb"      class="pane"><div class="loading"><div class="spinner"></div></div></div>
-  <div id="pane-matches" class="pane on"><div class="loading"><div class="spinner"></div></div></div>
+  <div id="pane-lb"      class="pane"><div style="padding:10px 0">
+    <div class="skel" style="height:90px;margin-bottom:14px;border-radius:14px"></div>
+    <div class="skel-row"><div class="skel skel-circ"></div><div class="skel-stack"><div class="skel skel-line" style="width:60%"></div><div class="skel skel-line" style="width:40%;height:9px"></div></div><div class="skel skel-line" style="width:50px"></div></div>
+    <div class="skel-row"><div class="skel skel-circ"></div><div class="skel-stack"><div class="skel skel-line" style="width:55%"></div><div class="skel skel-line" style="width:35%;height:9px"></div></div><div class="skel skel-line" style="width:50px"></div></div>
+    <div class="skel-row"><div class="skel skel-circ"></div><div class="skel-stack"><div class="skel skel-line" style="width:50%"></div><div class="skel skel-line" style="width:30%;height:9px"></div></div><div class="skel skel-line" style="width:50px"></div></div>
+  </div></div>
+  <div id="pane-matches" class="pane on"><div style="padding:10px 0">
+    <div class="skel" style="height:30px;width:60%;margin-bottom:12px"></div>
+    <div class="skel-row" style="height:54px"><div class="skel-stack"><div class="skel skel-line" style="width:70%"></div><div class="skel skel-line" style="width:40%;height:9px"></div></div><div class="skel skel-line" style="width:60px;height:24px"></div></div>
+    <div class="skel-row" style="height:54px"><div class="skel-stack"><div class="skel skel-line" style="width:65%"></div><div class="skel skel-line" style="width:35%;height:9px"></div></div><div class="skel skel-line" style="width:60px;height:24px"></div></div>
+  </div></div>
   <div id="pane-groups"  class="pane"><div class="loading"><div class="spinner"></div></div></div>
   <div id="pane-league"  class="pane"><div class="loading"><div class="spinner"></div></div></div>
   <div id="pane-admin"   class="pane"><div class="loading"><div class="spinner"></div></div></div>
@@ -676,108 +692,7 @@ function parseBetAmount(raw){
 }
 
 
-// ════════════════════════════════════════════════════════════════
-function renderDash(){
-  const n=netOf(ME.username);
-  const ud=MEMBERS.find(x=>x.username===ME.username);
-  const totalBet=ud?.spent||0;
-  const totalWon=ud?.earned||0;
-  const sorted=[...MEMBERS].sort((a,b)=>plPct(b.spent||0,b.earned||0)-plPct(a.spent||0,a.earned||0));
-  const rank=sorted.findIndex(x=>x.username===ME.username)+1;
-  const avc_color=avc(ME.username);
 
-  const settledPlayed=MATCHES.filter(m=>m.resolved&&(PREDS[m.id]||[]).find(p=>p.username===ME.username));
-  let exact=0,outcomeW=0,wrong=0,refunds=0;
-  settledPlayed.forEach(m=>{
-    const won=(m.resolved_winners||[]).includes(ME.username);
-    if(m.resolved_type==='exact'&&won) exact++;
-    else if(m.resolved_type==='outcome'&&won) outcomeW++;
-    else if(m.resolved_type==='refund'&&won) refunds++;
-    else wrong++;
-  });
-  const played=settledPlayed.length;
-  const hitRate=played>0?Math.round(((exact+outcomeW)/played)*100):0;
-  const pct=t=>played>0?Math.round((t/played)*100)+'%':'0%';
-
-
-  const recent=MATCHES.filter(m=>m.resolved&&(PREDS[m.id]||[]).find(p=>p.username===ME.username)).slice(-3);
-
-  // ── PROFILE CARD ──
-  let html=`<div style="background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden">
-
-    <!-- header row -->
-    <div style="display:flex;align-items:center;gap:16px;padding:20px 18px 16px">
-      <div style="width:68px;height:68px;border-radius:14px;background:${avc_color};border:2px solid rgba(212,160,23,.4);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;flex-shrink:0">${ini(ME.username)}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:20px;font-weight:700;color:var(--text)">${ME.username}</div>
-        <div style="font-size:13px;color:var(--muted);margin-top:3px">Rank ${rank} of ${MEMBERS.length} &nbsp;·&nbsp; ${played>0?hitRate+'% hit rate':'No matches yet'}</div>
-      </div>
-      <div style="text-align:right;flex-shrink:0">
-        <div style="font-size:30px;font-weight:700;color:${n>=0?'var(--success)':'var(--red)'}">₹${n>=0?'+':''}${n}</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px">net balance</div>
-      </div>
-    </div>
-
-    <div style="height:1px;background:var(--border);margin:0 18px"></div>
-
-    <!-- 2x2 scorecard grid -->
-    <div style="padding:18px 18px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-        <div class="scorecard-btn" onclick="showScorecardModal('exact')" style="background:rgba(76,175,80,.08);border:1px solid rgba(76,175,80,.2);border-radius:12px;padding:16px;display:flex;align-items:center;gap:14px">
-          <div style="font-size:36px;font-weight:700;color:var(--success);line-height:1">${exact||'0'}</div>
-          <div style="min-width:0"><div style="font-size:14px;font-weight:600;color:var(--muted)">Exact scores</div>
-            <div style="height:4px;background:rgba(76,175,80,.2);border-radius:2px;margin-top:6px"><div style="width:${pct(exact)};height:100%;background:var(--success);border-radius:2px"></div></div></div>
-        </div>
-        <div class="scorecard-btn" onclick="showScorecardModal('outcome')" style="background:rgba(232,160,32,.08);border:1px solid rgba(232,160,32,.2);border-radius:12px;padding:16px;display:flex;align-items:center;gap:14px">
-          <div style="font-size:36px;font-weight:700;color:var(--warn);line-height:1">${outcomeW||'0'}</div>
-          <div style="min-width:0"><div style="font-size:14px;font-weight:600;color:var(--muted)">Outcomes</div>
-            <div style="height:4px;background:rgba(232,160,32,.2);border-radius:2px;margin-top:6px"><div style="width:${pct(outcomeW)};height:100%;background:var(--warn);border-radius:2px"></div></div></div>
-        </div>
-        <div class="scorecard-btn" onclick="showScorecardModal('wrong')" style="background:rgba(226,75,74,.08);border:1px solid rgba(226,75,74,.2);border-radius:12px;padding:16px;display:flex;align-items:center;gap:14px">
-          <div style="font-size:36px;font-weight:700;color:var(--red);line-height:1">${wrong||'0'}</div>
-          <div style="min-width:0"><div style="font-size:14px;font-weight:600;color:var(--muted)">Wrong</div>
-            <div style="height:4px;background:rgba(226,75,74,.2);border-radius:2px;margin-top:6px"><div style="width:${pct(wrong)};height:100%;background:var(--red);border-radius:2px"></div></div></div>
-        </div>
-        <div class="scorecard-btn" onclick="showScorecardModal('refund')" style="background:rgba(55,138,221,.08);border:1px solid rgba(55,138,221,.2);border-radius:12px;padding:16px;display:flex;align-items:center;gap:14px">
-          <div style="font-size:36px;font-weight:700;color:var(--info);line-height:1">${refunds||'0'}</div>
-          <div style="min-width:0"><div style="font-size:14px;font-weight:600;color:var(--muted)">Refunds</div>
-            <div style="height:4px;background:rgba(55,138,221,.2);border-radius:2px;margin-top:6px"><div style="width:${pct(refunds)};height:100%;background:var(--info);border-radius:2px"></div></div></div>
-        </div>
-      </div>
-      <!-- total played strip -->
-      <div class="scorecard-btn" onclick="showScorecardModal('played')" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between">
-        <div style="font-size:14px;color:var(--muted)">Total played</div>
-        <div style="font-size:18px;font-weight:700;color:var(--text)">${played} <span style="font-size:13px;color:var(--muted);font-weight:400">matches · ₹${totalBet} bet · ₹${totalWon} won</span></div>
-      </div>
-    </div>
-
-    ${recent.length?`
-    <div style="height:1px;background:var(--border);margin:0 18px"></div>
-    <div style="font-size:15px;font-weight:700;color:var(--gold);padding:14px 18px 8px;letter-spacing:.3px">Recent results</div>
-    ${recent.map(m=>{
-      const myP=(PREDS[m.id]||[]).find(p=>p.username===ME.username);
-      const won=(m.resolved_winners||[]).includes(ME.username);
-      const rc=won&&m.resolved_type==='exact'?'rt-exact':won&&m.resolved_type==='outcome'?'rt-outcome':m.resolved_type==='refund'&&won?'rt-refund':'rt-wrong';
-      const rl=won&&m.resolved_type==='exact'?'Exact +₹'+m.resolved_share:won&&m.resolved_type==='outcome'?'Outcome +₹'+m.resolved_share:m.resolved_type==='refund'&&won?'Refund ₹'+m.resolved_share:'No win';
-      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 18px;gap:10px;border-bottom:1px solid rgba(255,255,255,.05)">'
-        +'<div style="font-size:14px;font-weight:600;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+m.home_flag+m.home+' '+m.result_home+'–'+m.result_away+' '+m.away+m.away_flag+'</div>'
-        +'<div style="display:flex;align-items:center;gap:7px;flex-shrink:0">'
-        +'<span style="font-size:13px;color:var(--muted)">'+myP.pred_home+'–'+myP.pred_away+'</span>'
-        +'<span class="rtag '+rc+'" style="font-size:11px;padding:3px 9px">'+rl+'</span>'
-        +'</div></div>';
-    }).join('')}
-    <div style="padding-bottom:6px"></div>
-    `:''}
-
-  </div>`;
-  if(!recent.length){
-    html+=`<div style="text-align:center;color:var(--muted);font-size:13px;padding:20px 0">Head to Matches to start predicting!</div>`;
-  }
-  document.getElementById('pane-dash').innerHTML=html;
-}
-// ════════════════════════════════════════════════════════════════
-//  MATCHES
-// ════════════════════════════════════════════════════════════════
 function renderMatches(){
   const groups=['All','A','B','C','D','E','F','G','H','I','J','K','L','R32','R16','QF','SF','Final'];
   let html=`<div class="filter-bar">`;
@@ -1057,16 +972,55 @@ function openMatchSheet(mid){
   if(canPredict||isEditing){
     const existingH=isEditing&&myP?myP.pred_home:'';
     const existingA=isEditing&&myP?myP.pred_away:'';
+    // ── REDESIGN H3: Team form context (last 3 settled matches per team) ──
+    function teamForm(teamName){
+      const recent=MATCHES.filter(x=>x.resolved&&(x.home===teamName||x.away===teamName))
+        .sort((a,b)=>dateKey(b.match_date)-dateKey(a.match_date))
+        .slice(0,3);
+      if(!recent.length) return '<span style="color:rgba(255,255,255,.25)">no data</span>';
+      return recent.map(x=>{
+        const isHome=x.home===teamName;
+        const my=isHome?x.result_home:x.result_away;
+        const opp=isHome?x.result_away:x.result_home;
+        if(my>opp) return '<span style="display:inline-block;width:14px;height:14px;line-height:14px;text-align:center;background:rgba(76,175,80,.25);color:var(--success);border-radius:3px;font-size:9px;font-weight:700;margin-right:2px">W</span>';
+        if(my<opp) return '<span style="display:inline-block;width:14px;height:14px;line-height:14px;text-align:center;background:rgba(226,75,74,.2);color:var(--red);border-radius:3px;font-size:9px;font-weight:700;margin-right:2px">L</span>';
+        return '<span style="display:inline-block;width:14px;height:14px;line-height:14px;text-align:center;background:rgba(255,255,255,.08);color:var(--muted);border-radius:3px;font-size:9px;font-weight:700;margin-right:2px">D</span>';
+      }).join('');
+    }
+    function teamGoals(teamName){
+      const recent=MATCHES.filter(x=>x.resolved&&(x.home===teamName||x.away===teamName));
+      if(!recent.length) return null;
+      const total=recent.reduce((s,x)=>s+(x.home===teamName?x.result_home:x.result_away),0);
+      return (total/recent.length).toFixed(1);
+    }
+    const homeForm=teamForm(m.home);
+    const awayForm=teamForm(m.away);
+    const homeGoals=teamGoals(m.home);
+    const awayGoals=teamGoals(m.away);
+    const hasFormData=MATCHES.some(x=>x.resolved&&(x.home===m.home||x.away===m.home||x.home===m.away||x.away===m.away));
+    const formStrip=hasFormData?`<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:11px;color:var(--muted)">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+        <div style="text-align:left;flex:1">
+          <div style="margin-bottom:3px">${m.home_flag} ${esc(m.home)}</div>
+          <div>${homeForm}${homeGoals?' · <span style="color:var(--text)">'+homeGoals+'</span> goals/match':''}</div>
+        </div>
+        <div style="text-align:right;flex:1">
+          <div style="margin-bottom:3px">${esc(m.away)} ${m.away_flag}</div>
+          <div>${awayForm}${awayGoals?' · <span style="color:var(--text)">'+awayGoals+'</span> goals/match':''}</div>
+        </div>
+      </div>
+    </div>`:'';
     html+=`<div style="background:rgba(212,160,23,.06);border:1px solid rgba(212,160,23,.25);border-radius:10px;padding:14px;margin-bottom:10px">
-      <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:10px">${isEditing?'Change your prediction':'Place your prediction'} (₹${betFor(m)})</div>
+      <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:10px">${isEditing?'Update your pick':'Stake \u20b9'+betFor(m)+' on the score'}</div>
+      ${formStrip}
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="text-align:center">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${m.home_flag} ${m.home}</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${m.home_flag} ${esc(m.home)}</div>
           <input id="sh_ph_${mid}" type="number" min="0" max="20" placeholder="0" value="${existingH}" style="width:70px;margin:0;font-size:18px;text-align:center" />
         </div>
         <div style="font-size:20px;color:var(--muted);padding-top:16px">–</div>
         <div style="text-align:center">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${m.away_flag} ${m.away}</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${m.away_flag} ${esc(m.away)}</div>
           <input id="sh_pa_${mid}" type="number" min="0" max="20" placeholder="0" value="${existingA}" style="width:70px;margin:0;font-size:18px;text-align:center" />
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;margin-top:16px">
@@ -1108,6 +1062,7 @@ function openMatchSheet(mid){
 
 
 async function submitPredFromSheet(mid){
+  const m=MATCHES.find(x=>x.id===mid);
   const h=parseInt(document.getElementById('sh_ph_'+mid)?.value);
   const a=parseInt(document.getElementById('sh_pa_'+mid)?.value);
   if(isNaN(h)||isNaN(a)||h<0||a<0){toast('Enter valid scores');return;}
@@ -1121,7 +1076,7 @@ async function submitPredFromSheet(mid){
   if(!PREDS[mid])PREDS[mid]=[];
   PREDS[mid]=PREDS[mid].filter(p=>p.username!==ME.username);
   PREDS[mid].push({match_id:mid,username:ME.username,pred_home:h,pred_away:a});
-  toast('Prediction saved!');
+  toast('✓ Locked in '+esc(m?.home||'')+' '+h+'–'+a+' '+esc(m?.away||'')+' · ₹'+betFor(m)+' staked', 3200);
   closeMatchSheet();
   renderMatchList(); renderLB();
 }
@@ -1146,7 +1101,7 @@ async function submitPred(mid){
   if(!PREDS[mid])PREDS[mid]=[];
   PREDS[mid]=PREDS[mid].filter(p=>p.username!==ME.username);
   PREDS[mid].push({match_id:mid,username:ME.username,pred_home:h,pred_away:a});
-  toast('Prediction saved!');
+  toast('✓ Locked in '+h+'–'+a+' · ₹'+(LEAGUE?betFor(MATCHES.find(x=>x.id===mid)):100)+' staked', 3200);
   renderMatchList(); renderLB();
 }
 
@@ -1324,6 +1279,53 @@ function renderLB(){
     const diff=prev-cur;
     if(diff>0) return '<span style="font-size:11px;color:var(--success);font-weight:700;flex-shrink:0;margin-right:2px">▲'+diff+'</span>';
     return '<span style="font-size:11px;color:var(--red);font-weight:700;flex-shrink:0;margin-right:2px">▼'+Math.abs(diff)+'</span>';
+  }
+
+  // ── REDESIGN C2/H4: Personal hero card (or empty state for new users) ──
+  let heroHtml='';
+  {
+    const meStats=playerStats.find(p=>p.u.username===ME.username);
+    const meRank=sortedMembers.findIndex(u=>u.username===ME.username)+1;
+    const meData=sortedMembers.find(u=>u.username===ME.username);
+    const meBet=meData?.spent||0;
+    const meWon=meData?.earned||0;
+    const mePL=meWon-meBet;
+    const mePct=plPct(meBet,meWon);
+    const myParticipated=meStats?meStats.participated:0;
+    const myMovement=rankMovement(ME.username);
+    const totalPlayers=sortedMembers.length;
+
+    if(myParticipated===0&&MATCHES.some(m=>matchStatus(m)==='open')){
+      // Empty state — new user, hasn't predicted, but matches are open
+      const openCount=MATCHES.filter(m=>matchStatus(m)==='open').length;
+      heroHtml='<div style="background:linear-gradient(135deg,rgba(212,160,23,.15),rgba(212,160,23,.05));border:1px solid rgba(212,160,23,.4);border-radius:14px;padding:18px 16px;margin-bottom:14px;text-align:center">'
+        +'<div style="font-size:24px;margin-bottom:6px">🎯</div>'
+        +'<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">Make your first prediction</div>'
+        +'<div style="font-size:12px;color:var(--muted);margin-bottom:12px">'+openCount+' match'+(openCount!==1?'es':'')+' open today · everyone starts at zero</div>'
+        +'<button onclick="goTab(\'matches\')" style="background:var(--gold);color:var(--dark);border:none;border-radius:8px;padding:9px 22px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation">Predict today\'s matches →</button>'
+      +'</div>';
+    } else if(meStats&&meBet>0){
+      // Hero card — user has placed predictions, show their position
+      const rankIcon=meRank===1?'🥇':meRank===2?'🥈':meRank===3?'🥉':'';
+      const rankSuffix=meRank===1?'st':meRank===2?'nd':meRank===3?'rd':'th';
+      const plColor2=mePL>0?'var(--success)':mePL<0?'var(--red)':'var(--muted)';
+      const plPctColor=mePct>0?'var(--success)':mePct<0?'var(--red)':'var(--muted)';
+      const accDisp=meStats.acc;
+      heroHtml='<div style="background:linear-gradient(135deg,rgba(55,138,221,.1),rgba(55,138,221,.02));border:1px solid rgba(55,138,221,.3);border-radius:14px;padding:14px 16px;margin-bottom:14px">'
+        +'<div style="font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.5px;margin-bottom:6px">YOUR POSITION</div>'
+        +'<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px">'
+          +(rankIcon?'<div style="font-size:24px">'+rankIcon+'</div>':'')
+          +'<div style="font-size:22px;font-weight:700;color:var(--text)">'+meRank+rankSuffix+'</div>'
+          +'<div style="font-size:13px;color:var(--muted)">of '+totalPlayers+'</div>'
+          +(myMovement?'<div style="margin-left:auto">'+myMovement.replace('font-size:11px','font-size:13px')+'</div>':'')
+        +'</div>'
+        +'<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">'
+          +'<div style="font-size:20px;font-weight:700;color:'+plPctColor+'">'+(mePct>0?'+':'')+mePct+'%</div>'
+          +'<div style="font-size:13px;color:'+plColor2+'">('+(mePL>0?'+':'')+'\u20b9'+mePL+')</div>'
+        +'</div>'
+        +'<div style="font-size:11px;color:var(--muted)">'+myParticipated+' match'+(myParticipated!==1?'es':'')+' · '+accDisp+'% hit rate · \u20b9'+meBet+' staked</div>'
+      +'</div>';
+    }
   }
 
   // ── Idea 3: Today's action banner ──
@@ -1531,7 +1533,7 @@ function renderLB(){
     }
   }
 
-  const html=bannerHtml+storyHtml+standingsHtml+tableHtml+recentHtml;
+  const html=heroHtml+bannerHtml+storyHtml+standingsHtml+tableHtml+recentHtml;
   document.getElementById('pane-lb').innerHTML=html;
 }
 
@@ -2710,19 +2712,36 @@ function randomFillPred(mid){
 async function settleRandom(mid){
   const m=MATCHES.find(x=>x.id===mid); if(!m)return;
   const[h,a]=randomScore();
-  toast('Settling '+m.home+' '+h+'\u2013'+a+' '+m.away+' (random)');
   await settleWithScore(mid,h,a);
   await loadAll();
   renderAll();
-  toast('\u2714 Settled: '+m.home+' '+h+'\u2013'+a+' '+m.away);
+  // Build winner-aware toast
+  const settled=MATCHES.find(x=>x.id===mid);
+  const winners=settled?.resolved_winners||[];
+  const share=settled?.resolved_share||0;
+  const type=settled?.resolved_type||'';
+  let winMsg='';
+  if(winners.length===1) winMsg=' \u00b7 '+esc(winners[0])+' won \u20b9'+share;
+  else if(winners.length>1) winMsg=' \u00b7 '+winners.length+' winners shared \u20b9'+share+' each';
+  else if(type==='refund') winMsg=' \u00b7 Refunded';
+  toast('\u2714 '+esc(m.home)+' '+h+'\u2013'+a+' '+esc(m.away)+winMsg, 3500);
 }
 
 async function quickSettle(mid, h, a){
   if(!confirm(`Settle match with score ${h}–${a}?`)) return;
+  const m=MATCHES.find(x=>x.id===mid);
   await settleWithScore(mid, parseInt(h), parseInt(a));
-  toast('Match settled!');
   await loadAll();
   renderAll();
+  const settled=MATCHES.find(x=>x.id===mid);
+  const winners=settled?.resolved_winners||[];
+  const share=settled?.resolved_share||0;
+  const type=settled?.resolved_type||'';
+  let winMsg='';
+  if(winners.length===1) winMsg=' \u00b7 '+esc(winners[0])+' won \u20b9'+share;
+  else if(winners.length>1) winMsg=' \u00b7 '+winners.length+' winners shared \u20b9'+share+' each';
+  else if(type==='refund') winMsg=' \u00b7 Refunded';
+  toast('\u2714 '+esc(m?.home||'')+' '+h+'\u2013'+a+' '+esc(m?.away||'')+winMsg, 3500);
 }
 
 // Open admin tab scrolled to that match's settle inputs
