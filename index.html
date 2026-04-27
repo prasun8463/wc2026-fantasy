@@ -581,6 +581,7 @@ function outcome(h,a){return h>a?'H':h<a?'A':'D';}
 // Returns: 'open' | 'inprogress' | 'settled' | 'future'
 function matchStatus(m){
   if(m.resolved) return 'settled';
+  if(m.home==='TBD'||m.away==='TBD') return 'future'; // teams not yet decided
   if(!m.kickoff_ist||!m.match_date) return 'future';
   const monthMap={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
   const parts=m.match_date.trim().split(' ');
@@ -619,16 +620,20 @@ function isToday(m){return matchStatus(m)==='open';}
 function isPredictable(m){return matchStatus(m)==='open';}
 
 function betFor(match){
-  const ba=LEAGUE?.bet_amount;
+  let ba=LEAGUE?.bet_amount;
   if(!ba) return 100;
+  // Parse JSON string if needed (DB stores as string)
+  if(typeof ba==='string'){
+    try{ ba=JSON.parse(ba); }catch(e){ return parseInt(ba)||100; }
+  }
   if(typeof ba==='object'){
     const grp=match?.grp||'';
-    if(['A','B','C','D','E','F','G','H','I','J','K','L'].includes(grp)) return ba.group||100;
-    if(grp==='R32') return ba.r32||ba.group||100;
-    if(grp==='R16') return ba.r16||ba.group||100;
-    if(grp==='QF')  return ba.qf||ba.group||100;
-    if(['SF','Final'].includes(grp)) return ba.sf||ba.group||100;
-    return ba.group||100;
+    if(['A','B','C','D','E','F','G','H','I','J','K','L'].includes(grp)) return parseInt(ba.group)||100;
+    if(grp==='R32') return parseInt(ba.r32)||parseInt(ba.group)||100;
+    if(grp==='R16') return parseInt(ba.r16)||parseInt(ba.group)||100;
+    if(grp==='QF')  return parseInt(ba.qf)||parseInt(ba.group)||100;
+    if(['SF','Final'].includes(grp)) return parseInt(ba.sf)||parseInt(ba.group)||100;
+    return parseInt(ba.group)||100;
   }
   return typeof ba==='number'?ba:100;
 }
@@ -798,6 +803,7 @@ function renderMatchList(){
     const arr=PREDS[m.id]||[];
     const myP=arr.find(p=>p.username===ME.username);
     const pot=arr.length*betFor(m);
+    const potDisplay=pot>0?'₹'+pot+' pot':'₹'+betFor(m)+' to enter';
     const status=forceFuture?'future':matchStatus(m);
     const canPredict=status==='open'&&!myP;
 
@@ -856,7 +862,7 @@ function renderMatchList(){
     return `<div class="mrow" id="mr_${m.id}" onclick="toggleMatchSheet('${m.id}')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;${rowStyle}">
       <div style="flex:1;min-width:0">
         <div class="mteams" style="color:${isPast?'var(--muted)':'var(--text)'}">${m.home_flag} ${m.home} <span style="color:var(--muted);font-weight:400;font-size:13px">vs</span> ${m.away} ${m.away_flag}</div>
-        <div class="mmeta">₹${pot} pot · ${arr.length} predicted${metaPick}</div>
+        <div class="mmeta">${potDisplay} · ${arr.length} predicted${metaPick}</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">${rightHtml}</div>
     </div>`;
@@ -1270,13 +1276,31 @@ function renderLB(){
   });
 
   // ── Idea 1: Rank movement arrows (compare today vs yesterday via localStorage) ──
-  const todayKey='wc2026_ranks_'+new Date().toISOString().slice(0,10);
-  const yestKey='wc2026_ranks_'+new Date(Date.now()-864e5).toISOString().slice(0,10);
+  function istDateStr(offset=0){
+    const d=new Date(Date.now()+5.5*60*60*1000+offset);
+    return d.toISOString().slice(0,10);
+  }
+  const todayKey='wc2026_ranks_'+istDateStr();
+  const yestKey='wc2026_ranks_'+istDateStr(-864e5);
   const todayRanks={};
   sortedMembers.forEach((u,i)=>todayRanks[u.username]=i+1);
-  try{localStorage.setItem(todayKey,JSON.stringify(todayRanks));}catch(e){}
+  // Save today's ranks every render — captures latest standings for comparison
+  // Yesterday's key is never overwritten so we always have a stable baseline
+  try{ localStorage.setItem(todayKey,JSON.stringify(todayRanks)); }catch(e){}
   let yestRanks={};
   try{const y=localStorage.getItem(yestKey);if(y)yestRanks=JSON.parse(y);}catch(e){}
+  // If no yesterday data, use previous saved state if any (for same-day testing)
+  if(!Object.keys(yestRanks).length){
+    try{
+      // Look for any older rank key to compare against
+      const keys=Object.keys(localStorage).filter(k=>k.startsWith('wc2026_ranks_')&&k!==todayKey);
+      if(keys.length){
+        const latest=keys.sort().pop();
+        const old=localStorage.getItem(latest);
+        if(old) yestRanks=JSON.parse(old);
+      }
+    }catch(e){}
+  }
   function rankMovement(username){
     const cur=todayRanks[username], prev=yestRanks[username];
     if(!prev||prev===cur) return '';
