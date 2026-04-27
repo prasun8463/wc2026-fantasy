@@ -359,6 +359,25 @@ function calcRoundStats(username){
   stats.overall={bet:ud?.spent||0, won:ud?.earned||0, pl:(ud?.earned||0)-(ud?.spent||0)};
   return stats;
 }
+// ── Constants ──────────────────────────────────────────────────
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // UTC+5:30
+const KICKOFF_CUTOFF_MS = 5 * 60 * 1000;     // 5 min before kickoff
+const MATCH_DURATION_MS = 105 * 60 * 1000;   // 90 + 15 stoppage
+
+// ── Sanitization ────────────────────────────────────────────────
+function esc(s){ // HTML-escape user-controlled strings before innerHTML
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// ── Shared date utility ─────────────────────────────────────────
+const MONTH_MAP={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+const MONTH_NUM={Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
+const MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function dateKey(d){ // returns numeric MMDD key for sorting/comparison
+  const p=(d||'').trim().split(' ');
+  return (MONTH_NUM[p[0]]||0)*100+(parseInt(p[1])||0);
+}
+
 function plColor(v){ return v>0?'var(--success)':v<0?'var(--red)':'var(--muted)'; }
 function fmtPL(v){ return (v>0?'+':'')+v; }
 // P/L % = (won - bet) / bet * 100 — fairer ranking metric
@@ -583,14 +602,13 @@ function matchStatus(m){
   if(m.resolved) return 'settled';
   if(m.home==='TBD'||m.away==='TBD') return 'future'; // teams not yet decided
   if(!m.kickoff_ist||!m.match_date) return 'future';
-  const monthMap={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
   const parts=m.match_date.trim().split(' ');
-  const month=monthMap[parts[0]];
+  const month=MONTH_MAP[parts[0]];
   const day=parseInt(parts[1]);
   const [hh,mm]=m.kickoff_ist.split(':').map(Number);
   const kickoffIST=new Date(Date.UTC(2026,month,day,hh,mm));
-  const kickoffUTC=new Date(kickoffIST.getTime()-330*60*1000);
-  const openUntil=new Date(kickoffUTC.getTime()-5*60*1000);
+  const kickoffUTC=new Date(kickoffIST.getTime()-IST_OFFSET_MS);
+  const openUntil=new Date(kickoffUTC.getTime()-KICKOFF_CUTOFF_MS);
   const now=new Date();
   if(now<openUntil){
     const nowIST=new Date(now.getTime()+5.5*60*60*1000);
@@ -607,7 +625,7 @@ function matchStatus(m){
        live.status==='ET'||live.status==='BT'||live.status==='P') return 'live';
   }
   // Fallback: estimate match finished after 105 mins (90 + stoppage)
-  const finishedAt=new Date(kickoffUTC.getTime()+105*60*1000);
+  const finishedAt=new Date(kickoffUTC.getTime()+MATCH_DURATION_MS);
   if(now>=finishedAt) return 'finished';
   return 'inprogress';
 }
@@ -657,8 +675,7 @@ function parseBetAmount(raw){
   }catch(e){ return parseInt(raw)||100; }
 }
 
-// ════════════════════════════════════════════════════════════════
-//  DASHBOARD — personal summary + upcoming predictions
+
 // ════════════════════════════════════════════════════════════════
 function renderDash(){
   const n=netOf(ME.username);
@@ -1345,11 +1362,11 @@ function renderLB(){
     const mostSkipped=playerStats.reduce((a,b)=>b.skipped>a.skipped?b:a,playerStats[0]);
     // Build candidate stories, then pick 2 with different players where possible
     const candidates=[];
-    if(bestStreak.streak>1) candidates.push({icon:'🔥',text:'<strong>'+bestStreak.u.username+'</strong> is on a <strong>'+bestStreak.streak+'-match winning streak</strong>',player:bestStreak.u.username,priority:1});
-    if(mostExact.exact>0) candidates.push({icon:'🎯',text:'<strong>'+mostExact.u.username+'</strong> has '+mostExact.exact+' exact score'+(mostExact.exact!==1?'s':'')+' — the hardest call in football',player:mostExact.u.username,priority:2});
-    if(bigWinner.biggestWin>0) candidates.push({icon:'💰',text:'<strong>'+bigWinner.u.username+'</strong> won the biggest single pot: <strong>₹'+bigWinner.biggestWin+'</strong>',player:bigWinner.u.username,priority:3});
-    if(boldest.participated>0&&sortedMembers.length>1&&boldest.participated===Math.max(...playerStats.map(p=>p.participated))) candidates.push({icon:'⚡',text:'<strong>'+boldest.u.username+'</strong> hasn’t missed a match — '+boldest.participated+' predictions placed',player:boldest.u.username,priority:4});
-    if(mostSkipped.skipped>2) candidates.push({icon:'👻',text:'<strong>'+mostSkipped.u.username+'</strong> has skipped '+mostSkipped.skipped+' matches',player:mostSkipped.u.username,priority:5});
+    if(bestStreak.streak>1) candidates.push({icon:'🔥',text:'<strong>'+esc(bestStreak.u.username)+'</strong> is on a <strong>'+bestStreak.streak+'-match winning streak</strong>',player:bestStreak.u.username,priority:1});
+    if(mostExact.exact>0) candidates.push({icon:'🎯',text:'<strong>'+esc(mostExact.u.username)+'</strong> has '+mostExact.exact+' exact score'+(mostExact.exact!==1?'s':'')+' — the hardest call in football',player:mostExact.u.username,priority:2});
+    if(bigWinner.biggestWin>0) candidates.push({icon:'💰',text:'<strong>'+esc(bigWinner.u.username)+'</strong> won the biggest single pot: <strong>₹'+bigWinner.biggestWin+'</strong>',player:bigWinner.u.username,priority:3});
+    if(boldest.participated>0&&sortedMembers.length>1&&boldest.participated===Math.max(...playerStats.map(p=>p.participated))) candidates.push({icon:'⚡',text:'<strong>'+esc(boldest.u.username)+'</strong> hasn’t missed a match — '+boldest.participated+' predictions placed',player:boldest.u.username,priority:4});
+    if(mostSkipped.skipped>2) candidates.push({icon:'👻',text:'<strong>'+esc(mostSkipped.u.username)+'</strong> has skipped '+mostSkipped.skipped+' matches',player:mostSkipped.u.username,priority:5});
     // Pick top 2, preferring different players
     const seen=new Set();
     for(const c of candidates){
@@ -1494,13 +1511,10 @@ function renderLB(){
   let recentHtml='';
   {
     const _nowIST=new Date(new Date().getTime()+5.5*60*60*1000);
-    const _mo={Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
-    const _mnames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    function _rdk(d){const p=(d||'').trim().split(' ');return(_mo[p[0]]||0)*100+(parseInt(p[1])||0);}
     const _yday=new Date(_nowIST.getTime()-24*60*60*1000);
-    const _ydayStr=_mnames[_yday.getUTCMonth()]+' '+_yday.getUTCDate();
-    const _ydayKey=_rdk(_ydayStr);
-    const recentMatches=settledMatches.filter(m=>_rdk(m.match_date)===_ydayKey);
+    const _ydayStr=MONTH_NAMES[_yday.getUTCMonth()]+' '+_yday.getUTCDate();
+    const _ydayKey=dateKey(_ydayStr);
+    const recentMatches=settledMatches.filter(m=>dateKey(m.match_date)===_ydayKey);
     if(recentMatches.length){
       const typeLabel={exact:'Exact',outcome:'Outcome',refund:'Refund'};
       recentHtml='<div class="sec" style="margin-top:4px">Recent results <span style="font-size:12px;font-weight:400;color:var(--muted)">· '+_ydayStr+'</span></div>';
@@ -1604,7 +1618,18 @@ async function joinLeague(){
   setTimeout(async()=>{await loadAll();renderAll();},1200);
 }
 
-function renderAll(){ renderLB(); renderMatches(); renderGroups(); renderLeague(); renderAdmin(); }
+function renderAll(){
+  // Only fully re-render the active tab — others re-render on next tab switch
+  const active=document.querySelector('.tab.on');
+  const activeTab=active?active.getAttribute('onclick')?.match(/goTab\('(\w+)'\)/)?.[1]:'lb';
+  // Always update LB and matches (most data-sensitive)
+  renderLB();
+  renderMatches();
+  // Only render other tabs if they are currently active
+  if(activeTab==='groups') renderGroups();
+  if(activeTab==='league') renderLeague();
+  if(activeTab==='admin') renderAdmin();
+}
 
 // ════════════════════════════════════════════════════════════════
 //  SCORECARD MODAL
