@@ -1389,21 +1389,21 @@ function renderLB(){
   }
 
   // ── Build standings rows ──
-  let standingsHtml='<div class="sec">Leaderboard <span style="font-size:12px;font-weight:400;color:var(--muted)">· '+LEAGUE.name+' · '+MEMBERS.length+' members</span></div>';
+  const otherPlayers=sortedMembers.filter(u=>u.username!==ME.username);
+  let standingsHtml=otherPlayers.length>0?'<div class="sec">Other players</div>':'';
   if(settledMatches.length===0){
-    standingsHtml+='<div class="card" style="text-align:center;color:var(--muted);font-size:13px;padding:20px">No settled matches yet.</div>';
     sortedMembers.forEach((u,i)=>{
       const isMe=u.username===ME.username;
+      if(isMe) return; // skip self — shown in hero
       const pc=Object.values(PREDS).filter(arr=>arr.find(p=>p.username===u.username)).length;
       const active0=ppActiveUser===u.username;
-      const bgMe0=active0?'rgba(212,160,23,.06)':(isMe?'rgba(55,138,221,.08)':'var(--card)');
-      const bdMe0=active0?'rgba(212,160,23,.4)':(isMe?'rgba(55,138,221,.3)':'rgba(255,255,255,.09)');
-      const blMe0=isMe?'border-left:3px solid var(--info);':'';
-      standingsHtml+='<div onclick="showPlayerPopup(\''+u.username+'\')" style="cursor:pointer;background:'+bgMe0+';border:1px solid '+bdMe0+';'+blMe0+'border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:6px">'
-        +'<div style="font-size:'+(i<3?26:14)+'px;font-weight:700;color:var(--muted);width:28px;text-align:center">'+( i<3?medals[i]:i+1)+'</div>'
+      const bgMe0=active0?'rgba(212,160,23,.06)':'var(--card)';
+      const bdMe0=active0?'rgba(212,160,23,.4)':'rgba(255,255,255,.09)';
+      standingsHtml+='<div onclick="showPlayerPopup(\''+esc(u.username)+'\')" style="cursor:pointer;background:'+bgMe0+';border:1px solid '+bdMe0+';border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:6px">'
+        +'<div style="font-size:14px;font-weight:700;color:var(--muted);width:28px;text-align:center">'+(i+1)+'</div>'
         +'<div class="av" style="background:'+avc(u.username)+';width:38px;height:38px;font-size:13px">'+ini(u.username)+'</div>'
         +'<div style="flex:1;min-width:0">'
-          +'<div style="font-size:15px;font-weight:700;color:'+(isMe?'var(--info)':'var(--text)')+'">'+u.username+(isMe?' <span style="font-size:10px;color:var(--muted)">(you)</span>':'')+'</div>'
+          +'<div style="font-size:15px;font-weight:700;color:var(--text)">'+esc(u.username)+'</div>'
           +'<div style="font-size:11px;color:var(--muted)">'+pc+' predictions</div>'
         +'</div>'
         +rankMovement(u.username)
@@ -1413,25 +1413,30 @@ function renderLB(){
     });
   } else {
     sortedMembers.forEach((u,i)=>{
+      const isMe=u.username===ME.username;
+      // Skip user's own row — already shown in hero card above
+      if(isMe) return;
       const ps=playerStats.find(x=>x.u.username===u.username);
       const s=calcRoundStats(u.username);
-      const isMe=u.username===ME.username;
       const active=ppActiveUser===u.username;
-      const bgMe=active?'rgba(212,160,23,.06)':(isMe?'rgba(55,138,221,.08)':'var(--card)');
-      const bdMe=active?'rgba(212,160,23,.4)':(isMe?'rgba(55,138,221,.3)':'rgba(255,255,255,.09)');
-      const blMe=isMe?'border-left:3px solid var(--info);':'';
-      standingsHtml+='<div onclick="showPlayerPopup(\''+u.username+'\')" style="cursor:pointer;background:'+bgMe+';border:1px solid '+bdMe+';'+blMe+'border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:6px">'
-        +'<div style="font-size:'+(i<3?26:14)+'px;font-weight:700;color:var(--muted);width:28px;text-align:center;flex-shrink:0">'+(i<3?medals[i]:i+1)+'</div>'
+      const bgMe=active?'rgba(212,160,23,.06)':'var(--card)';
+      const bdMe=active?'rgba(212,160,23,.4)':'rgba(255,255,255,.09)';
+      // Medals only for top 3 with positive P/L — losing money doesn't earn a medal
+      const showMedal=i<3 && s.overall.pl>0;
+      const rankDisplay=showMedal?medals[i]:(i+1);
+      const rankSize=showMedal?26:14;
+      standingsHtml+='<div onclick="showPlayerPopup(\''+esc(u.username)+'\')" style="cursor:pointer;background:'+bgMe+';border:1px solid '+bdMe+';border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:6px">'
+        +'<div style="font-size:'+rankSize+'px;font-weight:700;color:var(--muted);width:28px;text-align:center;flex-shrink:0">'+rankDisplay+'</div>'
         +'<div class="av" style="background:'+avc(u.username)+';width:38px;height:38px;font-size:13px;flex-shrink:0">'+ini(u.username)+'</div>'
         +'<div style="flex:1;min-width:0">'
-          +'<div style="font-size:15px;font-weight:700;color:'+(isMe?'var(--info)':'var(--text)')+'">'+u.username+(isMe?' <span style="font-size:10px;color:var(--muted)">(you)</span>':'')+'</div>'
+          +'<div style="font-size:15px;font-weight:700;color:var(--text)">'+esc(u.username)+'</div>'
           +'<div style="font-size:11px;color:var(--muted)">'+ps.participated+' played · '+(ps.participated>0?ps.acc+'% hit':'no data')+'</div>'
         +'</div>'
         +rankMovement(u.username)
         +'<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'
           +'<div style="text-align:right">'
             +'<div style="font-size:16px;font-weight:700;color:'+plColor(s.overall.pl)+'">'+fmtPct(plPct(s.overall.bet,s.overall.won))+'</div>'
-            +(s.overall.bet>0?'<div style="font-size:10px;color:'+plColor(s.overall.pl)+';opacity:.65;margin-top:1px">'+fmtPL(s.overall.pl)+' P/L</div>':'')
+            +(s.overall.bet>0?'<div style="font-size:10px;color:'+plColor(s.overall.pl)+';opacity:.65;margin-top:1px">'+fmtPL(s.overall.pl)+'</div>':'')
           +'</div>'
           +'<div style="color:rgba(255,255,255,.25);font-size:14px">'+(active?'&#x2227;':'&#x203a;')+'</div>'
         +'</div>'
