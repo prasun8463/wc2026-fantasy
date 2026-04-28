@@ -743,7 +743,7 @@ function renderMatchList(){
     if(myP&&status==='settled'){
       const won=(m.resolved_winners||[]).includes(ME.username);
       const rc=won&&m.resolved_type==='exact'?'rt-exact':won&&m.resolved_type==='outcome'?'rt-outcome':m.resolved_type==='refund'&&won?'rt-refund':'rt-wrong';
-      const rl=won&&m.resolved_type==='exact'?'Exact +₹'+m.resolved_share:won&&m.resolved_type==='outcome'?'Outcome +₹'+m.resolved_share:m.resolved_type==='refund'&&won?'Refund ₹'+m.resolved_share:'No win';
+      const rl=won&&m.resolved_type==='exact'?'Exact +₹'+m.resolved_share:won&&m.resolved_type==='outcome'?'Outcome +₹'+m.resolved_share:m.resolved_type==='refund'&&won?'Void ₹'+m.resolved_share:'No win';
       pickBadge=`<span class="rtag ${rc}" style="font-size:9px;margin-left:4px">${rl}</span>`;
     } else if(myP){
       pickBadge=`<span class="badge b-green" style="font-size:9px;padding:1px 6px;margin-left:4px">Predicted</span>`;
@@ -951,7 +951,7 @@ function openMatchSheet(mid){
     if(status==='settled'){
       const won=(m.resolved_winners||[]).includes(ME.username);
       const rc=won&&m.resolved_type==='exact'?'rt-exact':won&&m.resolved_type==='outcome'?'rt-outcome':m.resolved_type==='refund'&&won?'rt-refund':'rt-wrong';
-      const rl=won&&m.resolved_type==='exact'?'Exact! +₹'+m.resolved_share:won&&m.resolved_type==='outcome'?'Outcome +₹'+m.resolved_share:m.resolved_type==='refund'&&won?'Refund ₹'+m.resolved_share:'No win';
+      const rl=won&&m.resolved_type==='exact'?'Exact! +₹'+m.resolved_share:won&&m.resolved_type==='outcome'?'Outcome +₹'+m.resolved_share:m.resolved_type==='refund'&&won?'Void ₹'+m.resolved_share:'No win';
       html+=`<div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
         <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">Your prediction</div>
         <div style="font-size:18px;font-weight:700;color:var(--text)">${myP.pred_home} – ${myP.pred_away}</div></div>
@@ -1039,7 +1039,7 @@ function openMatchSheet(mid){
       const won=(m.resolved_winners||[]).includes(p.username);
       const tag=won&&m.resolved_type==='exact'?`<span class="rtag rt-exact">Exact</span>`:
                 won&&m.resolved_type==='outcome'?`<span class="rtag rt-outcome">Outcome</span>`:
-                m.resolved_type==='refund'&&won?`<span class="rtag rt-refund">Refund</span>`:
+                m.resolved_type==='refund'&&won?`<span class="rtag rt-refund">Void</span>`:
                 `<span class="rtag rt-wrong">Wrong</span>`;
       const winAmt=won?`<span style="font-size:11px;color:var(--success);font-weight:600;margin-left:4px">+₹${m.resolved_share}</span>`:'';
       html+=`<div class="pred-row">
@@ -1207,7 +1207,7 @@ function buildPlayerInline(username){
       +chip('exact',exact,'var(--success)','Exact')
       +chip('outcome',outcome_win,'var(--warn)','Outcome')
       +chip('wrong',wrong,'var(--red)','Wrong')
-      +chip('refund',refund,'var(--info)','Refund')
+      +chip('refund',refund,'var(--info)','Void')
     +'</div>'
     +'<div id="pp-match-list"></div>'
   +'</div>';
@@ -1522,7 +1522,7 @@ function renderLB(){
     const _ydayKey=dateKey(_ydayStr);
     const recentMatches=settledMatches.filter(m=>dateKey(m.match_date)===_ydayKey);
     if(recentMatches.length){
-      const typeLabel={exact:'Exact',outcome:'Outcome',refund:'Refund'};
+      const typeLabel={exact:'Exact',outcome:'Outcome',refund:'Void'};
       recentHtml='<div class="sec" style="margin-top:4px">Recent results <span style="font-size:12px;font-weight:400;color:var(--muted)">· '+_ydayStr+'</span></div>';
       recentMatches.forEach(m=>{
         const allPreds=PREDS[m.id]||[];
@@ -1641,7 +1641,7 @@ function renderAll(){
 //  SCORECARD MODAL
 // ════════════════════════════════════════════════════════════════
 function showScorecardModal(type){
-  const titles={exact:'Exact scores',outcome:'Correct outcomes',wrong:'Wrong predictions',refund:'Refunds',played:'All predictions made'};
+  const titles={exact:'Exact scores',outcome:'Correct outcomes',wrong:'Wrong predictions',refund:'Voids',played:'All predictions made'};
   const settled=MATCHES.filter(m=>m.resolved&&(PREDS[m.id]||[]).find(p=>p.username===ME.username));
   let matches=[];
   if(type==='exact'){
@@ -1695,11 +1695,11 @@ function showScorecardModal(type){
       if(type==='exact') resultLine=`<span style="color:var(--success);font-weight:600">Exact! +₹${m.resolved_share}</span>`;
       else if(type==='outcome') resultLine=`<span style="color:var(--warn);font-weight:600">Outcome +₹${m.resolved_share}</span>`;
       else if(type==='wrong') resultLine=`<span style="color:var(--red)">No win</span>`;
-      else if(type==='refund') resultLine=`<span style="color:var(--info)">Refund ₹${m.resolved_share}</span>`;
+      else if(type==='refund') resultLine=`<span style="color:var(--info)">Void ₹${m.resolved_share}</span>`;
       else if(type==='played'){
         if(m.resolved_type==='exact'&&won2) resultLine=`<span style="color:var(--success);font-weight:600">Exact +₹${m.resolved_share}</span>`;
         else if(m.resolved_type==='outcome'&&won2) resultLine=`<span style="color:var(--warn);font-weight:600">Outcome +₹${m.resolved_share}</span>`;
-        else if(m.resolved_type==='refund'&&won2) resultLine=`<span style="color:var(--info)">Refund ₹${m.resolved_share}</span>`;
+        else if(m.resolved_type==='refund'&&won2) resultLine=`<span style="color:var(--info)">Void ₹${m.resolved_share}</span>`;
         else resultLine=`<span style="color:var(--red)">No win</span>`;
       }
       html+=`<div class="modal-row">
@@ -1799,7 +1799,7 @@ function renderHowTo(){
           </div>
         </div>
         <div style="font-size:11px;color:var(--muted);line-height:1.6">
-          You got exact → full pot. Rahul got outcome right but exact takes priority. If <em>nobody</em> gets exact, outcome winners split the pot. If everyone gets the same outcome, all stakes are refunded.
+          You got exact → full pot. Rahul got outcome right but exact takes priority. If <em>nobody</em> gets exact, outcome winners split the pot. If everyone gets the same outcome, all stakes are voided.
         </div>`
     },
     {
@@ -1843,7 +1843,7 @@ function renderHowTo(){
             <div style="font-size:22px;width:26px;text-align:center">🥇</div>
             <div style="width:34px;height:34px;border-radius:50%;background:#378ADD;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff">PR</div>
             <div style="flex:1">
-              <div style="font-size:14px;font-weight:600;color:var(--info)">prasun84 (you)</div>
+              <div style="font-size:14px;font-weight:600;color:var(--info)">you</div>
               <div style="font-size:11px;color:var(--muted)">12 played · 50% hit</div>
             </div>
             <div style="text-align:right">
@@ -1852,7 +1852,7 @@ function renderHowTo(){
             </div>
           </div>
           <div style="padding:11px 13px;font-size:12px;color:var(--muted);line-height:1.6">
-            Tap any player row → see their Exact / Outcome / Wrong / Refund breakdown.<br>
+            Tap any player row → see their Exact / Outcome / Wrong / Void breakdown.<br>
             The <strong style="color:var(--text)">Stage breakdown</strong> table below shows P/L by tournament stage — group, R32, R16, QF, SF/Final.
           </div>
         </div>
@@ -2004,7 +2004,7 @@ function renderHowToClassic(){
       </div>
       <div style="padding:14px;background:rgba(55,138,221,.08);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px">🔄</div>
       <div style="padding:12px 14px;border-bottom:1px solid var(--border)">
-        <div style="font-size:13px;font-weight:600;color:var(--info);margin-bottom:3px">All same outcome → refund</div>
+        <div style="font-size:13px;font-weight:600;color:var(--info);margin-bottom:3px">All same outcome → void</div>
         <div style="font-size:12px;color:var(--muted)">Everyone predicted the same outcome and it happened. No winner, no loser — everyone gets their ₹\${bet} back.</div>
       </div>
       <div style="padding:14px;background:rgba(226,75,74,.08);display:flex;align-items:center;justify-content:center;font-size:20px">❌</div>
@@ -2500,73 +2500,6 @@ function getClosingTime(kickoff_ist){
   return (ch<10?'0':'')+ch+':'+(cm<10?'0':'')+cm;
 }
 
-function generateLeaderboardMessage(){
-  // Build a WhatsApp-friendly leaderboard summary
-  const leagueName=LEAGUE?.name||'WC2026 Fantasy';
-  const settledCount=MATCHES.filter(m=>m.resolved).length;
-  const totalCount=MATCHES.length;
-
-  // Sort members by P/L%
-  const sorted=[...MEMBERS].sort((a,b)=>{
-    const pctA=plPct(a.spent||0,a.earned||0);
-    const pctB=plPct(b.spent||0,b.earned||0);
-    return pctB-pctA;
-  });
-
-  // Date label
-  const nowIST=new Date(Date.now()+IST_OFFSET_MS);
-  const dateStr=MONTH_NAMES[nowIST.getUTCMonth()]+' '+nowIST.getUTCDate();
-
-  // Header
-  let msg='🏆 *'+leagueName+'*\n';
-  msg+='Leaderboard · '+dateStr+'\n';
-  msg+='_'+settledCount+' of '+totalCount+' matches settled_\n';
-  msg+='━━━━━━━━━━━━━━━━\n';
-
-  // Rows — medals only on positive P/L (matches in-app behavior)
-  const medals=['🥇','🥈','🥉'];
-  sorted.forEach((u,i)=>{
-    const bet=u.spent||0, won=u.earned||0;
-    const pl=won-bet;
-    const pct=plPct(bet,won);
-    const showMedal=i<3 && pl>0;
-    const rankPrefix=showMedal?medals[i]:(i+1)+'.';
-    const sign=pct>0?'+':'';
-    const plSign=pl>0?'+':'';
-    const plLine=bet>0?' ('+plSign+'₹'+pl+')':'';
-    msg+=rankPrefix+' '+u.username+' · *'+sign+pct+'%*'+plLine+'\n';
-  });
-
-  msg+='━━━━━━━━━━━━━━━━\n';
-  msg+='_Updated '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})+' IST_';
-  return msg;
-}
-
-async function copyLeaderboard(){
-  const msg=generateLeaderboardMessage();
-  try {
-    await navigator.clipboard.writeText(msg);
-    toast('\u2713 Leaderboard copied — paste in WhatsApp', 3000);
-  } catch(e) {
-    // Fallback for older browsers / iOS Safari edge cases
-    const ta=document.createElement('textarea');
-    ta.value=msg;
-    ta.style.position='fixed';
-    ta.style.opacity='0';
-    document.body.appendChild(ta);
-    ta.select();
-    try { document.execCommand('copy'); toast('\u2713 Leaderboard copied', 3000); }
-    catch(err) { toast('Could not copy — long-press text below to select'); }
-    document.body.removeChild(ta);
-  }
-}
-
-function shareLeaderboardWhatsApp(){
-  const msg=generateLeaderboardMessage();
-  const encoded=encodeURIComponent(msg);
-  window.open('https://wa.me/?text='+encoded,'_blank');
-}
-
 function sendWhatsAppReminder(){
   const matches=getTodayMatches();
   if(!matches.length){toast('No matches today!');return;}
@@ -2604,23 +2537,6 @@ function renderAdmin(){
       No matches today — nothing to remind!
     </div>`;
 
-  // ── Leaderboard share section ──
-  const lbPreviewMsg=generateLeaderboardMessage();
-  const lbShareHtml=`
-    <div class="sec">Share leaderboard</div>
-    <div class="card" style="margin-bottom:4px">
-      <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Post current standings to your WhatsApp group</div>
-      <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:13px;line-height:1.7;color:var(--text);font-family:monospace;white-space:pre-wrap;margin-bottom:12px;max-height:280px;overflow-y:auto">${esc(lbPreviewMsg).replace(/\*([^*]+)\*/g,'<strong>$1</strong>').replace(/_([^_]+)_/g,'<em style="opacity:.75">$1</em>')}</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-gold" onclick="shareLeaderboardWhatsApp()" style="width:auto;padding:10px 20px;font-size:14px;touch-action:manipulation">
-          📲 Open in WhatsApp
-        </button>
-        <button onclick="copyLeaderboard()" style="background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;padding:10px 18px;cursor:pointer;font-weight:600;touch-action:manipulation">
-          📋 Copy
-        </button>
-      </div>
-    </div>`;
-
   // Determine which stages have activity (predictions or settled matches) — lock those
   const stageHasActivity=(grps)=>MATCHES.some(m=>grps.includes(m.grp)&&((PREDS[m.id]&&PREDS[m.id].length>0)||m.resolved||matchStatus(m)==="inprogress"));
   const groupLocked=stageHasActivity(['A','B','C','D','E','F','G','H','I','J','K','L']);
@@ -2645,7 +2561,7 @@ function renderAdmin(){
     ?`<span style="font-size:11px;color:var(--success);margin-left:8px">🔴 ${liveCount} live fixture${liveCount!==1?'s':''} · Updated ${lastPollStr}</span>`
     :`<span style="font-size:11px;color:var(--muted);margin-left:8px">No live data · Last checked ${lastPollStr}</span>`;
 
-  let html=reminderHtml+lbShareHtml+`<div class="sec">Live scores ${liveBadge}</div>
+  let html=reminderHtml+`<div class="sec">Live scores ${liveBadge}</div>
   <div class="card" style="margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
     <div style="font-size:13px;color:var(--muted)">Polling every 5 minutes during match windows</div>
     <button onclick="fetchLiveScores()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--muted);cursor:pointer">↻ Refresh now</button>
@@ -2826,7 +2742,7 @@ async function settleRandom(mid){
   let winMsg='';
   if(winners.length===1) winMsg=' \u00b7 '+esc(winners[0])+' won \u20b9'+share;
   else if(winners.length>1) winMsg=' \u00b7 '+winners.length+' winners shared \u20b9'+share+' each';
-  else if(type==='refund') winMsg=' \u00b7 Refunded';
+  else if(type==='refund') winMsg=' \u00b7 Voided';
   toast('\u2714 '+esc(m.home)+' '+h+'\u2013'+a+' '+esc(m.away)+winMsg, 3500);
 }
 
@@ -2843,7 +2759,7 @@ async function quickSettle(mid, h, a){
   let winMsg='';
   if(winners.length===1) winMsg=' \u00b7 '+esc(winners[0])+' won \u20b9'+share;
   else if(winners.length>1) winMsg=' \u00b7 '+winners.length+' winners shared \u20b9'+share+' each';
-  else if(type==='refund') winMsg=' \u00b7 Refunded';
+  else if(type==='refund') winMsg=' \u00b7 Voided';
   toast('\u2714 '+esc(m?.home||'')+' '+h+'\u2013'+a+' '+esc(m?.away||'')+winMsg, 3500);
 }
 
