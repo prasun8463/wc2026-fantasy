@@ -2741,6 +2741,19 @@ function renderAdmin(){
     });
   }
 
+  html+=`<div class="sec">Share leaderboard on WhatsApp</div>
+  <div class="card" style="margin-bottom:8px">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+      Generate a rich, formatted leaderboard message ready to post in your league WhatsApp group. Uses bold/italic formatting and emojis. Tap copy or share directly.
+    </div>
+    <div id="lb-share-preview" style="background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;font-family:'SF Mono',Menlo,monospace;font-size:12px;line-height:1.7;white-space:pre-wrap;color:var(--text);max-height:340px;overflow-y:auto"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-gold" onclick="copyLeaderboardShare()" style="width:auto;padding:9px 18px;font-size:13px">📋 Copy</button>
+      <button onclick="shareLeaderboardWA()" style="background:#25D366;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;touch-action:manipulation">💬 Share to WhatsApp</button>
+      <button onclick="buildLeaderboardShare()" style="background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer">🔄 Refresh</button>
+    </div>
+  </div>`;
+
   html+=`<div class="sec">Import real fixtures from API</div>
   <div class="card" style="margin-bottom:8px">
     <div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6">
@@ -2765,6 +2778,8 @@ function renderAdmin(){
   </div>`;
 
   document.getElementById('pane-admin').innerHTML=html;
+  // Auto-build the leaderboard share preview after admin tab renders
+  setTimeout(()=>{ try{ buildLeaderboardShare(); }catch(e){ console.warn('Share preview failed:',e); } }, 0);
 }
 
 // Quick settle from match row (admin only, score from API)
@@ -2935,6 +2950,123 @@ async function updateBet(){
 // ════════════════════════════════════════════════════════════════
 //  FIXTURE IMPORT — fetch all WC2026 fixtures from api-football
 // ════════════════════════════════════════════════════════════════
+// ────────────────────────────────────────────────────────────────
+//  WHATSAPP LEADERBOARD SHARE
+// ────────────────────────────────────────────────────────────────
+function buildLeaderboardShare(){
+  if(!LEAGUE||!MEMBERS||!MEMBERS.length) return '';
+
+  // Compute stats per player (mirrors renderLB logic)
+  const settledMatches=MATCHES.filter(m=>m.resolved);
+  const sortedMembers=[...MEMBERS].sort((a,b)=>plPct(b.spent||0,b.earned||0)-plPct(a.spent||0,a.earned||0));
+  const totalSettled=settledMatches.length;
+
+  // Header
+  let msg='🏆 *FIFA WC 2026 — LEAGUE STANDINGS*\n';
+  msg+='_'+LEAGUE.name+'_\n';
+  const dt=new Date(Date.now()+IST_OFFSET_MS);
+  const dStr=MONTH_NAMES[dt.getUTCMonth()]+' '+dt.getUTCDate();
+  msg+=dStr+' · '+totalSettled+' match'+(totalSettled!==1?'es':'')+' settled\n';
+  msg+='━━━━━━━━━━━━━━━━━━━━\n\n';
+
+  // Standings
+  const medals=['🥇','🥈','🥉'];
+  sortedMembers.forEach((u,i)=>{
+    const bet=u.spent||0;
+    const won=u.earned||0;
+    const pl=won-bet;
+    const pct=plPct(bet,won);
+    const rank=i<3&&pl>0?medals[i]:('  '+(i+1)+'.');
+    const plStr=pl>0?'+₹'+pl:pl<0?'-₹'+Math.abs(pl):'₹0';
+    const pctStr=pct>0?'+'+pct+'%':pct+'%';
+    const trophy=pct>0?'📈':pct<0?'📉':'➖';
+
+    msg+=rank+' *'+u.username+'*\n';
+    msg+='     '+trophy+' '+pctStr+' ('+plStr+')\n';
+    if(bet>0) msg+='     ₹'+bet+' staked · ₹'+won+' won\n';
+    msg+='\n';
+  });
+
+  // Story highlights (mirror logic)
+  const playerStats=sortedMembers.map(u=>{
+    let exact=0,participated=0,biggestWin=0,streak=0;
+    settledMatches.forEach(m=>{
+      const myP=(PREDS[m.id]||[]).find(p=>p.username===u.username);
+      if(!myP) return;
+      participated++;
+      if(myP.pred_home===m.result_home&&myP.pred_away===m.result_away) exact++;
+      if((m.resolved_winners||[]).includes(u.username)){
+        if((m.resolved_share||0)>biggestWin) biggestWin=m.resolved_share;
+      }
+    });
+    // Compute current streak
+    const sortedByDate=[...settledMatches].sort((a,b)=>dateKey(b.match_date)-dateKey(a.match_date));
+    for(const m of sortedByDate){
+      const myP=(PREDS[m.id]||[]).find(p=>p.username===u.username);
+      if(!myP) continue;
+      const won=(m.resolved_winners||[]).includes(u.username);
+      const isRefund=m.resolved_type==='refund';
+      if(won||isRefund) streak++;
+      else break;
+    }
+    return {u,exact,participated,biggestWin,streak};
+  });
+
+  const highlights=[];
+  const bestStreak=playerStats.reduce((b,p)=>p.streak>b.streak?p:b,{streak:0,u:{username:''}});
+  const mostExact=playerStats.reduce((b,p)=>p.exact>b.exact?p:b,{exact:0,u:{username:''}});
+  const bigWin=playerStats.reduce((b,p)=>p.biggestWin>b.biggestWin?p:b,{biggestWin:0,u:{username:''}});
+  if(bestStreak.streak>1) highlights.push('🔥 *'+bestStreak.u.username+'* on '+bestStreak.streak+'-match streak');
+  if(mostExact.exact>0) highlights.push('🎯 *'+mostExact.u.username+'* nailed '+mostExact.exact+' exact score'+(mostExact.exact>1?'s':''));
+  if(bigWin.biggestWin>0) highlights.push('💰 *'+bigWin.u.username+'* won biggest pot: ₹'+bigWin.biggestWin);
+
+  if(highlights.length){
+    msg+='━━━━━━━━━━━━━━━━━━━━\n';
+    msg+='*HIGHLIGHTS*\n';
+    highlights.slice(0,3).forEach(h=>msg+=h+'\n');
+    msg+='\n';
+  }
+
+  // Footer
+  msg+='━━━━━━━━━━━━━━━━━━━━\n';
+  msg+='_Place your picks at_ '+location.origin+location.pathname.replace('/index.html','');
+
+  // Render preview
+  const el=document.getElementById('lb-share-preview');
+  if(el){
+    // Convert WhatsApp markdown to HTML for preview
+    let preview=msg
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/\*([^*\n]+)\*/g,'<b style="color:var(--gold)">$1</b>')
+      .replace(/_([^_\n]+)_/g,'<i style="color:var(--muted)">$1</i>');
+    el.innerHTML=preview;
+  }
+  // Stash for copy/share
+  window._lbShareText=msg;
+  return msg;
+}
+
+async function copyLeaderboardShare(){
+  const txt=window._lbShareText||buildLeaderboardShare();
+  try{
+    await navigator.clipboard.writeText(txt);
+    toast('✓ Leaderboard copied — paste into WhatsApp');
+  }catch(e){
+    // Fallback for older browsers
+    const ta=document.createElement('textarea');
+    ta.value=txt; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast('✓ Leaderboard copied');
+  }
+}
+
+function shareLeaderboardWA(){
+  const txt=window._lbShareText||buildLeaderboardShare();
+  // wa.me opens WhatsApp directly with pre-filled text
+  const url='https://wa.me/?text='+encodeURIComponent(txt);
+  window.open(url,'_blank');
+}
+
 async function importFixturesFromAPI(){
   const statusEl=document.getElementById('import-status');
   if(!statusEl) return;
