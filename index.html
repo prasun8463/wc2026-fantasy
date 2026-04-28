@@ -2500,6 +2500,73 @@ function getClosingTime(kickoff_ist){
   return (ch<10?'0':'')+ch+':'+(cm<10?'0':'')+cm;
 }
 
+function generateLeaderboardMessage(){
+  // Build a WhatsApp-friendly leaderboard summary
+  const leagueName=LEAGUE?.name||'WC2026 Fantasy';
+  const settledCount=MATCHES.filter(m=>m.resolved).length;
+  const totalCount=MATCHES.length;
+
+  // Sort members by P/L%
+  const sorted=[...MEMBERS].sort((a,b)=>{
+    const pctA=plPct(a.spent||0,a.earned||0);
+    const pctB=plPct(b.spent||0,b.earned||0);
+    return pctB-pctA;
+  });
+
+  // Date label
+  const nowIST=new Date(Date.now()+IST_OFFSET_MS);
+  const dateStr=MONTH_NAMES[nowIST.getUTCMonth()]+' '+nowIST.getUTCDate();
+
+  // Header
+  let msg='🏆 *'+leagueName+'*\n';
+  msg+='Leaderboard · '+dateStr+'\n';
+  msg+='_'+settledCount+' of '+totalCount+' matches settled_\n';
+  msg+='━━━━━━━━━━━━━━━━\n';
+
+  // Rows — medals only on positive P/L (matches in-app behavior)
+  const medals=['🥇','🥈','🥉'];
+  sorted.forEach((u,i)=>{
+    const bet=u.spent||0, won=u.earned||0;
+    const pl=won-bet;
+    const pct=plPct(bet,won);
+    const showMedal=i<3 && pl>0;
+    const rankPrefix=showMedal?medals[i]:(i+1)+'.';
+    const sign=pct>0?'+':'';
+    const plSign=pl>0?'+':'';
+    const plLine=bet>0?' ('+plSign+'₹'+pl+')':'';
+    msg+=rankPrefix+' '+u.username+' · *'+sign+pct+'%*'+plLine+'\n';
+  });
+
+  msg+='━━━━━━━━━━━━━━━━\n';
+  msg+='_Updated '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})+' IST_';
+  return msg;
+}
+
+async function copyLeaderboard(){
+  const msg=generateLeaderboardMessage();
+  try {
+    await navigator.clipboard.writeText(msg);
+    toast('\u2713 Leaderboard copied — paste in WhatsApp', 3000);
+  } catch(e) {
+    // Fallback for older browsers / iOS Safari edge cases
+    const ta=document.createElement('textarea');
+    ta.value=msg;
+    ta.style.position='fixed';
+    ta.style.opacity='0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); toast('\u2713 Leaderboard copied', 3000); }
+    catch(err) { toast('Could not copy — long-press text below to select'); }
+    document.body.removeChild(ta);
+  }
+}
+
+function shareLeaderboardWhatsApp(){
+  const msg=generateLeaderboardMessage();
+  const encoded=encodeURIComponent(msg);
+  window.open('https://wa.me/?text='+encoded,'_blank');
+}
+
 function sendWhatsAppReminder(){
   const matches=getTodayMatches();
   if(!matches.length){toast('No matches today!');return;}
@@ -2537,6 +2604,23 @@ function renderAdmin(){
       No matches today — nothing to remind!
     </div>`;
 
+  // ── Leaderboard share section ──
+  const lbPreviewMsg=generateLeaderboardMessage();
+  const lbShareHtml=`
+    <div class="sec">Share leaderboard</div>
+    <div class="card" style="margin-bottom:4px">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Post current standings to your WhatsApp group</div>
+      <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:13px;line-height:1.7;color:var(--text);font-family:monospace;white-space:pre-wrap;margin-bottom:12px;max-height:280px;overflow-y:auto">${esc(lbPreviewMsg).replace(/\*([^*]+)\*/g,'<strong>$1</strong>').replace(/_([^_]+)_/g,'<em style="opacity:.75">$1</em>')}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-gold" onclick="shareLeaderboardWhatsApp()" style="width:auto;padding:10px 20px;font-size:14px;touch-action:manipulation">
+          📲 Open in WhatsApp
+        </button>
+        <button onclick="copyLeaderboard()" style="background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;padding:10px 18px;cursor:pointer;font-weight:600;touch-action:manipulation">
+          📋 Copy
+        </button>
+      </div>
+    </div>`;
+
   // Determine which stages have activity (predictions or settled matches) — lock those
   const stageHasActivity=(grps)=>MATCHES.some(m=>grps.includes(m.grp)&&((PREDS[m.id]&&PREDS[m.id].length>0)||m.resolved||matchStatus(m)==="inprogress"));
   const groupLocked=stageHasActivity(['A','B','C','D','E','F','G','H','I','J','K','L']);
@@ -2561,7 +2645,7 @@ function renderAdmin(){
     ?`<span style="font-size:11px;color:var(--success);margin-left:8px">🔴 ${liveCount} live fixture${liveCount!==1?'s':''} · Updated ${lastPollStr}</span>`
     :`<span style="font-size:11px;color:var(--muted);margin-left:8px">No live data · Last checked ${lastPollStr}</span>`;
 
-  let html=reminderHtml+`<div class="sec">Live scores ${liveBadge}</div>
+  let html=reminderHtml+lbShareHtml+`<div class="sec">Live scores ${liveBadge}</div>
   <div class="card" style="margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
     <div style="font-size:13px;color:var(--muted)">Polling every 5 minutes during match windows</div>
     <button onclick="fetchLiveScores()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--muted);cursor:pointer">↻ Refresh now</button>
