@@ -483,3 +483,40 @@ Run through all of these the day before June 11:
 - [ ] App opens correctly, lands on How to Play for fresh session
 - [ ] Admin can see all fixtures, betting amounts correct per stage
 - [ ] One test prediction made and settled to verify full flow
+
+---
+
+## Step 17 — Add `bold` column to predictions (for Bold Pick feature)
+
+```sql
+-- Add bold column for the knockout Bold Pick feature
+ALTER TABLE predictions ADD COLUMN IF NOT EXISTS bold BOOLEAN DEFAULT false;
+
+-- Verify column exists
+SELECT column_name, data_type, column_default
+FROM information_schema.columns
+WHERE table_name = 'predictions' AND column_name = 'bold';
+```
+
+The Bold Pick feature is enabled in code for all knockout stages (R32, R16, QF, SF/Final). Each player gets one bold pick per stage. If they nail the exact score on a bold pick, they take the entire pot (no splitting with other exact pickers). Loss is unchanged.
+
+The DB stores `resolved_type='exact_bold'` instead of `exact` when a bold won the pot — used in stats and badges.
+
+---
+
+## Step 18 — Knockout settlement window for extra time + penalties
+
+**Already handled in code** — but worth verifying in production:
+
+- `MATCH_DURATION_MS` (105 min) used for group stage fallback if API has no live data
+- `KNOCKOUT_DURATION_MS` (150 min = 90 + 30 ET + 30 penalties) used for R32 onwards
+- Auto-settle waits for `FT`, `AET`, or `PEN` status from api-football before firing
+- Auto-settle delay after FT/AET/PEN: 15 min in PROD_MODE (covers VAR review, post-match procedures)
+
+**Verification on first knockout match in June:**
+1. Watch a live R32 match in the app
+2. If it goes to extra time, verify the match shows `live` (not finished) status throughout ET
+3. After penalties, verify status badge shows `PEN` and final score reflects penalty total
+4. Confirm auto-settle fires ~15 min after PEN status
+
+**Manual fallback if auto-settle misbehaves:** Admin can use the Settle button on the match row with the actual final score (including penalty result, e.g. for a 1-1 match decided 4-3 on penalties, enter 1-1 and let the API status indicate it was PEN).

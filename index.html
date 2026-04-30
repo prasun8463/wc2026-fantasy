@@ -378,7 +378,10 @@ function calcRoundStats(username){
 // ── Constants ──────────────────────────────────────────────────
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // UTC+5:30
 const KICKOFF_CUTOFF_MS = 5 * 60 * 1000;     // 5 min before kickoff
-const MATCH_DURATION_MS = 105 * 60 * 1000;   // 90 + 15 stoppage
+const MATCH_DURATION_MS = 105 * 60 * 1000;       // 90 + 15 stoppage (group stage)
+const KNOCKOUT_DURATION_MS = 150 * 60 * 1000;    // 90 + 30 ET + 30 penalties (knockout fallback)
+const KNOCKOUT_STAGES = ['R32','R16','QF','SF','Final'];
+function isKnockout(m){ return KNOCKOUT_STAGES.includes(m?.grp); }
 
 // ── Sanitization ────────────────────────────────────────────────
 function esc(s){ // HTML-escape user-controlled strings before innerHTML
@@ -395,6 +398,8 @@ function dateKey(d){ // returns numeric MMDD key for sorting/comparison
 }
 
 function plColor(v){ return v>0?'var(--success)':v<0?'var(--red)':'var(--muted)'; }
+// Treat exact_bold as exact for win categorisation/stats purposes
+function isExactType(t){ return t==='exact'||t==='exact_bold'; }
 function fmtPL(v){ return (v>0?'+':'')+v; }
 // P/L % = (won - bet) / bet * 100 — fairer ranking metric
 function plPct(bet,won){ if(!bet) return 0; return Math.round((won-bet)/bet*100); }
@@ -640,8 +645,9 @@ function matchStatus(m){
     if(live.status==='1H'||live.status==='HT'||live.status==='2H'||
        live.status==='ET'||live.status==='BT'||live.status==='P') return 'live';
   }
-  // Fallback: estimate match finished after 105 mins (90 + stoppage)
-  const finishedAt=new Date(kickoffUTC.getTime()+MATCH_DURATION_MS);
+  // Fallback: knockouts can run 150 mins (incl. ET + penalties), group stage 105 mins
+  const durMs=isKnockout(m)?KNOCKOUT_DURATION_MS:MATCH_DURATION_MS;
+  const finishedAt=new Date(kickoffUTC.getTime()+durMs);
   if(now>=finishedAt) return 'finished';
   return 'inprogress';
 }
@@ -742,8 +748,8 @@ function renderMatchList(){
     let pickBadge='';
     if(myP&&status==='settled'){
       const won=(m.resolved_winners||[]).includes(ME.username);
-      const rc=won&&m.resolved_type==='exact'?'rt-exact':won&&m.resolved_type==='outcome'?'rt-outcome':m.resolved_type==='refund'&&won?'rt-refund':'rt-wrong';
-      const rl=won&&m.resolved_type==='exact'?'Exact +₹'+m.resolved_share:won&&m.resolved_type==='outcome'?'Outcome +₹'+m.resolved_share:m.resolved_type==='refund'&&won?'Void ₹'+m.resolved_share:'No win';
+      const rc=won&&isExactType(m.resolved_type)?'rt-exact':won&&m.resolved_type==='outcome'?'rt-outcome':m.resolved_type==='refund'&&won?'rt-refund':'rt-wrong';
+      const rl=won&&m.resolved_type==='exact_bold'?'🔥 Bold +₹'+m.resolved_share:won&&m.resolved_type==='exact'?'Exact +₹'+m.resolved_share:won&&m.resolved_type==='outcome'?'Outcome +₹'+m.resolved_share:m.resolved_type==='refund'&&won?'Void ₹'+m.resolved_share:'No win';
       pickBadge=`<span class="rtag ${rc}" style="font-size:9px;margin-left:4px">${rl}</span>`;
     } else if(myP){
       pickBadge=`<span class="badge b-green" style="font-size:9px;padding:1px 6px;margin-left:4px">Predicted</span>`;
@@ -950,17 +956,19 @@ function openMatchSheet(mid){
   if(myP){
     if(status==='settled'){
       const won=(m.resolved_winners||[]).includes(ME.username);
-      const rc=won&&m.resolved_type==='exact'?'rt-exact':won&&m.resolved_type==='outcome'?'rt-outcome':m.resolved_type==='refund'&&won?'rt-refund':'rt-wrong';
-      const rl=won&&m.resolved_type==='exact'?'Exact! +₹'+m.resolved_share:won&&m.resolved_type==='outcome'?'Outcome +₹'+m.resolved_share:m.resolved_type==='refund'&&won?'Void ₹'+m.resolved_share:'No win';
+      const rc=won&&m.resolved_type==='exact'?'rt-exact':won&&(m.resolved_type==='outcome')?'rt-outcome':m.resolved_type==='refund'&&won?'rt-refund':won&&m.resolved_type==='exact_bold'?'rt-exact':'rt-wrong';
+      const rl=won&&m.resolved_type==='exact'?'Exact! +₹'+m.resolved_share:won&&m.resolved_type==='exact_bold'?'🔥 Bold Exact! +₹'+m.resolved_share:won&&m.resolved_type==='outcome'?'Outcome +₹'+m.resolved_share:m.resolved_type==='refund'&&won?'Void ₹'+m.resolved_share:'No win';
+      const boldBadge=myP.bold?'<span style="font-size:10px;color:var(--gold);font-weight:700;margin-left:6px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.4);border-radius:4px;padding:1px 6px;vertical-align:middle">🔥 BOLD</span>':'';
       html+=`<div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
         <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">Your prediction</div>
-        <div style="font-size:18px;font-weight:700;color:var(--text)">${myP.pred_home} – ${myP.pred_away}</div></div>
+        <div style="font-size:18px;font-weight:700;color:var(--text)">${myP.pred_home} – ${myP.pred_away}${boldBadge}</div></div>
         <span class="rtag ${rc}" style="font-size:12px;padding:4px 10px">${rl}</span>
       </div>`;
     } else {
+      const boldBadge=myP.bold?'<span style="font-size:10px;color:var(--gold);font-weight:700;margin-left:6px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.4);border-radius:4px;padding:1px 6px;vertical-align:middle">🔥 BOLD</span>':'';
       html+=`<div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
         <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">Your prediction</div>
-        <div style="font-size:18px;font-weight:700;color:var(--text)">${myP.pred_home} – ${myP.pred_away}</div></div>
+        <div style="font-size:18px;font-weight:700;color:var(--text)">${myP.pred_home} – ${myP.pred_away}${boldBadge}</div></div>
         ${status==='open'?`<span class="link" style="font-size:12px" onclick="cancelPredFromSheet('${mid}')">Change</span>`:'<span class="badge b-gray">Locked</span>'}
       </div>`;
     }
@@ -1010,9 +1018,35 @@ function openMatchSheet(mid){
         </div>
       </div>
     </div>`:'';
+
+    // ── Bold Pick (knockouts only) ──
+    let boldStripHtml='';
+    if(isKnockout(m)){
+      const stageGrps=m.grp==='SF'||m.grp==='Final'?['SF','Final']:[m.grp];
+      const myBoldsInStage=stageGrps.flatMap(g=>MATCHES.filter(x=>x.grp===g)).reduce((cnt,mm)=>{
+        if(mm.id===mid) return cnt; // exclude current match (we may be editing it)
+        const myPick=(PREDS[mm.id]||[]).find(p=>p.username===ME.username&&p.bold===true);
+        return myPick?cnt+1:cnt;
+      },0);
+      const isCurrentBold=isEditing&&myP&&myP.bold===true;
+      const canBold=myBoldsInStage<1; // 1 bold per stage
+      const stageLabel=m.grp==='SF'||m.grp==='Final'?'SF/Final':m.grp;
+      const statusLine=isCurrentBold?'currently your bold for this stage':canBold?'1 bold available this stage':'already used this stage';
+      boldStripHtml=`<div style="background:rgba(212,160,23,.04);border:1px solid rgba(212,160,23,.18);border-radius:8px;padding:10px 12px;margin-bottom:10px">
+        <label style="display:flex;align-items:flex-start;gap:9px;cursor:${(canBold||isCurrentBold)?'pointer':'not-allowed'};opacity:${(canBold||isCurrentBold)?'1':'.55'}">
+          <input type="checkbox" id="sh_bold_${mid}" ${isCurrentBold?'checked':''} ${(canBold||isCurrentBold)?'':'disabled'} style="margin-top:2px;width:16px;height:16px;accent-color:var(--gold)" />
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:2px">🔥 Bold Pick · ${stageLabel} <span style="font-weight:400;color:var(--muted);font-size:11px">(${statusLine})</span></div>
+            <div style="font-size:11px;color:var(--muted);line-height:1.5">If your exact score wins, you take the whole pot — no splitting with other exact pickers. Loss is unchanged. One bold per stage.</div>
+          </div>
+        </label>
+      </div>`;
+    }
+
     html+=`<div style="background:rgba(212,160,23,.06);border:1px solid rgba(212,160,23,.25);border-radius:10px;padding:14px;margin-bottom:10px">
       <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:10px">${isEditing?'Update your pick':'Stake \u20b9'+betFor(m)+' on the score'}</div>
       ${formStrip}
+      ${boldStripHtml}
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="text-align:center">
           <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${m.home_flag} ${esc(m.home)}</div>
@@ -1038,12 +1072,14 @@ function openMatchSheet(mid){
       const isMe=p.username===ME.username;
       const won=(m.resolved_winners||[]).includes(p.username);
       const tag=won&&m.resolved_type==='exact'?`<span class="rtag rt-exact">Exact</span>`:
+                won&&m.resolved_type==='exact_bold'?`<span class="rtag rt-exact">🔥 Bold</span>`:
                 won&&m.resolved_type==='outcome'?`<span class="rtag rt-outcome">Outcome</span>`:
                 m.resolved_type==='refund'&&won?`<span class="rtag rt-refund">Void</span>`:
                 `<span class="rtag rt-wrong">Wrong</span>`;
       const winAmt=won?`<span style="font-size:11px;color:var(--success);font-weight:600;margin-left:4px">+₹${m.resolved_share}</span>`:'';
+      const boldMark=p.bold?'<span style="font-size:9px;color:var(--gold);margin-left:3px" title="Bold pick">🔥</span>':'';
       html+=`<div class="pred-row">
-        <span style="color:${isMe?'var(--info)':'var(--text)'}${isMe?';font-weight:700':''}">${p.username}${isMe?' <span style="font-size:10px;color:var(--muted)">(you)</span>':''}</span>
+        <span style="color:${isMe?'var(--info)':'var(--text)'}${isMe?';font-weight:700':''}">${esc(p.username)}${isMe?' <span style="font-size:10px;color:var(--muted)">(you)</span>':''}${boldMark}</span>
         <span style="display:flex;align-items:center;gap:5px"><span style="font-size:13px;color:var(--muted)">${p.pred_home}–${p.pred_away}</span>${tag}${winAmt}</span>
       </div>`;
     });
@@ -1066,17 +1102,30 @@ async function submitPredFromSheet(mid){
   const h=parseInt(document.getElementById('sh_ph_'+mid)?.value);
   const a=parseInt(document.getElementById('sh_pa_'+mid)?.value);
   if(isNaN(h)||isNaN(a)||h<0||a<0){toast('Enter valid scores');return;}
+  // Bold pick (knockouts only)
+  const boldEl=document.getElementById('sh_bold_'+mid);
+  const isBold=!!(boldEl&&boldEl.checked);
+  // Defense in depth: re-validate stage limit before insert
+  if(isBold&&m){
+    const stageGrps=m.grp==='SF'||m.grp==='Final'?['SF','Final']:[m.grp];
+    const existingBoldsInStage=stageGrps.flatMap(g=>MATCHES.filter(x=>x.grp===g)).reduce((cnt,mm)=>{
+      if(mm.id===mid) return cnt;
+      const myPick=(PREDS[mm.id]||[]).find(p=>p.username===ME.username&&p.bold===true);
+      return myPick?cnt+1:cnt;
+    },0);
+    if(existingBoldsInStage>=1){toast('You\u2019ve already used your Bold Pick this stage');return;}
+  }
   // delete existing prediction first (if any), then insert fresh
   // this avoids upsert RLS issues — delete+insert works with standard policies
   await sb.from('predictions').delete()
     .eq('match_id',mid).eq('username',ME.username);
   const {error}=await sb.from('predictions')
-    .insert({match_id:mid,username:ME.username,pred_home:h,pred_away:a});
+    .insert({match_id:mid,username:ME.username,pred_home:h,pred_away:a,bold:isBold});
   if(error){toast('Error: '+error.message);return;}
   if(!PREDS[mid])PREDS[mid]=[];
   PREDS[mid]=PREDS[mid].filter(p=>p.username!==ME.username);
-  PREDS[mid].push({match_id:mid,username:ME.username,pred_home:h,pred_away:a});
-  toast('✓ Locked in '+esc(m?.home||'')+' '+h+'–'+a+' '+esc(m?.away||'')+' · ₹'+betFor(m)+' staked', 3200);
+  PREDS[mid].push({match_id:mid,username:ME.username,pred_home:h,pred_away:a,bold:isBold});
+  toast('✓ Locked in '+esc(m?.home||'')+' '+h+'–'+a+' '+esc(m?.away||'')+' · ₹'+betFor(m)+' staked'+(isBold?' · 🔥 BOLD':''), 3500);
   closeMatchSheet();
   renderMatchList(); renderLB();
 }
@@ -1143,7 +1192,7 @@ function ppShowType(type){
 
   const settled=MATCHES.filter(m=>m.resolved&&(PREDS[m.id]||[]).find(p=>p.username===username));
   let matches=[];
-  if(ppActiveType==='exact') matches=settled.filter(m=>(m.resolved_winners||[]).includes(username)&&m.resolved_type==='exact');
+  if(ppActiveType==='exact') matches=settled.filter(m=>(m.resolved_winners||[]).includes(username)&&isExactType(m.resolved_type));
   else if(ppActiveType==='outcome') matches=settled.filter(m=>(m.resolved_winners||[]).includes(username)&&m.resolved_type==='outcome');
   else if(ppActiveType==='wrong') matches=settled.filter(m=>!(m.resolved_winners||[]).includes(username));
   else if(ppActiveType==='refund') matches=settled.filter(m=>(m.resolved_winners||[]).includes(username)&&m.resolved_type==='refund');
@@ -1183,7 +1232,7 @@ function buildPlayerInline(username){
   let exact=0,outcome_win=0,wrong=0,refund=0;
   settled.forEach(m=>{
     const won=(m.resolved_winners||[]).includes(username);
-    if(m.resolved_type==='exact'&&won) exact++;
+    if(isExactType(m.resolved_type)&&won) exact++;
     else if(m.resolved_type==='outcome'&&won) outcome_win++;
     else if(m.resolved_type==='refund'&&won) refund++;
     else wrong++;
@@ -1238,7 +1287,7 @@ function renderLB(){
       if(!myP){skipped++;return;}
       participated++;
       const won=(m.resolved_winners||[]).includes(u.username);
-      if(m.resolved_type==='exact'&&won){exact++;onStreak++;streak=Math.max(streak,onStreak);if(m.resolved_share>biggestWin)biggestWin=m.resolved_share;}
+      if(isExactType(m.resolved_type)&&won){exact++;onStreak++;streak=Math.max(streak,onStreak);if(m.resolved_share>biggestWin)biggestWin=m.resolved_share;}
       else if(m.resolved_type==='outcome'&&won){outcome_win++;onStreak++;streak=Math.max(streak,onStreak);if(m.resolved_share>biggestWin)biggestWin=m.resolved_share;}
       else if(m.resolved_type==='refund'&&won){onStreak++;}
       else{wrong++;onStreak=0;}
@@ -1647,7 +1696,7 @@ function showScorecardModal(type){
   if(type==='exact'){
     matches=settled.filter(m=>{
       const won=(m.resolved_winners||[]).includes(ME.username);
-      return m.resolved_type==='exact'&&won;
+      return isExactType(m.resolved_type)&&won;
     });
   } else if(type==='outcome'){
     matches=settled.filter(m=>{
@@ -1697,7 +1746,7 @@ function showScorecardModal(type){
       else if(type==='wrong') resultLine=`<span style="color:var(--red)">No win</span>`;
       else if(type==='refund') resultLine=`<span style="color:var(--info)">Void ₹${m.resolved_share}</span>`;
       else if(type==='played'){
-        if(m.resolved_type==='exact'&&won2) resultLine=`<span style="color:var(--success);font-weight:600">Exact +₹${m.resolved_share}</span>`;
+        if(isExactType(m.resolved_type)&&won2) resultLine=`<span style="color:var(--success);font-weight:600">${m.resolved_type==='exact_bold'?'🔥 Bold ':'Exact '}+₹${m.resolved_share}</span>`;
         else if(m.resolved_type==='outcome'&&won2) resultLine=`<span style="color:var(--warn);font-weight:600">Outcome +₹${m.resolved_share}</span>`;
         else if(m.resolved_type==='refund'&&won2) resultLine=`<span style="color:var(--info)">Void ₹${m.resolved_share}</span>`;
         else resultLine=`<span style="color:var(--red)">No win</span>`;
@@ -2841,7 +2890,12 @@ async function settleWithScore(mid, h, a){
   const outW=parts.filter(p=>outcome(p.pred_home,p.pred_away)===act);
   const allSame=parts.length>0&&parts.every(p=>outcome(p.pred_home,p.pred_away)===act);
   let winners,winType;
-  if(exact.length){winners=exact;winType='exact';}
+  if(exact.length){
+    // Bold Option C: if any exact picker went bold, only bolds split the pot
+    const exactBold=exact.filter(p=>p.bold===true);
+    winners=exactBold.length?exactBold:exact;
+    winType=exactBold.length?'exact_bold':'exact';
+  }
   else if(!allSame&&outW.length){winners=outW;winType='outcome';}
   else{winners=parts;winType='refund';}
   const share=parts.length?Math.round(pot/winners.length):0;
@@ -2878,7 +2932,12 @@ async function settle(mid){
   const outW=parts.filter(p=>outcome(p.pred_home,p.pred_away)===act);
   const allSame=parts.length>0&&parts.every(p=>outcome(p.pred_home,p.pred_away)===act);
   let winners,winType;
-  if(exact.length){winners=exact;winType='exact';}
+  if(exact.length){
+    // Bold Option C: if any exact picker went bold, only bolds split
+    const exactBold=exact.filter(p=>p.bold===true);
+    winners=exactBold.length?exactBold:exact;
+    winType=exactBold.length?'exact_bold':'exact';
+  }
   else if(!allSame&&outW.length){winners=outW;winType='outcome';}
   else{winners=parts;winType='refund';}
   const share=parts.length?Math.round(pot/winners.length):0;
