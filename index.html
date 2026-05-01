@@ -931,7 +931,7 @@ function openMatchSheet(mid){
   const pot=arr.length*betFor(m);
   const status=matchStatus(m); // 'open'|'inprogress'|'settled'|'future'
   const canPredict=status==='open'&&!myP;
-  const showOtherPreds=status==='settled'; // only show others' predictions when settled
+  const showOtherPreds=status==='settled'||status==='inprogress'||status==='finished'; // reveal during live play
 
   document.getElementById('ms-title').textContent=m.home+' vs '+m.away;
 
@@ -1211,8 +1211,19 @@ function ppShowType(type){
   let matches=[];
   if(ppActiveType==='exact') matches=settled.filter(m=>(m.resolved_winners||[]).includes(username)&&isExactType(m.resolved_type));
   else if(ppActiveType==='outcome') matches=settled.filter(m=>(m.resolved_winners||[]).includes(username)&&m.resolved_type==='outcome');
-  else if(ppActiveType==='wrong') matches=settled.filter(m=>!(m.resolved_winners||[]).includes(username));
+  else if(ppActiveType==='wrong') matches=settled.filter(m=>{
+    const participated=(PREDS[m.id]||[]).find(p=>p.username===username);
+    return participated&&!(m.resolved_winners||[]).includes(username)&&m.resolved_type!=='refund';
+  });
   else if(ppActiveType==='refund') matches=settled.filter(m=>(m.resolved_winners||[]).includes(username)&&m.resolved_type==='refund');
+
+  // Sort descending — most recent/latest stage first
+  const stageOrder={Final:0,SF:1,QF:2,R16:3,R32:4};
+  matches.sort((a,b)=>{
+    const sa=stageOrder[a.grp]??5, sb=stageOrder[b.grp]??5;
+    if(sa!==sb) return sa-sb; // knockout stages first
+    return dateKey(b.match_date)-dateKey(a.match_date); // then by date descending
+  });
 
   if(!matches.length) return;
 
@@ -1222,21 +1233,32 @@ function ppShowType(type){
     return;
   }
 
-  // Multiple matches — show tappable list below chips
+  // Multiple matches — show tappable list with round + money columns
   setTimeout(()=>{
     const el=document.getElementById('pp-match-list');
     if(!el) return;
-    let html='<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Tap a match to see details</div>';
+    const stageLabel={R32:'R32',R16:'R16',QF:'QF',SF:'SF',Final:'Final'};
+    const groupLabel=(grp)=>stageLabel[grp]?stageLabel[grp]:'Grp '+grp;
+    let html='<div style="display:grid;grid-template-columns:1fr auto auto;gap:0;border-top:1px solid rgba(255,255,255,.06);margin-top:6px">';
+    html+='<div style="font-size:10px;color:var(--muted);padding:5px 0 5px 0;font-weight:600">Match</div>'
+         +'<div style="font-size:10px;color:var(--muted);padding:5px 6px;text-align:center;font-weight:600">Round</div>'
+         +'<div style="font-size:10px;color:var(--muted);padding:5px 0;text-align:right;font-weight:600">Won</div>';
     matches.forEach(m=>{
       const myP=(PREDS[m.id]||[]).find(p=>p.username===username);
-      html+='<div onclick="toggleMatchSheet(\''+m.id+'\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06)">'
-        +'<div style="font-size:12px;font-weight:600">'+m.home_flag+m.home+' <span style="color:var(--gold)">'+m.result_home+'\u2013'+m.result_away+'</span> '+m.away+m.away_flag+'</div>'
-        +'<div style="display:flex;align-items:center;gap:6px">'
-          +'<span style="font-size:11px;color:var(--muted)">'+(myP?myP.pred_home+'\u2013'+myP.pred_away:'')+'</span>'
-          +'<span style="color:rgba(255,255,255,.25);font-size:13px">&#x203a;</span>'
+      const won=(m.resolved_winners||[]).includes(username);
+      const wonAmt=won?m.resolved_share:0;
+      const wonColor=wonAmt>0?'var(--success)':'var(--red)';
+      const wonStr=wonAmt>0?'+₹'+wonAmt:'-₹'+betFor(m);
+      html+='<div onclick="toggleMatchSheet(\''+m.id+'\')" style="cursor:pointer;display:contents">'
+        +'<div style="font-size:11px;font-weight:500;padding:7px 0;border-top:1px solid rgba(255,255,255,.05)">'
+          +m.home_flag+m.home+' <span style="color:var(--gold)">'+m.result_home+'–'+m.result_away+'</span> '+m.away+m.away_flag
+          +(myP?'<span style="font-size:10px;color:rgba(255,255,255,.35);margin-left:4px">('+myP.pred_home+'–'+myP.pred_away+')</span>':'')
         +'</div>'
+        +'<div style="font-size:10px;color:var(--muted);padding:7px 6px;text-align:center;border-top:1px solid rgba(255,255,255,.05)">'+groupLabel(m.grp)+'</div>'
+        +'<div style="font-size:11px;font-weight:600;color:'+wonColor+';padding:7px 0;text-align:right;border-top:1px solid rgba(255,255,255,.05)">'+wonStr+'</div>'
       +'</div>';
     });
+    html+='</div>';
     el.innerHTML=html;
   }, 50);
 }
@@ -1430,19 +1452,28 @@ function renderLB(){
     const mostSkipped=playerStats.reduce((a,b)=>b.skipped>a.skipped?b:a,playerStats[0]);
     // Build candidate stories, then pick 2 with different players where possible
     const candidates=[];
+    // Always start with who's leading — most relevant story for everyone
+    if(sortedMembers.length>0){
+      const leader=sortedMembers[0];
+      const ls=calcRoundStats(leader.username);
+      if(ls.overall.pl>0) candidates.push({icon:'🏆',text:'<strong>'+esc(leader.username)+'</strong> leads the table at '+fmtPct(plPct(ls.overall.bet,ls.overall.won)),player:leader.username,priority:0});
+    }
     if(bestStreak.streak>1) candidates.push({icon:'🔥',text:'<strong>'+esc(bestStreak.u.username)+'</strong> is on a <strong>'+bestStreak.streak+'-match winning streak</strong>',player:bestStreak.u.username,priority:1});
     if(mostExact.exact>0) candidates.push({icon:'🎯',text:'<strong>'+esc(mostExact.u.username)+'</strong> has '+mostExact.exact+' exact score'+(mostExact.exact!==1?'s':'')+' — the hardest call in football',player:mostExact.u.username,priority:2});
     if(bigWinner.biggestWin>0) candidates.push({icon:'💰',text:'<strong>'+esc(bigWinner.u.username)+'</strong> won the biggest single pot: <strong>₹'+bigWinner.biggestWin+'</strong>',player:bigWinner.u.username,priority:3});
-    if(boldest.participated>0&&sortedMembers.length>1&&boldest.participated===Math.max(...playerStats.map(p=>p.participated))) candidates.push({icon:'⚡',text:'<strong>'+esc(boldest.u.username)+'</strong> hasn’t missed a match — '+boldest.participated+' predictions placed',player:boldest.u.username,priority:4});
+    if(boldest.participated>0&&sortedMembers.length>1&&boldest.participated===Math.max(...playerStats.map(p=>p.participated))) candidates.push({icon:'⚡',text:'<strong>'+esc(boldest.u.username)+'</strong> hasn\'t missed a match — '+boldest.participated+' predictions placed',player:boldest.u.username,priority:4});
     if(mostSkipped.skipped>2) candidates.push({icon:'👻',text:'<strong>'+esc(mostSkipped.u.username)+'</strong> has skipped '+mostSkipped.skipped+' matches',player:mostSkipped.u.username,priority:5});
-    // Pick top 2, preferring different players
+    // Pick top 2, strongly preferring different players
     const seen=new Set();
     for(const c of candidates){
       if(stories.length>=2) break;
-      if(!seen.has(c.player)||stories.length===1&&seen.size===1) {seen.add(c.player);stories.push(c);}
+      if(!seen.has(c.player)){seen.add(c.player);stories.push(c);}
     }
-    // If still only 1 story (all same player), allow a second from same player
-    if(stories.length<2&&candidates.length>1) stories.push(candidates[1]);
+    // Fallback: same player ok only if no variety available
+    if(stories.length<2&&candidates.length>stories.length){
+      const next=candidates.find(c=>!stories.includes(c));
+      if(next) stories.push(next);
+    }
     if(stories.length){
       const top=stories.slice(0,2); // max 2 stories
       storyHtml='<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px">'
@@ -1997,7 +2028,7 @@ function renderHowTo(){
     ${faqHTML}
 
     <div style="text-align:center;padding:24px 0 8px;margin-top:14px;border-top:1px solid var(--border)">
-      <button onclick="showAboutPopup()" style="background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;padding:8px 16px;cursor:pointer;touch-action:manipulation">ℹ️ About this app</button>
+      <button onclick="showAboutPopup()" style="background:var(--gold);color:var(--dark);border:none;border-radius:8px;padding:6px 18px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation">ℹ️ About this app</button>
     </div>
   `;
 }
