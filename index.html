@@ -276,7 +276,6 @@
     <div class="tab"     onclick="goTab('groups')">Tournament</div>
     <div class="tab"     onclick="goTab('league')">League</div>
     <div class="tab"     onclick="goTab('admin')">Admin</div>
-    <div class="tab"     onclick="goTab('about')">About</div>
   </div>
 
   <div id="pane-howto"   class="pane"></div>
@@ -294,7 +293,6 @@
   <div id="pane-groups"  class="pane"><div class="loading"><div class="spinner"></div></div></div>
   <div id="pane-league"  class="pane"><div class="loading"><div class="spinner"></div></div></div>
   <div id="pane-admin"   class="pane"><div class="loading"><div class="spinner"></div></div></div>
-  <div id="pane-about"   class="pane"></div>
 <!-- SCORECARD MODAL -->
 <div class="modal-overlay" id="score-modal" onclick="closeModal(event)">
   <div class="modal-box">
@@ -313,6 +311,18 @@
     </div>
     <div id="ms-body"></div>
     <button class="sheet-close-btn" onclick="closeMatchSheet()">Close</button>
+  </div>
+
+  <!-- Generic info modal (used for About, Bold announcement, etc.) -->
+  <div class="modal-overlay" id="info-modal" onclick="maybeCloseInfoModal(event)" style="z-index:1001">
+    <div class="modal-box">
+      <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between">
+        <div class="modal-title" id="info-modal-title"></div>
+        <button style="background:transparent;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0;line-height:1" onclick="closeInfoModal()">&#x2715;</button>
+      </div>
+      <div id="info-modal-body"></div>
+      <button class="sheet-close-btn" onclick="closeInfoModal()">Close</button>
+    </div>
   </div>
 
 
@@ -548,6 +558,8 @@ async function launchApp(user){
   await loadAll();
   goTab(smartLanding()); // context-aware landing tab
   startLivePolling(); // begin live score polling
+  // Show Bold Pick announcement once when knockouts begin (Jul 10 2026 onwards)
+  setTimeout(()=>maybeShowBoldAnnouncement(), 600);
 }
 
 async function loadAll(){
@@ -596,7 +608,7 @@ async function refreshMe(){
 
 // ── Tab routing ────────────────────────────────────────────────
 function goTab(t){
-  const names=['howto','lb','matches','groups','league','admin','about'];
+  const names=['howto','lb','matches','groups','league','admin'];
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('on',names[i]===t));
   document.querySelectorAll('.pane').forEach((el,i)=>el.classList.toggle('on',names[i]===t));
   if(t==='matches')renderMatches();
@@ -605,7 +617,6 @@ function goTab(t){
   if(t==='groups')renderGroups();
   if(t==='howto')renderHowTo();
   if(t==='admin')renderAdmin();
-  if(t==='about')renderAbout();
 }
 
 // ── Net balance helper ─────────────────────────────────────────
@@ -1978,6 +1989,10 @@ function renderHowTo(){
       <button onclick="htpClassic()" style="background:transparent;border:none;font-size:11px;color:rgba(255,255,255,.3);cursor:pointer;padding:0">View full guide</button>
     </div>
     ${faqHTML}
+
+    <div style="text-align:center;padding:24px 0 8px;margin-top:14px;border-top:1px solid var(--border)">
+      <button onclick="showAboutPopup()" style="background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;padding:8px 16px;cursor:pointer;touch-action:manipulation">ℹ️ About this app</button>
+    </div>
   `;
 }
 
@@ -1992,6 +2007,120 @@ function htpClassic(){
   // Fallback to the original full-text guide
   window._htpClassic=true;
   renderHowToClassic();
+}
+
+// ════════════════════════════════════════════════════════════════
+//  INFO MODAL — generic popup (About, Bold announcement, etc.)
+// ════════════════════════════════════════════════════════════════
+function showInfoModal(title, bodyHtml){
+  document.getElementById('info-modal-title').textContent=title;
+  document.getElementById('info-modal-body').innerHTML=bodyHtml;
+  document.getElementById('info-modal').classList.add('open');
+}
+function closeInfoModal(){
+  document.getElementById('info-modal').classList.remove('open');
+}
+function maybeCloseInfoModal(e){
+  if(e.target.id==='info-modal') closeInfoModal();
+}
+
+function showAboutPopup(){
+  showInfoModal('About', _aboutContentHtml());
+}
+
+function _aboutContentHtml(){
+  return `
+  <div style="font-size:22px;margin-bottom:10px;text-align:center">🤖⚽</div>
+  <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:8px">What is FIFA 2026 Fantasy Predictor?</div>
+  <div style="font-size:13px;line-height:1.7;color:var(--text);margin-bottom:14px">
+    A friend-group betting app built for the FIFA World Cup 2026.
+    Predict scorelines, win pots, track your league — all without touching a casino or a spreadsheet.
+  </div>
+
+  <div style="font-size:14px;font-weight:700;color:var(--gold);margin-bottom:6px">How was it made?</div>
+  <div style="font-size:12px;line-height:1.7;color:var(--muted);margin-bottom:10px">
+    Every line of this app — UI, scoring engine, database schema, the works — was written in conversation with
+    <strong style="color:var(--text)">Claude</strong> (Anthropic's AI). No traditional coding IDE. No Stack Overflow rabbit holes. Just a long, iterative chat where one person described what they wanted and Claude figured out how to build it.
+  </div>
+  <div style="font-size:12px;line-height:1.7;color:var(--muted);margin-bottom:14px">
+    The entire app lives in a <strong style="color:var(--text)">single HTML file</strong>. Zero build tools, zero deployment pipelines. Just one file pushed to GitHub Pages.
+  </div>
+
+  <div style="font-size:14px;font-weight:700;color:var(--gold);margin-bottom:8px">Tech stack</div>
+  <div style="font-size:12px;line-height:1.7;color:var(--muted);margin-bottom:14px">
+    <div style="margin-bottom:6px">🏗️ <strong style="color:var(--text)">Single HTML file</strong> · vanilla JS, CSS variables, no frameworks</div>
+    <div style="margin-bottom:6px">🗄️ <strong style="color:var(--text)">Supabase</strong> · Postgres database, free tier, no backend server</div>
+    <div style="margin-bottom:6px">🚀 <strong style="color:var(--text)">GitHub Pages</strong> · free static hosting</div>
+    <div>🤖 <strong style="color:var(--text)">Claude</strong> · entire codebase written through conversation</div>
+  </div>
+
+  <div style="text-align:center;padding:14px 0 4px;border-top:1px solid var(--border)">
+    <div style="font-size:13px;color:var(--text);font-weight:500">Made by prasun8463@gmail.com (Prasun NAG)</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:4px">with 🤖 + ☕ + ⚽</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px">WC2026 Fantasy Predictor · ${new Date().getFullYear()}</div>
+  </div>
+  `;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  BOLD PICK ANNOUNCEMENT — shown once when knockouts begin
+// ════════════════════════════════════════════════════════════════
+function maybeShowBoldAnnouncement(){
+  // Show ONCE when knockouts have started (any non-TBD knockout match dated today/past).
+  // Gates: not seen yet, MATCHES loaded, user is in a league, has placed >=1 prediction overall.
+  if(localStorage.getItem('wc2026_bold_seen')) return;
+  if(!MATCHES||!MATCHES.length||!ME) return;
+  const istNow=new Date(Date.now()+IST_OFFSET_MS);
+  const todayKey=(istNow.getUTCMonth()+1)*100+istNow.getUTCDate();
+  const knockoutStarted=MATCHES.some(m=>{
+    if(!isKnockout(m)) return false;
+    if(m.home==='TBD'||m.away==='TBD') return false;
+    return dateKey(m.match_date)<=todayKey;
+  });
+  if(!knockoutStarted) return;
+  // Skip for total newcomers — only show to engaged players
+  const myPredCount=Object.values(PREDS||{}).reduce((n,arr)=>n+(arr||[]).filter(p=>p.username===ME.username).length,0);
+  if(myPredCount<1) return;
+
+  localStorage.setItem('wc2026_bold_seen','1');
+  showInfoModal('🔥 New: Bold Pick — knockouts only', _boldAnnouncementHtml());
+}
+
+function _boldAnnouncementHtml(){
+  return `
+  <div style="background:linear-gradient(135deg,rgba(212,160,23,.12),rgba(212,160,23,.03));border:1px solid rgba(212,160,23,.4);border-radius:12px;padding:18px;margin-bottom:14px;text-align:center">
+    <div style="font-size:42px;margin-bottom:6px">🔥</div>
+    <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:4px">Bold Pick has unlocked</div>
+    <div style="font-size:12px;color:var(--muted)">Knockout stages only · One per stage</div>
+  </div>
+
+  <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px">How it works</div>
+  <div style="font-size:13px;line-height:1.7;color:var(--muted);margin-bottom:14px">
+    On any knockout match, you can mark your prediction as a <strong style="color:var(--gold)">Bold Pick</strong>. If your <strong style="color:var(--text)">exact score</strong> wins, you take the <strong style="color:var(--text)">whole pot</strong> — no splitting with other exact pickers. If you miss, your loss is unchanged.
+  </div>
+
+  <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px">
+    <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px">Example</div>
+    <div style="font-size:11px;line-height:1.7;color:var(--muted)">
+      Brazil vs France · 4 players × ₹500 = ₹2,000 pot.<br>
+      You go <strong style="color:var(--gold)">🔥 Bold</strong> on 2-1. test1 also picks 2-1 (no bold).<br>
+      Result: <strong style="color:var(--text)">2-1</strong> → <strong style="color:var(--success)">You take the full ₹2,000</strong>. test1 gets ₹0.<br>
+      <span style="opacity:.7">Without bold, you'd have split: ₹1,000 each.</span>
+    </div>
+  </div>
+
+  <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px">The catch</div>
+  <ul style="font-size:13px;line-height:1.8;color:var(--muted);padding-left:20px;margin-bottom:14px">
+    <li><strong style="color:var(--text)">One bold per stage</strong> — R32, R16, QF, SF/Final</li>
+    <li>If multiple players bold the same exact score, they split — bolds compete first</li>
+    <li>Outcome wins (right team, wrong score) ignore the bold flag entirely</li>
+    <li>Pick the match where you're most confident in the <em>exact score</em>, not just the winner</li>
+  </ul>
+
+  <div style="background:rgba(55,138,221,.06);border:1px solid rgba(55,138,221,.2);border-radius:8px;padding:11px 13px;font-size:12px;color:var(--muted)">
+    💡 <strong style="color:var(--text)">Strategy tip</strong> — save your bold for the match where you have a strong gut feeling on a specific score that others might miss. A 3-2 or 2-1 in a tight QF is more likely to be uniquely yours than an obvious 1-0.
+  </div>
+  `;
 }
 
 
@@ -3140,70 +3269,6 @@ function applyInviteParam(){
   }
 })();
 
-function renderAbout(){
-  const el=document.getElementById('pane-about');
-  if(el.innerHTML.trim())return;
-  el.innerHTML=`
-  <div class="sec">FIFA 2026 Predictor</div>
-
-  <div class="card" style="margin-bottom:10px">
-    <div style="font-size:22px;margin-bottom:10px">🤖⚽</div>
-    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:8px">What is FIFA 2026 Fantasy Predictor?</div>
-    <div style="font-size:13px;line-height:1.8;color:var(--text)">
-      WC2026 Fantasy Predictor is a friend-group betting app built for the FIFA World Cup 2026.
-      Predict scorelines, win pots, track your league — all without touching a casino or a spreadsheet.
-    </div>
-  </div>
-
-  <div class="card" style="margin-bottom:10px">
-    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:8px">How was it made?</div>
-    <div style="font-size:13px;line-height:1.8;color:var(--text)">
-      Every single line of this app — the UI, the scoring engine, the database schema, the SQL resets,
-      the prediction visibility rules, the bracket diagram — was written in conversation with
-      <strong style="color:var(--gold)">Claude</strong> (Anthropic's AI). No traditional coding IDE.
-      No Stack Overflow rabbit holes. Just a long, iterative chat where one person described what they wanted
-      and Claude figured out how to build it.
-    </div>
-    <div style="font-size:13px;line-height:1.8;color:var(--text);margin-top:8px">
-      The entire app lives in a <strong style="color:var(--gold)">single HTML file</strong>. 
-      That was a deliberate choice — zero build tools, zero deployment pipelines, zero DevOps drama.
-      Just one file pushed to GitHub Pages and it's live for everyone.
-    </div>
-  </div>
-
-  <div class="card" style="margin-bottom:10px">
-    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:12px">The tech stack</div>
-    <div style="display:flex;flex-direction:column;gap:8px">
-      <div style="display:flex;align-items:flex-start;gap:12px">
-        <div style="font-size:20px;flex-shrink:0">🏗️</div>
-        <div><div style="font-size:13px;font-weight:600;color:var(--text)">Single HTML file</div>
-        <div style="font-size:12px;color:var(--muted)">Vanilla JS, CSS variables, no frameworks, no build step. Deployable anywhere that serves static files.</div></div>
-      </div>
-      <div style="display:flex;align-items:flex-start;gap:12px">
-        <div style="font-size:20px;flex-shrink:0">🗄️</div>
-        <div><div style="font-size:13px;font-weight:600;color:var(--text)">Supabase</div>
-        <div style="font-size:12px;color:var(--muted)">Postgres database in the cloud. Handles all match data, user accounts, predictions and league membership. Free tier, no backend server needed.</div></div>
-      </div>
-      <div style="display:flex;align-items:flex-start;gap:12px">
-        <div style="font-size:20px;flex-shrink:0">🚀</div>
-        <div><div style="font-size:13px;font-weight:600;color:var(--text)">GitHub Pages</div>
-        <div style="font-size:12px;color:var(--muted)">Free hosting. Push the HTML file, wait 60 seconds, it's live at a public URL. Every update is a git commit.</div></div>
-      </div>
-      <div style="display:flex;align-items:flex-start;gap:12px">
-        <div style="font-size:20px;flex-shrink:0">🤖</div>
-        <div><div style="font-size:13px;font-weight:600;color:var(--text)">Claude (claude.ai)</div>
-        <div style="font-size:12px;color:var(--muted)">The entire codebase was written through conversation. Requirements described in plain English, code delivered in seconds, bugs fixed by describing the symptom. No prior web dev experience required.</div></div>
-      </div>
-    </div>
-  </div>
-
-
-  <div style="text-align:center;padding:20px 0 10px">
-    <div style="font-size:13px;color:var(--muted)">Made with 🤖 + ☕ + ⚽</div>
-    <div style="font-size:11px;color:var(--muted);margin-top:4px">WC2026 Fantasy Predictor · ${new Date().getFullYear()}</div>
-  </div>
-  `;
-}
 
 </script>
 </body>
