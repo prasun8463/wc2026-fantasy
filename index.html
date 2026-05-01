@@ -303,6 +303,8 @@
     <button class="sheet-close-btn" onclick="document.getElementById('score-modal').classList.remove('open')">Close</button>
   </div>
 </div>
+
+
 <div class="modal-overlay" id="match-sheet" onclick="maybeCloseMatchSheet(event)">
   <div class="modal-box">
     <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between">
@@ -312,18 +314,19 @@
     <div id="ms-body"></div>
     <button class="sheet-close-btn" onclick="closeMatchSheet()">Close</button>
   </div>
+</div>
 
-  <!-- Generic info modal (used for About, Bold announcement, etc.) -->
-  <div class="modal-overlay" id="info-modal" onclick="maybeCloseInfoModal(event)" style="z-index:1001">
-    <div class="modal-box">
-      <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between">
-        <div class="modal-title" id="info-modal-title"></div>
-        <button style="background:transparent;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0;line-height:1" onclick="closeInfoModal()">&#x2715;</button>
-      </div>
-      <div id="info-modal-body"></div>
-      <button class="sheet-close-btn" onclick="closeInfoModal()">Close</button>
+<!-- Generic info modal (used for About, Bold announcement, etc.) -->
+<div class="modal-overlay" id="info-modal" onclick="maybeCloseInfoModal(event)" style="z-index:1001">
+  <div class="modal-box">
+    <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between">
+      <div class="modal-title" id="info-modal-title"></div>
+      <button style="background:transparent;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0;line-height:1" onclick="closeInfoModal()">&#x2715;</button>
     </div>
+    <div id="info-modal-body"></div>
+    <button class="sheet-close-btn" onclick="closeInfoModal()">Close</button>
   </div>
+</div>
 
 
 <script>
@@ -899,12 +902,15 @@ function renderMatchList(){
 let activeMatchId=null;
 function toggleMatchSheet(mid){
   if(activeMatchId===mid){ closeMatchSheet(); return; }
+  // Clear only the previously highlighted row (not all rows)
+  if(activeMatchId){
+    const prev=document.getElementById('mr_'+activeMatchId);
+    if(prev) prev.style.borderColor='';
+  }
   activeMatchId=mid;
-  document.querySelectorAll('.mrow').forEach(r=>r.style.borderColor='');
   const row=document.getElementById('mr_'+mid);
   if(row) row.style.borderColor='rgba(212,160,23,.5)';
-  // Show sheet immediately with spinner, then fill content
-  // This makes the tap feel instant on iOS Safari
+  // Show sheet immediately with spinner — makes tap feel instant on iOS Safari
   document.getElementById('match-sheet').classList.add('open');
   document.getElementById('ms-title').textContent='Loading...';
   document.getElementById('ms-body').innerHTML='<div class="loading"><div class="spinner"></div></div>';
@@ -3268,7 +3274,6 @@ function applyInviteParam(){
     localStorage.removeItem('wc2026_user'); setAuthLoading(false); applyInviteParam();
   }
 })();
-
 
 </script>
 </body>
