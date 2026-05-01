@@ -1088,11 +1088,14 @@ function openMatchSheet(mid){
     arr.forEach(p=>{
       const isMe=p.username===ME.username;
       const won=(m.resolved_winners||[]).includes(p.username);
-      const tag=won&&m.resolved_type==='exact'?`<span class="rtag rt-exact">Exact</span>`:
-                won&&m.resolved_type==='exact_bold'?`<span class="rtag rt-exact">🔥 Bold</span>`:
-                won&&m.resolved_type==='outcome'?`<span class="rtag rt-outcome">Outcome</span>`:
-                m.resolved_type==='refund'&&won?`<span class="rtag rt-refund">Void</span>`:
-                `<span class="rtag rt-wrong">Wrong</span>`;
+      // Only show outcome tags on fully settled matches — in-progress should be neutral
+      const tag=!m.resolved
+        ? `<span style="font-size:10px;color:var(--muted);padding:2px 6px">–</span>`
+        : won&&m.resolved_type==='exact'?`<span class="rtag rt-exact">Exact</span>`
+        : won&&m.resolved_type==='exact_bold'?`<span class="rtag rt-exact">🔥 Bold</span>`
+        : won&&m.resolved_type==='outcome'?`<span class="rtag rt-outcome">Outcome</span>`
+        : m.resolved_type==='refund'&&won?`<span class="rtag rt-refund">Void</span>`
+        : `<span class="rtag rt-wrong">Wrong</span>`;
       const winAmt=won?`<span style="font-size:11px;color:var(--success);font-weight:600;margin-left:4px">+₹${m.resolved_share}</span>`:'';
       const boldMark=p.bold?'<span style="font-size:9px;color:var(--gold);margin-left:3px" title="Bold pick">🔥</span>':'';
       html+=`<div class="pred-row">
@@ -1321,16 +1324,29 @@ function renderLB(){
   // ── Per-player stats ──
   const playerStats=sortedMembers.map(u=>{
     let exact=0,outcome_win=0,wrong=0,participated=0,skipped=0,biggestWin=0,onStreak=0,streak=0;
-    settledMatches.forEach(m=>{
+    // Sort settled matches chronologically for correct stats/streak
+    const sortedSettled=[...settledMatches].sort((a,b)=>dateKey(a.match_date)-dateKey(b.match_date));
+    sortedSettled.forEach(m=>{
       const myP=(PREDS[m.id]||[]).find(p=>p.username===u.username);
       if(!myP){skipped++;return;}
       participated++;
       const won=(m.resolved_winners||[]).includes(u.username);
-      if(isExactType(m.resolved_type)&&won){exact++;onStreak++;streak=Math.max(streak,onStreak);if(m.resolved_share>biggestWin)biggestWin=m.resolved_share;}
-      else if(m.resolved_type==='outcome'&&won){outcome_win++;onStreak++;streak=Math.max(streak,onStreak);if(m.resolved_share>biggestWin)biggestWin=m.resolved_share;}
-      else if(m.resolved_type==='refund'&&won){onStreak++;}
-      else{wrong++;onStreak=0;}
+      if(isExactType(m.resolved_type)&&won){exact++;if(m.resolved_share>biggestWin)biggestWin=m.resolved_share;}
+      else if(m.resolved_type==='outcome'&&won){outcome_win++;if(m.resolved_share>biggestWin)biggestWin=m.resolved_share;}
+      else if(m.resolved_type==='refund'){}  // refund: neutral, don't count
+      else{wrong++;}
     });
+    // Current streak: count backwards from most recent match where user predicted
+    // Only exact+outcome wins count — refunds and skips break the streak
+    const predSettled=sortedSettled.filter(m=>(PREDS[m.id]||[]).find(p=>p.username===u.username));
+    for(let i=predSettled.length-1;i>=0;i--){
+      const m=predSettled[i];
+      const won=(m.resolved_winners||[]).includes(u.username);
+      const isWin=(isExactType(m.resolved_type)||m.resolved_type==='outcome')&&won;
+      if(isWin) onStreak++;
+      else break; // stop at first non-win (including refunds and losses)
+    }
+    streak=onStreak;
     const acc=participated>0?Math.round(((exact+outcome_win)/participated)*100):0;
     return {u,exact,outcome_win,wrong,participated,skipped,acc,biggestWin,streak};
   });
