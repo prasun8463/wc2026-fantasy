@@ -261,7 +261,7 @@
 ════════════════════════════════════════════ -->
 <div id="s-app" class="screen z">
   <nav>
-    <div class="brand">🏆 FIFA 2026</div>
+    <div class="brand">🏆 FIFA 2026 <button onclick="showAboutPopup()" title="About this app" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0 0 0 4px;opacity:.7;touch-action:manipulation;vertical-align:middle;line-height:1">ℹ️</button></div>
     <div class="nav-right">
       <span id="nav-uname" style="font-size:12px"></span>
       <div class="av" id="nav-av"></div>
@@ -2794,6 +2794,23 @@ function sendWhatsAppReminder(){
   window.open('https://wa.me/?text='+encoded,'_blank');
 }
 
+async function copyReminderMessage(){
+  const matches=getTodayMatches();
+  if(!matches.length){toast('No matches today!');return;}
+  const msg=generateWhatsAppMessage(matches);
+  try{
+    await navigator.clipboard.writeText(msg);
+    toast('✓ Reminder copied — paste into WhatsApp');
+  }catch(e){
+    const ta=document.createElement('textarea');
+    ta.value=msg;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');toast('✓ Reminder copied');}
+    catch(err){toast('Could not copy automatically');}
+    document.body.removeChild(ta);
+  }
+}
+
 function renderAdmin(){
   if(!LEAGUE||LEAGUE.admin_username!==ME.username){
     document.getElementById('pane-admin').innerHTML='<div class="empty" style="padding-top:40px">Only the league admin can access this panel.</div>';
@@ -2814,9 +2831,14 @@ function renderAdmin(){
     <div class="card" style="margin-bottom:4px">
       <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Send today's fixture list to your WhatsApp group</div>
       <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:13px;line-height:1.9;color:var(--text);font-family:monospace;white-space:pre-wrap;margin-bottom:12px">${generateWhatsAppMessage(todayMatches)}</div>
-      <button class="btn btn-gold" onclick="sendWhatsAppReminder()" style="width:auto;padding:10px 20px;font-size:14px">
-        📲 Open in WhatsApp
-      </button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-gold" onclick="sendWhatsAppReminder()" style="width:auto;padding:10px 20px;font-size:14px;touch-action:manipulation">
+          📲 Open in WhatsApp
+        </button>
+        <button onclick="copyReminderMessage()" style="background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;padding:10px 18px;cursor:pointer;font-weight:600;touch-action:manipulation">
+          📋 Copy
+        </button>
+      </div>
     </div>`:`
     <div class="sec">Today's match reminder</div>
     <div class="card" style="text-align:center;color:var(--muted);font-size:13px;padding:20px">
