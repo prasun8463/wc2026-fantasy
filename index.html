@@ -542,12 +542,15 @@ async function doForgot(){
 
 // ── Boot app ───────────────────────────────────────────────────
 function smartLanding(){
-  // First ever login → How to Play stepper
+  // PRE-LAUNCH MODE: always land on How to Play so new friends
+  // get oriented before the real tournament starts in June.
+  // TODO June 11: restore the full logic below (see JUNE_GOLIVE_CHECKLIST Step 19)
+  return 'howto';
+  /* JUNE LOGIC (restore before go-live):
   const seen = localStorage.getItem('wc2026_seen');
   if(!seen){ localStorage.setItem('wc2026_seen','1'); return 'howto'; }
-  // Returning user → always Leaderboard
-  // (action banner on leaderboard links to Matches when needed)
   return 'lb';
+  */
 }
 
 async function launchApp(user){

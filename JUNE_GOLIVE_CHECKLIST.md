@@ -520,3 +520,30 @@ The DB stores `resolved_type='exact_bold'` instead of `exact` when a bold won th
 4. Confirm auto-settle fires ~15 min after PEN status
 
 **Manual fallback if auto-settle misbehaves:** Admin can use the Settle button on the match row with the actual final score (including penalty result, e.g. for a 1-1 match decided 4-3 on penalties, enter 1-1 and let the API status indicate it was PEN).
+
+---
+
+## Step 19 — Restore smart landing tab logic (code change)
+
+Before go-live, restore the context-aware landing in `smartLanding()` in `index.html`.
+
+Find the current pre-launch version:
+```js
+function smartLanding(){
+  // PRE-LAUNCH MODE: always land on How to Play
+  return 'howto';
+  /* JUNE LOGIC (restore before go-live): ...
+```
+
+Replace with:
+```js
+function smartLanding(){
+  // First ever login → How to Play stepper
+  const seen = localStorage.getItem('wc2026_seen');
+  if(!seen){ localStorage.setItem('wc2026_seen','1'); return 'howto'; }
+  // Returning user → always Leaderboard
+  return 'lb';
+}
+```
+
+**Why:** During pre-launch friend testing, every login lands on How to Play so new users are oriented. Once the tournament starts, returning users should land on Leaderboard (more interesting), with How to Play only shown on genuine first logins.
