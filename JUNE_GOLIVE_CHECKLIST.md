@@ -1,12 +1,30 @@
 # WC2026 Fantasy — June Go-Live Checklist
 
-Complete these steps in order before June 11, 2026.
+Complete these steps **in order** before June 11, 2026.
+Steps 1–3 can be done any time now. Steps 4–12 run in sequence on go-live day.
 
 ---
 
-## Step 1 — Schema fixes (run now, safe to re-run)
+## API Keys Reference
 
-In Supabase SQL Editor:
+| Key | Value | Used for |
+|---|---|---|
+| **Supabase URL** | `https://wxolmlxphwieqvyfuyfu.supabase.co` | Database (all reads/writes) |
+| **Supabase Anon Key** | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` | Supabase auth (public key, safe to expose) |
+| **RapidAPI Key** | `9ccccda5ebmsh35908237b362fe4p12568cjsn6a49fb26955c` | Live scores + fixture import |
+| **api-football League ID** | `1` | FIFA World Cup (confirmed valid for v3) |
+| **api-football Season** | `2026` | WC2026 season identifier |
+| **BSD API Key** | _Not yet registered_ | Step 7 (odds-informed 🎲 — build before June 11) |
+
+**Verify RapidAPI key before June 11:** Log in at https://rapidapi.com, confirm the key is active and the account has not hit monthly limits. Free tier = 100 calls/day — shared across live scores and fixture import.
+
+**Fixture data is already live:** api-football has all 104 WC2026 fixtures available now at `league=1&season=2026`. Safe to import any time after Step 5.
+
+---
+
+## PHASE 1 — Schema & config (do now, safe to re-run any time)
+
+### Step 1 — Schema fixes
 
 ```sql
 -- 1a. Unique constraint on predictions
@@ -23,335 +41,81 @@ BEGIN
 END $$;
 
 -- 1b. Disable RLS on predictions
--- App uses custom auth (not Supabase Auth) — RLS was blocking deletes
+-- App uses custom auth — RLS was blocking deletes
 ALTER TABLE predictions DISABLE ROW LEVEL SECURITY;
+
+-- 1c. Bold Pick column (knockout feature)
+ALTER TABLE predictions ADD COLUMN IF NOT EXISTS bold BOOLEAN DEFAULT false;
+
+-- 1d. PROD_MODE column on leagues
+ALTER TABLE leagues ADD COLUMN IF NOT EXISTS prod_mode BOOLEAN DEFAULT false;
+
+-- 1e. api_fixture_id (needed for odds feature in Step 7)
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS api_fixture_id INTEGER;
+
+-- 1f. Verify all columns exist
+SELECT column_name FROM information_schema.columns
+WHERE table_name = 'predictions' AND column_name IN ('bold','match_id','username','pred_home','pred_away');
+
+SELECT column_name FROM information_schema.columns
+WHERE table_name = 'matches' AND column_name = 'api_fixture_id';
+
+SELECT column_name FROM information_schema.columns
+WHERE table_name = 'leagues' AND column_name = 'prod_mode';
 ```
 
----
-
-## Step 2 — Bet amounts (run now)
+### Step 2 — Bet amounts
 
 ```sql
 UPDATE leagues
 SET bet_amount = '{"group":100,"r32":200,"r16":300,"qf":500,"sf":800}'
-WHERE name = 'prasun84''s League';
-```
-
-Rationale:
-- Group: ₹100 base × 40 matches = ₹4,000 total exposure
-- Knockout stages scale by scarcity — QF pot = ₹4,000, Final pot = ₹8,000+
-- A single correct Final prediction can swing the leaderboard completely
-
----
-
-## Step 3 — Reset all April test data
-
-Run this when April testing is fully done, right before inviting real users.
-
-```sql
--- 3a. Clear all predictions
-DELETE FROM predictions;
-
--- 3b. Reset user balances
-UPDATE users SET spent = 0, earned = 0;
-
--- 3c. Unsettle all matches (keep fixtures, wipe results)
-UPDATE matches SET
-  resolved         = false,
-  result_home      = null,
-  result_away      = null,
-  resolved_pot     = null,
-  resolved_share   = null,
-  resolved_type    = null,
-  resolved_winners = null
-WHERE resolved = true;
-
--- 3d. Delete April test fixtures
-DELETE FROM matches WHERE match_date LIKE 'Apr%';
-```
-
----
-
-## Step 4 — Import real fixtures (in the app)
-
-1. Open the app, log in as admin
-2. Go to **Admin tab → "Import WC2026 fixtures from API"**
-3. Tap **⬇ Import WC2026 fixtures**
-4. Wait for success message: "✓ Imported 104 fixtures"
-
-Notes:
-- Fetches all 104 WC2026 fixtures from api-football (league=1, season=2026)
-- Upserts with correct IST kickoff times and group codes (A–L, R32, R16, QF, SF, Final)
-- Safe to re-run — upsert not insert, no duplicates
-- If API doesn't have data yet, it will say so — re-try closer to June 11
-
----
-
-## Step 5 — Enable PROD_MODE (SQL only, no code change needed)
-
-```sql
--- Add prod_mode column if it doesn't exist
-ALTER TABLE leagues ADD COLUMN IF NOT EXISTS prod_mode BOOLEAN DEFAULT false;
-
--- Flip to true before June go-live
-UPDATE leagues SET prod_mode = true WHERE name = 'prasun84''s League';
+WHERE name = 'HSBC Friends League';
 
 -- Verify
-SELECT name, prod_mode FROM leagues;
-```
-
-`prod_mode` is read from the DB at login — no code push needed, takes effect immediately on next page load.
-
-This single flag:
-- ✅ Removes random Settle button from matches tab (shows "⚡ Auto-settling" instead)
-- ✅ Removes random Settle button from admin tab (shows "⚡ Will auto-settle via API")
-- ✅ Keeps manual Settle in admin for edge cases (e.g. API score available but auto-settle hasn't fired)
-- ✅ Sets auto-settle delay to 15 mins after FT (covers VAR/extra time wrap-up)
-
-To roll back (e.g. during testing):
-```sql
-UPDATE leagues SET prod_mode = false WHERE name = 'prasun84''s League';
-```
-
----
-
-## Step 6 — Verify clean state
-
-```sql
--- All should show clean / expected values
 SELECT name, bet_amount FROM leagues;
-SELECT username, spent, earned FROM users ORDER BY username;
-SELECT COUNT(*) AS predictions FROM predictions;
-SELECT COUNT(*) AS total_matches,
-       COUNT(*) FILTER (WHERE resolved) AS settled
-FROM matches;
-SELECT grp, COUNT(*) AS matches
-FROM matches
-GROUP BY grp
-ORDER BY grp;
 ```
 
-Expected:
-- `bet_amount` = `{"group":100,"r32":200,"r16":300,"qf":500,"sf":800}`
-- All users: `spent = 0`, `earned = 0`
-- `predictions` = 0
-- `total_matches` = 104, `settled` = 0
-- Groups A–L: 4 matches each (48 total) + R32: 16 + R16: 8 + QF: 4 + SF: 2 + Final: 1 = 79 knockout + 48 group = but knockouts are TBD until group stage ends
+Rationale: Group ₹100 × ~40 matches = ₹4,000 exposure. QF pot = ₹4,000. Final pot = ₹8,000+. A single correct Final prediction reshuffles the entire leaderboard.
 
 ---
 
-## Auto-settle flow (June, already in code)
+## PHASE 2 — Reset test data (when April/May testing is fully done)
 
-No action needed — this runs automatically:
+Run these **in order**, right before inviting real users.
 
-1. Live polling runs every 5 mins during match windows (admin must be logged in)
-2. API returns `FT` / `AET` / `PEN` → timestamp recorded
-3. **15 minutes later** → `autoSettleFinished()` runs
-4. Settles with real API score via `settleWithScore()`
-5. `loadAll()` + `renderAll()` fires → leaderboard, stage breakdown, recent results all update
-6. Toast shown to admin: "✓ Auto-settled: Brazil 2–1 France"
-
-> **Important:** Keep the app open on match days (admin account) for auto-settle to fire.
-> If the admin session is closed, matches can still be manually settled via Admin tab
-> once the real FT score is visible.
-
----
-
-## RapidAPI key check
-
-Verify the key in `index.html` is still active before June 11:
-
-```
-Key: 9ccccda5ebmsh35908237b362fe4p12568cjsn6a49fb26955c
-Host: api-football-v1.p.rapidapi.com
-League: 1 (FIFA World Cup)
-Season: 2026
-```
-
-Test at: https://rapidapi.com/api-sports/api/api-football
-
----
-
-## Step 7 — Odds-informed 🎲 prediction hint (build before June 11)
-
-### What it does
-The 🎲 Random button in the predict form currently generates a purely weighted random score. From June, it should suggest a score informed by real market odds — so a user who doesn't know the matchup gets a sensible starting point, not just noise.
-
-### API choice: BSD (Bzzoiro Sports Data)
-- Free, no rate limits, no credit card: https://sports.bzzoiro.com
-- Returns 1X2 odds (home win / draw / away win) for all upcoming matches
-- Multi-bookmaker aggregated — more reliable than a single bookmaker
-- No fixture ID mapping needed — matches by team name
-
-### Architecture: fetch once, cache for session
-One API call at login (or first 🎲 tap) fetches all upcoming WC2026 matches with odds. Cached in memory as `ODDS_CACHE`. Every subsequent 🎲 tap reads from cache — zero additional API calls. No quota risk.
-
-### Implementation plan
-
-**1. Fetch and cache odds at session start (add to `launchApp`):**
-```javascript
-let ODDS_CACHE = {}; // { 'TeamA_TeamB': { home, draw, away } }
-
-async function fetchOddsCache(){
-  try {
-    const res = await fetch('https://sports.bzzoiro.com/api/events/?sport=soccer', {
-      headers: { 'Authorization': 'Token YOUR_BSD_KEY' }
-    });
-    const data = await res.json();
-    (data.results || []).forEach(e => {
-      if(!e.odds_home) return;
-      const key = e.home_team + '_' + e.away_team;
-      ODDS_CACHE[key] = {
-        home: parseFloat(e.odds_home),
-        draw: parseFloat(e.odds_draw),
-        away: parseFloat(e.odds_away)
-      };
-    });
-    console.log('Odds cache loaded:', Object.keys(ODDS_CACHE).length, 'matches');
-  } catch(err) {
-    console.log('Odds fetch failed, using random fallback:', err.message);
-  }
-}
-```
-
-**2. Replace `randomFillPred` with odds-aware version:**
-```javascript
-function randomFillPred(mid){
-  const m = MATCHES.find(x => x.id === mid);
-  const oddsKey = Object.keys(ODDS_CACHE).find(k => {
-    const [h, a] = k.split('_');
-    return m.home.includes(h) || h.includes(m.home);
-  });
-  const odds = oddsKey ? ODDS_CACHE[oddsKey] : null;
-
-  let h, a;
-  if(odds){
-    // Convert to implied probabilities (remove bookmaker margin)
-    const raw = [1/odds.home, 1/odds.draw, 1/odds.away];
-    const total = raw.reduce((s,v) => s+v, 0);
-    const [pH, pD, pA] = raw.map(v => v/total);
-
-    // Pick outcome based on probability
-    const r = Math.random();
-    let outcome;
-    if(r < pH) outcome = 'home';
-    else if(r < pH + pD) outcome = 'draw';
-    else outcome = 'away';
-
-    // Generate realistic score for that outcome
-    [h, a] = scoreForOutcome(outcome);
-    // Flash with odds label
-    showOddsHint(mid, odds, outcome);
-  } else {
-    [h, a] = randomScore(); // weighted random fallback
-  }
-
-  document.getElementById('sh_ph_'+mid).value = h;
-  document.getElementById('sh_pa_'+mid).value = a;
-  [document.getElementById('sh_ph_'+mid), document.getElementById('sh_pa_'+mid)].forEach(el => {
-    if(!el) return;
-    el.style.borderColor = 'rgba(212,160,23,.7)';
-    setTimeout(() => el.style.borderColor = '', 600);
-  });
-}
-
-function scoreForOutcome(outcome){
-  const homeWin = [[1,0,15],[2,0,12],[2,1,14],[3,0,7],[3,1,8],[3,2,5],[1,0,15]];
-  const draw    = [[0,0,20],[1,1,35],[2,2,15],[3,3,5]];
-  const awayWin = [[0,1,15],[0,2,12],[1,2,14],[0,3,7],[1,3,8],[2,3,5]];
-  const weights = outcome==='home'?homeWin : outcome==='draw'?draw : awayWin;
-  const total = weights.reduce((s,w) => s+w[2], 0);
-  let r = Math.floor(Math.random()*total);
-  for(const [h,a,w] of weights){ r-=w; if(r<0) return [h,a]; }
-  return [1,0];
-}
-
-function showOddsHint(mid, odds, chosenOutcome){
-  const el = document.getElementById('sh_odds_hint_'+mid);
-  if(!el) return;
-  const fmt = v => (v > 0 ? '+' : '') + Math.round(v) + '%';
-  const raw = [1/odds.home, 1/odds.draw, 1/odds.away];
-  const total = raw.reduce((s,v) => s+v, 0);
-  const [pH, pD, pA] = raw.map(v => Math.round(v/total*100));
-  el.innerHTML = `<span style="font-size:10px;color:var(--muted)">📊 Market odds · `
-    + `<span style="${chosenOutcome==='home'?'color:var(--gold)':''}">H ${pH}%</span> · `
-    + `<span style="${chosenOutcome==='draw'?'color:var(--gold)':''}">D ${pD}%</span> · `
-    + `<span style="${chosenOutcome==='away'?'color:var(--gold)':''}">A ${pA}%</span></span>`;
-}
-```
-
-**3. Add odds hint placeholder to predict form (inside `openMatchSheet`):**
-```javascript
-// Add this div after the score inputs, before the buttons
-`<div id="sh_odds_hint_${mid}" style="margin-top:6px;min-height:16px"></div>`
-```
-
-**4. Call `fetchOddsCache()` in `launchApp` after `loadAll()`:**
-```javascript
-await loadAll();
-if(PROD_MODE) fetchOddsCache(); // only in June — no data in April
-goTab('matches');
-```
-
-### BSD API key
-Register at https://sports.bzzoiro.com — free, instant, no card needed.
-Store key in the same config section as the RapidAPI key in `index.html`.
-
-### Fallback behaviour
-- If BSD fetch fails (network error, key issue) → silent fallback to weighted random
-- If match not found in cache (e.g. knockout fixture teams TBD) → weighted random
-- April testing (`PROD_MODE = false`) → always weighted random, BSD never called
-
-### UX result
-User taps 🎲 on "Brazil vs France" → sees 2–1 pre-filled with `📊 Market odds · H 52% · D 27% · A 21%` below the inputs → can accept or adjust → taps Predict. Informed but not prescriptive.
-
----
-
-## Step 8 — Clean up test users before inviting real users
-
-After resetting match/prediction data in Step 3, also clean up test accounts:
+### Step 3 — Delete test users
 
 ```sql
--- View current test users (adjust usernames as needed)
+-- Check who's in the DB first
 SELECT username, email, earned, spent FROM users ORDER BY username;
 
--- Delete test accounts (keep only real admin account)
+-- Delete test accounts (keep only prasun84)
 DELETE FROM users WHERE username IN ('test1','test2','test3');
 
--- If test users have a league, their removal orphans predictions — already cleared in Step 3
--- Verify only real users remain
+-- Verify
 SELECT username, email FROM users;
 ```
 
-> **Note:** Real users will register themselves via the app using your league invite code. Don't pre-create their accounts.
+> Real users will register via invite code — do not pre-create accounts.
 
----
-
-## Step 9 — Reset localStorage for first-run experience
-
-Real users on new devices will automatically get the How to Play stepper (first login detection via `wc2026_seen` key in localStorage). However if you are testing on the same device/browser used for April testing, clear your own localStorage first so you see what real users see:
-
-In Safari console (Develop → Show JavaScript Console):
-```js
-// Clear all WC2026 app keys
-Object.keys(localStorage)
-  .filter(k => k.startsWith('wc2026_'))
-  .forEach(k => localStorage.removeItem(k));
-```
-
-This resets:
-- `wc2026_seen` → triggers How to Play on next login
-- `wc2026_ranks_*` → clears rank movement history
-- `wc2026_user` → clears remembered username
-
----
-
-## Step 10 — May test matches cleanup
-
-If you ran May-dated test fixtures (May 1–2 for SF/Final), these also need deletion in Step 3:
+### Step 4 — Clear all test data
 
 ```sql
--- Extend the April cleanup to also cover May test fixtures
+-- 4a. Clear predictions
+DELETE FROM predictions;
+
+-- 4b. Reset balances
+UPDATE users SET spent = 0, earned = 0;
+
+-- 4c. Unsettle all matches
+UPDATE matches SET
+  resolved = false, result_home = null, result_away = null,
+  resolved_pot = null, resolved_share = null,
+  resolved_type = null, resolved_winners = null
+WHERE resolved = true;
+
+-- 4d. Delete ALL test fixtures (Apr + May dates)
+DELETE FROM matches WHERE match_date LIKE 'Apr%';
 DELETE FROM matches WHERE match_date LIKE 'May%';
 
 -- Verify no test dates remain
@@ -360,190 +124,201 @@ SELECT DISTINCT match_date FROM matches ORDER BY match_date;
 
 ---
 
-## Step 11 — Verify password recovery flow works for real users
+## PHASE 3 — Import real fixtures & enable production
 
-The forgot password flow uses the `email` column on the `users` table. Verify before inviting real users:
+### Step 5 — Import real WC2026 fixtures (in the app)
+
+1. Open app → log in as **prasun84** (admin)
+2. Go to **Admin tab → "Import WC2026 fixtures from API"**
+3. Tap **⬇ Import WC2026 fixtures**
+4. Wait for: `✓ Imported 104 fixtures`
+
+Notes:
+- Fetches all 104 WC2026 fixtures with correct IST kickoff times and group codes (A–L, R32, R16, QF, SF, Final)
+- Upserts — safe to run multiple times
+- Also stores `api_fixture_id` from api-football (used by Step 7 odds feature)
+- Fixture data is already live on api-football. Can run this now.
+
+### Step 6 — Third place match
+
+WC2026 has a 3rd place playoff on **Jul 18**. Check if the import included it:
 
 ```sql
--- Check all real users have email set
-SELECT username, email FROM users WHERE email IS NULL OR email = '';
+SELECT id, home, away, match_date, grp FROM matches WHERE grp = 'Final' ORDER BY match_date;
 ```
 
-- If any users have no email, they cannot use forgot password — ask them to set it via registration or update manually
-- The flow: username + email → random 8-char password shown on screen → user logs in → no email is actually sent (all in-app)
-- Communicate this to real users so they know to note their password
-
----
-
-## Step 12 — League invite code & admin setup
-
-Before sharing the app with real users:
-
-1. **Verify invite code** — go to League tab, note the 6-char invite code to share with friends
-2. **Verify admin username** — the admin is whoever registered first (without invite code). Confirm it's `prasun84` via:
-   ```sql
-   SELECT name, admin_username, code FROM leagues;
-   ```
-3. **Share the app URL** with invite code: `https://prasun8463.github.io/wc2026-fantasy`
-4. **WhatsApp message** — use the League tab → "Invite others" button to generate a ready-to-send WhatsApp message with the code
-
----
-
-## Step 13 — WhatsApp Business (optional, for June match-day reminders)
-
-The admin tab has a WhatsApp reminder generator that creates match-day messages. Currently uses WhatsApp personal (wa.me links). For June, if you want to send reminders to the group:
-
-- The feature works with personal WhatsApp — just tap "Send reminder" in Admin tab on match day
-- WhatsApp Business API (for programmatic sending) was discussed but is NOT implemented — would require approval, Meta Business account, and a paid API. Not needed unless you want fully automated reminders
-- **Current behaviour**: Admin taps button → WhatsApp opens with pre-filled message → manually send to league group
-
-No action needed unless you want to upgrade to full automation.
-
----
-
-## Step 14 — Third place match
-
-WC2026 has a third place playoff on July 18 (day before the Final). Currently your DB has SF and Final but no third place fixture. Add it after importing fixtures in Step 4:
+If Jul 18 is missing, add it manually:
 
 ```sql
--- Add third place match after fixture import
--- Only needed if you want users to predict the 3rd place playoff
 INSERT INTO matches (id, grp, home, away, home_flag, away_flag, match_date, kickoff_ist, resolved)
 VALUES ('3rd', 'Final', 'TBD', 'TBD', '🏳️', '🏳️', 'Jul 18', '00:30', false)
 ON CONFLICT (id) DO NOTHING;
 ```
 
-> The api-football import may already include this — check after Step 4 before adding manually.
+### Step 7 — Build odds-informed 🎲 (code change, build before June 11)
 
----
+The 🎲 Random button currently uses weighted random scores. For June, wire it to BSD (Bzzoiro Sports Data) market odds so it suggests a probability-informed score instead.
 
-## Step 15 — Repair balances SQL (if needed)
+**Register BSD key:** https://sports.bzzoiro.com — free, instant, no card needed.
 
-If after going live any user balances look wrong (e.g. after a settle bug or manual DB edit), run this to recompute from scratch:
+**Implementation** (full code in previous session):
+1. Add `fetchOddsCache()` — single API call at login fetching all upcoming match odds
+2. Replace `randomFillPred()` — uses cached odds to pick outcome probabilistically, then generates a realistic score
+3. Add `showOddsHint()` — shows `📊 Market odds · H 52% · D 27% · A 21%` below inputs
+4. Gate with `if(PROD_MODE) fetchOddsCache()` — never fires during April testing
+
+### Step 8 — Enable PROD_MODE
 
 ```sql
--- Recompute all balances from actual prediction/settlement data
-UPDATE users SET spent = 0, earned = 0;
-
-UPDATE users u SET spent = COALESCE((
-  SELECT COUNT(*) * b.bet_per_match
-  FROM predictions p
-  JOIN matches m ON m.id = p.match_id
-  CROSS JOIN (
-    SELECT (bet_amount::json->>'group')::int AS bet_per_match
-    FROM leagues WHERE id = u.league_id
-  ) b
-  WHERE p.username = u.username AND m.resolved = true
-), 0)
-WHERE u.league_id IS NOT NULL;
-
-UPDATE users u SET earned = COALESCE((
-  SELECT SUM(m.resolved_share)
-  FROM matches m
-  WHERE m.resolved = true
-  AND u.username = ANY(m.resolved_winners)
-), 0)
-WHERE u.league_id IS NOT NULL;
+UPDATE leagues SET prod_mode = true WHERE name = 'HSBC Friends League';
 
 -- Verify
-SELECT username, spent, earned, earned-spent AS pl FROM users ORDER BY pl DESC;
+SELECT name, prod_mode, bet_amount FROM leagues;
 ```
 
----
+Takes effect immediately on next page load. No code push needed. This:
+- Removes random Settle buttons (shows "⚡ Auto-settling" instead)
+- Sets auto-settle delay to 15 min after FT/AET/PEN
+- Keeps manual Settle in Admin for edge cases
 
-## Step 16 — api_fixture_id column (needed for Step 7 odds feature)
-
-When building the odds-informed 🎲 button (Step 7), the fixture import needs to store api-football's internal fixture ID so odds can be fetched per match. Add this column before running the fixture import:
-
-```sql
-ALTER TABLE matches ADD COLUMN IF NOT EXISTS api_fixture_id INTEGER;
-```
-
-Then update the `importFixturesFromAPI()` function in index.html to store `fixture.fixture.id` into this column during import. The odds endpoint takes this ID as a parameter.
+To roll back: `UPDATE leagues SET prod_mode = false WHERE name = 'HSBC Friends League';`
 
 ---
 
-## Pre-launch verification checklist
+## PHASE 4 — Code changes (push to GitHub before June 11)
 
-Run through all of these the day before June 11:
+### Step 9 — Restore smart landing logic (code change)
 
-- [ ] Step 1 SQL run (unique constraint + RLS disabled)
-- [ ] Step 2 SQL run (bet amounts correct)
-- [ ] Step 3 SQL run (all test data cleared)
-- [ ] Step 10 SQL run (May test fixtures deleted)
-- [ ] Step 8 SQL run (test users deleted)
-- [ ] Step 4 done (104 real fixtures imported from API)
-- [ ] Step 5 SQL run (PROD_MODE = true)
-- [ ] Step 6 verify query shows clean state
-- [ ] Step 9 done (localStorage cleared on your test device)
-- [ ] Step 14 checked (third place match present)
-- [ ] Step 11 done (all real users have email set)
-- [ ] Step 12 done (invite code verified, shared with friends)
-- [ ] RapidAPI key tested and active
-- [ ] App opens correctly, lands on How to Play for fresh session
-- [ ] Admin can see all fixtures, betting amounts correct per stage
-- [ ] One test prediction made and settled to verify full flow
-
----
-
-## Step 17 — Add `bold` column to predictions (for Bold Pick feature)
-
-```sql
--- Add bold column for the knockout Bold Pick feature
-ALTER TABLE predictions ADD COLUMN IF NOT EXISTS bold BOOLEAN DEFAULT false;
-
--- Verify column exists
-SELECT column_name, data_type, column_default
-FROM information_schema.columns
-WHERE table_name = 'predictions' AND column_name = 'bold';
-```
-
-The Bold Pick feature is enabled in code for all knockout stages (R32, R16, QF, SF/Final). Each player gets one bold pick per stage. If they nail the exact score on a bold pick, they take the entire pot (no splitting with other exact pickers). Loss is unchanged.
-
-The DB stores `resolved_type='exact_bold'` instead of `exact` when a bold won the pot — used in stats and badges.
-
----
-
-## Step 18 — Knockout settlement window for extra time + penalties
-
-**Already handled in code** — but worth verifying in production:
-
-- `MATCH_DURATION_MS` (105 min) used for group stage fallback if API has no live data
-- `KNOCKOUT_DURATION_MS` (150 min = 90 + 30 ET + 30 penalties) used for R32 onwards
-- Auto-settle waits for `FT`, `AET`, or `PEN` status from api-football before firing
-- Auto-settle delay after FT/AET/PEN: 15 min in PROD_MODE (covers VAR review, post-match procedures)
-
-**Verification on first knockout match in June:**
-1. Watch a live R32 match in the app
-2. If it goes to extra time, verify the match shows `live` (not finished) status throughout ET
-3. After penalties, verify status badge shows `PEN` and final score reflects penalty total
-4. Confirm auto-settle fires ~15 min after PEN status
-
-**Manual fallback if auto-settle misbehaves:** Admin can use the Settle button on the match row with the actual final score (including penalty result, e.g. for a 1-1 match decided 4-3 on penalties, enter 1-1 and let the API status indicate it was PEN).
-
----
-
-## Step 19 — Restore smart landing tab logic (code change)
-
-Before go-live, restore the context-aware landing in `smartLanding()` in `index.html`.
-
-Find the current pre-launch version:
+Find in `index.html`:
 ```js
 function smartLanding(){
   // PRE-LAUNCH MODE: always land on How to Play
   return 'howto';
-  /* JUNE LOGIC (restore before go-live): ...
 ```
 
 Replace with:
 ```js
 function smartLanding(){
-  // First ever login → How to Play stepper
   const seen = localStorage.getItem('wc2026_seen');
   if(!seen){ localStorage.setItem('wc2026_seen','1'); return 'howto'; }
-  // Returning user → always Leaderboard
   return 'lb';
 }
 ```
 
-**Why:** During pre-launch friend testing, every login lands on How to Play so new users are oriented. Once the tournament starts, returning users should land on Leaderboard (more interesting), with How to Play only shown on genuine first logins.
+**Why:** Pre-launch, everyone lands on How to Play. From June 11, returning users land on Leaderboard (more relevant), first-timers still get How to Play.
+
+---
+
+## PHASE 5 — Verify & launch
+
+### Step 10 — Final verification
+
+```sql
+-- All should show expected values
+SELECT name, bet_amount, prod_mode FROM leagues;
+SELECT username, spent, earned FROM users ORDER BY username;
+SELECT COUNT(*) AS predictions FROM predictions;
+SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE resolved) AS settled FROM matches;
+SELECT grp, COUNT(*) AS matches FROM matches GROUP BY grp ORDER BY grp;
+```
+
+Expected:
+- `bet_amount` = `{"group":100,"r32":200,"r16":300,"qf":500,"sf":800}`
+- `prod_mode` = `true`
+- `predictions` = 0, `settled` = 0
+- Groups A–L: 4 each (48) + R32: 16 + R16: 8 + QF: 4 + SF: 2 + Final: 1–2 = 79–80 knockouts
+
+### Step 11 — Verify password recovery
+
+```sql
+-- All real users must have email set for forgot-password to work
+SELECT username, email FROM users WHERE email IS NULL OR email = '';
+```
+
+The forgot-password flow is all in-app (no email sent) — password displays on screen. Tell users to note their password when registering.
+
+### Step 12 — League invite code
+
+```sql
+SELECT name, admin_username, code FROM leagues;
+```
+
+Share the invite code + URL in WhatsApp:
+`https://prasun8463.github.io/wc2026-fantasy`
+
+Use Admin tab → "Today's match reminder" → Copy to generate the match-day message.
+
+### Step 13 — Reset localStorage on your test device
+
+In Safari console (Develop → Show JavaScript Console):
+```js
+Object.keys(localStorage)
+  .filter(k => k.startsWith('wc2026_'))
+  .forEach(k => localStorage.removeItem(k));
+```
+
+Clears: `wc2026_seen`, `wc2026_ranks_*`, `wc2026_user`, `wc2026_bold_seen`
+
+---
+
+## Auto-settle flow (June, no action needed — already in code)
+
+1. Admin must be logged in on match days (polling runs every 5 min)
+2. API returns `FT` / `AET` / `PEN` → timestamp recorded
+3. **15 min later** → `autoSettleFinished()` settles with real API score
+4. `loadAll()` + `renderAll()` → leaderboard updates for all players
+5. Toast: `✓ Brazil 2–1 France · prasun84 won ₹4000`
+
+**Knockout matches (R32 onwards):** Auto-settle uses `AET`/`PEN` status correctly. Fallback duration = 150 min (covers ET + penalties). Manual settle available in Admin tab if API data is delayed.
+
+---
+
+## Emergency reference
+
+### Repair balances (if settlement bug occurs)
+
+```sql
+UPDATE users SET spent = 0, earned = 0;
+
+UPDATE users u SET spent = COALESCE((
+  SELECT COUNT(*) * (SELECT (bet_amount::json->>'group')::int FROM leagues WHERE id = u.league_id)
+  FROM predictions p
+  JOIN matches m ON m.id = p.match_id
+  WHERE p.username = u.username AND m.resolved = true
+), 0) WHERE u.league_id IS NOT NULL;
+
+UPDATE users u SET earned = COALESCE((
+  SELECT SUM(m.resolved_share)
+  FROM matches m
+  WHERE m.resolved = true AND u.username = ANY(m.resolved_winners)
+), 0) WHERE u.league_id IS NOT NULL;
+
+SELECT username, spent, earned, earned-spent AS pl FROM users ORDER BY pl DESC;
+```
+
+### WhatsApp Business
+
+Admin tab → "Today's match reminder" → Copy or Open in WhatsApp. Works with personal WhatsApp — no Business API needed.
+
+---
+
+## Pre-launch day checklist (June 10)
+
+- [ ] Step 1 SQL run (schema fixes, bold column, api_fixture_id, prod_mode column)
+- [ ] Step 2 SQL run (bet amounts — HSBC Friends League)
+- [ ] Step 3 SQL run (test users deleted)
+- [ ] Step 4 SQL run (test data cleared, Apr+May fixtures deleted)
+- [ ] Step 5 done (104 real fixtures imported via Admin tab)
+- [ ] Step 6 checked (3rd place match Jul 18 present)
+- [ ] Step 7 built (odds-informed 🎲 with BSD API key)
+- [ ] Step 8 SQL run (PROD_MODE = true)
+- [ ] Step 9 code pushed (smart landing restored)
+- [ ] Step 10 verify queries all clean
+- [ ] Step 11 all real users have email
+- [ ] Step 12 invite code shared with friends
+- [ ] Step 13 localStorage cleared on your device
+- [ ] RapidAPI key confirmed active (test at rapidapi.com)
+- [ ] App opens → lands on How to Play for fresh session
+- [ ] Admin sees 104 fixtures with correct IST times
+- [ ] Bet amounts correct per stage (₹100 group → ₹800 SF/Final)
+- [ ] One test prediction placed + settled → leaderboard updates correctly
