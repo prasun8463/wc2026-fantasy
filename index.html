@@ -502,7 +502,14 @@ async function doRegister(){
   const {data:newUser,error:ue}=await sb.from('users').insert({username:u,password_hash:hash,league_id:leagueId,earned:0,spent:0,email:em}).select().single();
   if(ue){setAuthLoading(false);showReg();e.textContent='Error: '+ue.message;return;}
   e.textContent='';
-  await launchApp(newUser);
+  // If user joined via invite code, show welcome interstitial before launching
+  if(code){
+    await launchApp(newUser);
+    // After app loads, show welcome popup
+    setTimeout(()=>showLeagueWelcome(), 800);
+  } else {
+    await launchApp(newUser);
+  }
 }
 
 function doLogout(){
@@ -810,16 +817,30 @@ function renderMatchList(){
     }
 
     const isPast=status==='settled'||status==='inprogress'||status==='live'||status==='finished';
-    const rowStyle=isPast?'background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);':
-                   status==='future'?'background:#162616;border:1px solid rgba(255,255,255,.09);opacity:.78;':
-                   'background:#162616;border:1px solid rgba(212,160,23,.5);box-shadow:0 0 0 2px rgba(212,160,23,.2);';
+    const rowStyle=myP&&(status==='open'||status==='inprogress'||status==='live')
+      ? 'background:rgba(76,175,80,.06);border:1px solid rgba(76,175,80,.35);'
+      : isPast?'background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);'
+      : status==='future'?'background:#162616;border:1px solid rgba(255,255,255,.09);opacity:.78;'
+      : 'background:#162616;border:1px solid rgba(212,160,23,.5);box-shadow:0 0 0 2px rgba(212,160,23,.2);';
 
-    return `<div class="mrow" id="mr_${m.id}" onclick="toggleMatchSheet('${m.id}')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;${rowStyle}">
-      <div style="flex:1;min-width:0">
-        <div class="mteams" style="color:${isPast?'var(--muted)':'var(--text)'}">${m.home_flag} ${m.home} <span style="color:var(--muted);font-weight:400;font-size:13px">vs</span> ${m.away} ${m.away_flag}</div>
-        <div class="mmeta">${potDisplay} · ${arr.length} predicted${metaPick}</div>
+    // Fix 3: confirmation strip — shows pick prominently below match name
+    const confirmStrip=myP&&(status==='open'||status==='inprogress'||status==='live')?
+      `<div style="margin-top:5px;background:rgba(76,175,80,.1);border-radius:6px;padding:4px 8px;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:11px;color:rgba(76,175,80,.9);font-weight:600">Your pick: <span style="color:var(--text)">${myP.pred_home} – ${myP.pred_away}</span>${myP.bold?'<span style="color:var(--gold);margin-left:4px;font-size:10px">🔥 BOLD</span>':''}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.35)">₹${betFor(m)} staked · tap to change</div>
+      </div>`:
+      status==='settled'&&myP?``:
+      '';
+
+    return `<div class="mrow" id="mr_${m.id}" onclick="toggleMatchSheet('${m.id}')" style="cursor:pointer;${rowStyle}">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div class="mteams" style="color:${isPast&&!myP?'var(--muted)':'var(--text)'}">${m.home_flag} ${m.home} <span style="color:var(--muted);font-weight:400;font-size:13px">vs</span> ${m.away} ${m.away_flag}</div>
+          <div class="mmeta">${potDisplay} · ${arr.length} predicted${status==='settled'?metaPick:''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">${rightHtml}</div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">${rightHtml}</div>
+      ${confirmStrip}
     </div>`;
   }
 
@@ -1064,7 +1085,10 @@ function openMatchSheet(mid){
     }
 
     html+=`<div style="background:rgba(212,160,23,.06);border:1px solid rgba(212,160,23,.25);border-radius:10px;padding:14px;margin-bottom:10px">
-      <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:10px">${isEditing?'Update your pick':'Stake \u20b9'+betFor(m)+' on the score'}</div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:13px;font-weight:600;color:var(--gold)">${isEditing?'Update your pick':'Stake \u20b9'+betFor(m)+' on the score'}</div>
+        <div style="font-size:11px;color:var(--success);font-weight:600">win up to \u20b9${(arr.length+1)*betFor(m)}</div>
+      </div>
       ${formStrip}
       ${boldStripHtml}
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -2045,7 +2069,16 @@ function renderHowTo(){
       <button onclick="htpClassic()" style="background:transparent;border:none;font-size:11px;color:rgba(255,255,255,.3);cursor:pointer;padding:0">View full guide</button>
     </div>
     ${faqHTML}
-
+    ${(()=>{
+      // Fix 1: show "predict now" shortcut only on step 1 when matches are open
+      if(step!==0) return '';
+      const openMatches=MATCHES.filter(m=>matchStatus(m)==='open');
+      if(!openMatches.length) return '';
+      return `<div onclick="goTab('matches')" style="cursor:pointer;margin-top:8px;text-align:center;padding:10px 14px;background:rgba(212,160,23,.06);border:1px dashed rgba(212,160,23,.35);border-radius:9px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:3px">${openMatches.length} match${openMatches.length!==1?'es':''} open to predict right now</div>
+        <div style="font-size:13px;font-weight:700;color:var(--gold)">Predict now → go to today's matches</div>
+      </div>`;
+    })()}
   `;
 }
 
@@ -2065,6 +2098,52 @@ function htpClassic(){
 // ════════════════════════════════════════════════════════════════
 //  INFO MODAL — generic popup (About, Bold announcement, etc.)
 // ════════════════════════════════════════════════════════════════
+function showLeagueWelcome(){
+  if(!LEAGUE||!MEMBERS) return;
+  const sorted=[...MEMBERS].sort((a,b)=>plPct(b.spent||0,b.earned||0)-plPct(a.spent||0,a.earned||0));
+  const memberCount=MEMBERS.length;
+
+  const avatarRow=sorted.slice(0,6).map(u=>{
+    const isMe=u.username===ME.username;
+    return `<div style="text-align:center">
+      <div style="width:38px;height:38px;border-radius:50%;background:${avc(u.username)};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#fff;border:2px solid ${isMe?'var(--gold)':'transparent'}">${ini(u.username)}</div>
+      <div style="font-size:9px;color:var(--muted);margin-top:3px;max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${isMe?'you':esc(u.username)}</div>
+    </div>`;
+  }).join('');
+
+  const medals=['🥇','🥈','🥉'];
+  const standingRows=sorted.slice(0,5).map((u,i)=>{
+    const isMe=u.username===ME.username;
+    const s=calcRoundStats(u.username);
+    const pct=plPct(s.overall.bet,s.overall.won);
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+      <div style="font-size:${i<3?14:12}px;width:22px;text-align:center">${i<3&&s.overall.pl>0?medals[i]:i+1}</div>
+      <div style="flex:1;font-size:12px;font-weight:${isMe?700:500};color:${isMe?'var(--info)':'var(--text)'}">
+        ${esc(u.username)}${isMe?' <span style="font-size:10px;color:var(--muted)">(you)</span>':''}
+      </div>
+      <div style="font-size:12px;font-weight:600;color:${pct>0?'var(--success)':pct<0?'var(--red)':'var(--muted)'}">
+        ${s.overall.bet>0?(pct>0?'+'+pct+'%':pct+'%'):'No picks yet'}
+      </div>
+    </div>`;
+  }).join('');
+
+  showInfoModal('You\'re in the league 🏆', `
+    <div style="text-align:center;margin-bottom:14px">
+      <div style="font-size:14px;font-weight:600;color:var(--muted);margin-bottom:2px">Welcome to</div>
+      <div style="font-size:18px;font-weight:700;color:var(--gold)">${esc(LEAGUE.name)}</div>
+    </div>
+    <div style="display:flex;justify-content:center;gap:8px;margin-bottom:14px">${avatarRow}</div>
+    <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:12px">
+      <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:6px;letter-spacing:.3px">CURRENT STANDINGS</div>
+      ${standingRows}
+    </div>
+    <div style="background:rgba(212,160,23,.06);border:1px solid rgba(212,160,23,.2);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--muted);text-align:center">
+      You're joining <strong style="color:var(--text)">${memberCount}</strong> player${memberCount!==1?'s':''}.
+      Predict scores on the <strong style="color:var(--text)">Matches</strong> tab to climb the table.
+    </div>
+  `);
+}
+
 function showInfoModal(title, bodyHtml){
   document.getElementById('info-modal-title').textContent=title;
   document.getElementById('info-modal-body').innerHTML=bodyHtml;
