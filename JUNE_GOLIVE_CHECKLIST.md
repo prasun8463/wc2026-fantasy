@@ -53,7 +53,13 @@ ALTER TABLE leagues ADD COLUMN IF NOT EXISTS prod_mode BOOLEAN DEFAULT false;
 -- 1e. api_fixture_id (needed for odds feature in Step 7)
 ALTER TABLE matches ADD COLUMN IF NOT EXISTS api_fixture_id INTEGER;
 
--- 1f. Verify all columns exist
+-- 1f. Drop orphaned RLS policies on predictions
+-- RLS is disabled (correct for our custom auth) but Supabase flags leftover
+-- policies as a security misconfiguration — drop them to clear the warning
+DROP POLICY IF EXISTS "public insert predictions" ON predictions;
+DROP POLICY IF EXISTS "public read predictions" ON predictions;
+
+-- 1g. Verify all columns exist
 SELECT column_name FROM information_schema.columns
 WHERE table_name = 'predictions' AND column_name IN ('bold','match_id','username','pred_home','pred_away');
 
@@ -62,6 +68,11 @@ WHERE table_name = 'matches' AND column_name = 'api_fixture_id';
 
 SELECT column_name FROM information_schema.columns
 WHERE table_name = 'leagues' AND column_name = 'prod_mode';
+
+-- 1h. Verify security state is clean
+-- Expected: no rows returned from pg_policies, rowsecurity = false
+SELECT policyname FROM pg_policies WHERE tablename = 'predictions';
+SELECT tablename, rowsecurity FROM pg_tables WHERE tablename = 'predictions';
 ```
 
 ### Step 2 — Bet amounts
