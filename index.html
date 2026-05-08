@@ -354,7 +354,7 @@ let PREDS = {};      // { match_id: [ {username, pred_home, pred_away} ] }
 let matchFilter = 'All';
 
 // ── Live score state ──────────────────────────────────────────
-const RAPIDAPI_KEY = '9ccccda5ebmsh35908237b362fe4p12568cjsn6a49fb26955c';
+const RAPIDAPI_KEY = '72c3fbeb3130fc32f1bdf600f71a23f9'; // api-sports.io direct key
 const WC_LEAGUE_ID = 1;     // FIFA World Cup in api-football v3
 const WC_SEASON    = 2026;
 let LIVE_SCORES    = {};    // { "Home vs Away": { status, home, away, minute } }
@@ -2600,7 +2600,7 @@ function setGroupFilter(f){
 }
 
 // ════════════════════════════════════════════════════════════════
-//  LIVE SCORE ENGINE — api-football via RapidAPI
+//  LIVE SCORE ENGINE — api-football via api-sports.io (direct)
 // ════════════════════════════════════════════════════════════════
 
 // Fetch live + today's finished matches from api-football
@@ -2613,12 +2613,8 @@ async function fetchLiveScores(){
     const dateStr=`${yyyy}-${mo}-${dd}`;
 
     const res=await fetch(
-      `https://api-football-v1.p.rapidapi.com/v3/fixtures?league=${WC_LEAGUE_ID}&season=${WC_SEASON}&date=${dateStr}`,
-      { headers:{
-          'X-RapidAPI-Key': RAPIDAPI_KEY,
-          'X-RapidAPI-Host': 'api-football-v1.p.rapidapi.com'
-        }
-      }
+      `https://v3.football.api-sports.io/fixtures?league=${WC_LEAGUE_ID}&season=${WC_SEASON}&date=${dateStr}`,
+      { headers:{ 'x-apisports-key': RAPIDAPI_KEY } }
     );
     if(!res.ok) return;
     const data=await res.json();
@@ -3300,10 +3296,9 @@ async function importFixturesFromAPI(){
 
   try {
     // Fetch all fixtures for WC2026 (league=1, season=2026)
-    const resp=await fetch('https://api-football-v1.p.rapidapi.com/v3/fixtures?league=1&season=2026',{
+    const resp=await fetch('https://v3.football.api-sports.io/fixtures?league=1&season=2026',{
       headers:{
-        'x-rapidapi-key': RAPIDAPI_KEY,
-        'x-rapidapi-host': 'api-football-v1.p.rapidapi.com'
+        'x-apisports-key': RAPIDAPI_KEY
       }
     });
     const data=await resp.json();
