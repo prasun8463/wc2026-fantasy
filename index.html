@@ -567,6 +567,8 @@ async function launchApp(user){
   await loadAll();
   goTab(smartLanding()); // context-aware landing tab
   startLivePolling(); // begin live score polling
+  // Catch-up settle: handle any matches that finished while offline/asleep
+  setTimeout(()=>catchUpSettle(), 2000);
   // Show Bold Pick announcement once when knockouts begin (Jul 10 2026 onwards)
   setTimeout(()=>maybeShowBoldAnnouncement(), 600);
 }
@@ -2699,7 +2701,6 @@ const AUTO_SETTLE_DELAY=PROD_MODE ? 15*60*1000 : 10*60*1000;
 // Auto-settle matches the API says are FT, 60 min after FT confirmed
 async function autoSettleFinished(){
   if(!LEAGUE||!ME||ME.username!==LEAGUE.admin_username) return;
-  const finishedStatuses=['FT','AET','PEN'];
   const now=Date.now();
   let anySettled=false;
 
@@ -2708,30 +2709,100 @@ async function autoSettleFinished(){
     const liveKey=m.home+'_'+m.away;
     const live=LIVE_SCORES[liveKey];
     if(!live) continue;
-    if(!finishedStatuses.includes(live.status)) continue;
     if(live.home==null||live.away==null) continue;
 
-    // Record when we first saw this match as FT
+    // ── KO-aware status check ──────────────────────────────────────
+    // Group stage: FT is definitive — settle immediately after delay
+    // Knockout: FT at 90min is NOT definitive if ET/PEN follows.
+    //   Only settle KO matches on AET or PEN (the true final status).
+    //   If still FT on a KO match, keep polling — it may go to ET.
+    const koMatch = isKnockout(m);
+    const definitiveStatuses = koMatch
+      ? ['AET','PEN']          // KO: must be after extra time / penalties
+      : ['FT','AET','PEN'];    // Group: FT is final
+    if(!definitiveStatuses.includes(live.status)) continue;
+
+    // Record when we first saw this definitive status
     if(!FT_TIMESTAMPS[m.id]) FT_TIMESTAMPS[m.id]=now;
 
-    // Only settle after delay elapsed
+    // Only settle after delay elapsed (15 min in PROD_MODE)
     const elapsed=now-FT_TIMESTAMPS[m.id];
     if(elapsed<AUTO_SETTLE_DELAY){
       const minsLeft=Math.ceil((AUTO_SETTLE_DELAY-elapsed)/60000);
-      console.log(`Auto-settle waiting: ${m.home} vs ${m.away} — ${minsLeft} min remaining`);
+      console.log(`Auto-settle waiting: ${m.home} vs ${m.away} — ${minsLeft} min remaining (${live.status})`);
       continue;
     }
 
-    // 60 min elapsed — settle now
     await settleWithScore(m.id, live.home, live.away);
-    toast(`✓ Auto-settled: ${m.home} ${live.home}–${live.away} ${m.away}`);
+    toast('✓ Auto-settled: '+m.home+' '+live.home+'–'+live.away+' '+m.away
+      +(koMatch&&live.status==='PEN'?' (pen)':koMatch&&live.status==='AET'?' (aet)':''));
     anySettled=true;
   }
 
-  if(anySettled){
-    await loadAll();
-    renderAll();
+  if(anySettled){ await loadAll(); renderAll(); }
+}
+
+// ── Catch-up settle: fires on login ────────────────────────────────
+// Handles matches that finished while admin was offline/asleep.
+// Fetches today's (and yesterday's) API data, settles anything missed.
+async function catchUpSettle(){
+  if(!LEAGUE||!ME||ME.username!==LEAGUE.admin_username) return;
+
+  const unsettled=MATCHES.filter(m=>!m.resolved&&m.home!=='TBD'&&m.away!=='TBD');
+  if(!unsettled.length) return;
+
+  // Fetch scores for each unsettled match date (deduplicated)
+  const dates=[...new Set(unsettled.map(m=>m.match_date))];
+
+  // Convert match_date ("Jun 11") to YYYY-MM-DD for the API
+  const MMAP={Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
+  let caught=0;
+
+  for(const dateStr of dates){
+    const [mon,day]=dateStr.split(' ');
+    const mm=String(MMAP[mon]||6).padStart(2,'0');
+    const dd=String(day).padStart(2,'0');
+    const apiDate=`2026-${mm}-${dd}`;
+
+    try{
+      const res=await fetch(
+        `https://v3.football.api-sports.io/fixtures?league=${WC_LEAGUE_ID}&season=${WC_SEASON}&date=${apiDate}`,
+        {headers:{'x-apisports-key':RAPIDAPI_KEY}}
+      );
+      if(!res.ok) continue;
+      const data=await res.json();
+      const fixtures=data.response||[];
+
+      for(const fix of fixtures){
+        const home=fix.teams?.home?.name;
+        const away=fix.teams?.away?.name;
+        const status=fix.fixture?.status?.short;
+        const gh=fix.goals?.home;
+        const ga=fix.goals?.away;
+        if(gh==null||ga==null) continue;
+
+        // Find the matching unsettled match
+        const m=unsettled.find(x=>x.home===home&&x.away===away&&x.match_date===dateStr);
+        if(!m||m.resolved) continue;
+
+        // Same KO-aware logic: only settle if status is truly final
+        const koMatch=isKnockout(m);
+        const definitiveStatuses=koMatch?['AET','PEN']:['FT','AET','PEN'];
+        if(!definitiveStatuses.includes(status)) continue;
+
+        // Settle immediately — no delay needed for catch-up (match long over)
+        await settleWithScore(m.id, gh, ga);
+        const suffix=status==='PEN'?' (pen)':status==='AET'?' (aet)':'';
+        toast('⚡ Catch-up settled: '+m.home+' '+gh+'–'+ga+' '+m.away+suffix, 4000);
+        caught++;
+      }
+    }catch(e){
+      console.warn('Catch-up settle error for '+dateStr, e.message);
+    }
   }
+
+  if(caught>0){ await loadAll(); renderAll(); }
+  else console.log('Catch-up settle: nothing missed ✓');
 }
 
 // Start polling — runs during match windows, continues until all settled
