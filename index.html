@@ -549,15 +549,11 @@ async function doForgot(){
 
 // ── Boot app ───────────────────────────────────────────────────
 function smartLanding(){
-  // PRE-LAUNCH MODE: always land on How to Play so new friends
-  // get oriented before the real tournament starts in June.
-  // TODO June 11: restore the full logic below (see JUNE_GOLIVE_CHECKLIST Step 19)
-  return 'howto';
-  /* JUNE LOGIC (restore before go-live):
+  // First-ever login → How to Play stepper
   const seen = localStorage.getItem('wc2026_seen');
   if(!seen){ localStorage.setItem('wc2026_seen','1'); return 'howto'; }
+  // Returning user → Leaderboard
   return 'lb';
-  */
 }
 
 async function launchApp(user){
@@ -1091,6 +1087,7 @@ function openMatchSheet(mid){
       </div>
       ${formStrip}
       ${boldStripHtml}
+      <div id="odds-hint-${mid}" style="display:none"></div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="text-align:center">
           <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${m.home_flag} ${esc(m.home)}</div>
@@ -1103,7 +1100,7 @@ function openMatchSheet(mid){
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;margin-top:16px">
           <button class="btn btn-gold btn-sm" style="width:auto;padding:10px 20px;margin:0;font-size:14px;touch-action:manipulation" onclick="submitPredFromSheet('${mid}')">${isEditing?'Update':'Predict'}</button>
-          <button style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:7px;color:var(--muted);font-size:11px;padding:5px 10px;cursor:pointer;touch-action:manipulation;white-space:nowrap" onclick="randomFillPred('${mid}')">🎲 Random</button>
+          <button style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:7px;color:var(--muted);font-size:11px;padding:5px 10px;cursor:pointer;touch-action:manipulation;white-space:nowrap" onclick="randomFillPred('${mid}')">🎲 Smart pick</button>
         </div>
       </div>
     </div>`;
@@ -3085,27 +3082,97 @@ function renderAdmin(){
 
 // Quick settle from match row (admin only, score from API)
 // Realistic football score generator for testing
+// ════════════════════════════════════════════════════════════════
+//  SMART ODDS ENGINE
+//  Team strength ratings derived from FIFA rankings + WC2022/2024
+//  Nations League form. Scale 50-99.
+// ════════════════════════════════════════════════════════════════
+const TEAM_RATINGS = {
+  'France':96,'Brazil':95,'England':93,'Argentina':93,'Spain':92,
+  'Portugal':91,'Germany':90,'Netherlands':89,'Belgium':88,
+  'Uruguay':86,'Croatia':85,'Colombia':84,'Morocco':83,'Mexico':83,
+  'USA':82,'Japan':82,'Switzerland':81,'Denmark':81,'Austria':80,
+  'Senegal':80,'South Korea':80,'Ecuador':80,'Egypt':79,'Serbia':79,
+  'Poland':79,'Sweden':78,'Norway':78,'Turkiye':78,'Turkey':78,
+  'Australia':76,'Iran':75,'Canada':75,'Saudi Arabia':74,'Algeria':73,
+  'Ivory Coast':73,'Ghana':72,'Qatar':71,'Romania':71,'Scotland':71,
+  'Czech Republic':70,'Czechia':70,'Slovakia':69,'Ukraine':69,
+  'Bosnia and Herzegovina':69,'Hungary':68,'Tunisia':68,'Greece':68,
+  'DR Congo':66,'Nigeria':66,'Israel':65,'Mali':65,'Cameroon':65,
+  'Jordan':64,'Peru':64,'Cabo Verde':63,'Chile':63,'Venezuela':63,
+  'Paraguay':63,'Bolivia':62,'South Africa':62,'Costa Rica':62,
+  'Panama':61,'Honduras':61,'El Salvador':60,'Cuba':60,'Jamaica':59,
+  'Cura\u00e7ao':59,'Trinidad and Tobago':58,'Haiti':58,
+  'New Zealand':57,'Uzbekistan':57,'Iraq':56,
+};
+
+const BASE_SCORES = [
+  [1,0,13],[0,1,13],[1,1,16],[2,1,12],[1,2,12],[2,0,9],[0,2,9],
+  [0,0,8],[3,1,5],[1,3,5],[2,2,6],[3,0,4],[0,3,4],
+  [3,2,2],[2,3,2],[4,0,1],[0,4,1],[4,1,1],[1,4,1]
+];
+
+function getTeamRating(name){
+  if(!name||name==='TBD') return 70;
+  return TEAM_RATINGS[name]||TEAM_RATINGS[name.replace('\u00fc','u')]||70;
+}
+
+function smartOdds(homeName, awayName){
+  const hr=getTeamRating(homeName), ar=getTeamRating(awayName);
+  const adjDiff=(hr-ar)+3;
+  const rawHome=36+adjDiff*0.85;
+  const rawAway=36-adjDiff*0.85;
+  const rawDraw=100-rawHome-rawAway;
+  const homeWin=Math.max(10,Math.min(78,Math.round(rawHome)));
+  const awayWin=Math.max(10,Math.min(78,Math.round(rawAway)));
+  const draw=Math.max(10,Math.min(35,Math.round(rawDraw)));
+  const total=homeWin+draw+awayWin;
+  const hPct=Math.round(homeWin/total*100);
+  const dPct=Math.round(draw/total*100);
+  const aPct=100-hPct-dPct;
+  // Pick outcome by probability then a matching scoreline
+  const r=Math.random()*100;
+  const outcome=r<hPct?'H':r<hPct+dPct?'D':'A';
+  const cands=BASE_SCORES.filter(([h,a])=>outcome==='H'?h>a:outcome==='D'?h===a:a>h);
+  const totalW=cands.reduce((s,[,,w])=>s+w,0);
+  let pick=Math.floor(Math.random()*totalW),sh=1,sa=0;
+  for(const[h,a,w]of cands){pick-=w;if(pick<0){sh=h;sa=a;break;}}
+  return{hPct,dPct,aPct,suggestedH:sh,suggestedA:sa};
+}
+
 function randomScore(){
-  // Weighted distribution — most football matches are low scoring
-  const weights=[
-    [0,0,9],[1,0,12],[0,1,12],[1,1,15],[2,0,10],[0,2,10],
-    [2,1,11],[1,2,11],[3,0,6],[0,3,6],[2,2,7],[3,1,5],
-    [1,3,5],[3,2,3],[2,3,3],[4,0,2],[0,4,2],[4,1,1],[1,4,1]
-  ];
-  const total=weights.reduce((s,w)=>s+w[2],0);
+  const total=BASE_SCORES.reduce((s,w)=>s+w[2],0);
   let r=Math.floor(Math.random()*total);
-  for(const [h,a,w] of weights){r-=w;if(r<0)return[h,a];}
+  for(const[h,a,w]of BASE_SCORES){r-=w;if(r<0)return[h,a];}
   return[1,0];
 }
 
-// Fill predict form inputs with a random score (does not submit)
 function randomFillPred(mid){
-  const[h,a]=randomScore();
+  const m=MATCHES.find(x=>x.id===mid);
+  const isTBD=!m||m.home==='TBD'||m.away==='TBD';
+  let h,a;
+  if(isTBD){
+    [h,a]=randomScore();
+  } else {
+    const odds=smartOdds(m.home,m.away);
+    h=odds.suggestedH; a=odds.suggestedA;
+    const hint=document.getElementById('odds-hint-'+mid);
+    if(hint){
+      const hr=getTeamRating(m.home),ar=getTeamRating(m.away);
+      const stronger=hr>=ar?m.home:m.away;
+      hint.innerHTML='<span style="font-size:10px;color:var(--muted)">\u{1F4CA} '
+        +esc(m.home)+' <b style="color:var(--text)">'+odds.hPct+'%</b>'
+        +' \u00b7 Draw <b style="color:var(--text)">'+odds.dPct+'%</b>'
+        +' \u00b7 '+esc(m.away)+' <b style="color:var(--text)">'+odds.aPct+'%</b></span>'
+        +'<span style="font-size:10px;color:rgba(212,160,23,.8)">'+esc(stronger)+' favoured</span>';
+      hint.style.cssText='display:flex;justify-content:space-between;align-items:center;'
+        +'padding:5px 8px;background:rgba(255,255,255,.03);border-radius:6px;margin-bottom:8px';
+    }
+  }
   const hEl=document.getElementById('sh_ph_'+mid);
   const aEl=document.getElementById('sh_pa_'+mid);
   if(hEl) hEl.value=h;
   if(aEl) aEl.value=a;
-  // Flash inputs briefly to confirm
   [hEl,aEl].forEach(el=>{
     if(!el) return;
     el.style.borderColor='rgba(212,160,23,.7)';
