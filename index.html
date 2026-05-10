@@ -3125,27 +3125,64 @@ function renderAdmin(){
     });
   }
 
-  html+=`<div class="sec">Import real fixtures from API</div>
-  <div class="card" style="margin-bottom:8px">
-    <div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6">
-      Fetches all WC2026 fixtures (group stage + knockouts) from api-football and populates your database. Safe to run multiple times — existing rows are updated, not duplicated.<br>
-      <span style="color:var(--warn);font-size:11px">⚠ Run SQL reset first to clear April test data before importing real fixtures.</span>
+  html+=`<div class="sec">Knockout bracket — update teams</div>
+  <div class="card" style="margin-bottom:4px">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+      Once group stage finishes, update the TBD slots below as teams qualify.
+      Select home and away team for each match. Flags are auto-filled.
+      Kickoff times are pre-set from the fixture schedule.
     </div>
-    <div id="import-status" style="font-size:12px;color:var(--muted);margin-bottom:10px;min-height:18px"></div>
-    <button class="btn btn-gold" onclick="importFixturesFromAPI()" style="width:auto;padding:10px 20px;font-size:14px">
-      ⬇ Import WC2026 fixtures
-    </button>
-  </div>`;
-
-  html+=`<div class="sec">Add/edit knockout fixture</div>
-  <div class="card">
-    <div class="field-label">Match ID (e.g. r05, qf1)</div><input id="new-id" placeholder="r05" />
-    <div class="field-label">Group/stage</div><input id="new-grp" placeholder="R16" />
-    <div class="field-label">Home team</div><input id="new-home" placeholder="Brazil" />
-    <div class="field-label">Away team</div><input id="new-away" placeholder="France" />
-    <div class="field-label">Date</div><input id="new-date" placeholder="Jul 9" />
-    <button class="btn btn-gold" onclick="addMatch()">Save fixture</button>
-    <div class="err" id="match-err"></div>
+    ${(()=>{
+      const koStages=['R32','R16','QF','SF','Final'];
+      const stageLabel={'R32':'Round of 32','R16':'Round of 16','QF':'Quarter-finals','SF':'Semi-finals','Final':'Final & 3rd Place'};
+      // All 48 WC2026 teams sorted alphabetically
+      const allTeams=[
+        'Algeria','Argentina','Australia','Austria','Belgium',
+        'Bolivia','Bosnia and Herzegovina','Brazil','Cabo Verde','Cameroon',
+        'Canada','Chile','Colombia','Costa Rica','Croatia',
+        'Cuba','Curaçao','Czech Republic','DR Congo','Denmark',
+        'Ecuador','Egypt','El Salvador','England','France',
+        'Germany','Ghana','Greece','Haiti','Honduras',
+        'Hungary','Iran','Iraq','Israel','Ivory Coast',
+        'Jamaica','Japan','Jordan','Mali','Mexico',
+        'Morocco','Netherlands','New Zealand','Nigeria','Norway',
+        'Panama','Paraguay','Peru','Poland','Portugal',
+        'Qatar','Romania','Saudi Arabia','Scotland','Senegal',
+        'Serbia','Slovakia','South Africa','South Korea','Spain',
+        'Sweden','Switzerland','Trinidad and Tobago','Tunisia','Turkey',
+        'Türkiye','Ukraine','Uruguay','USA','Uzbekistan','Venezuela'
+      ];
+      const teamOptions=allTeams.map(t=>`<option value="${t}">${t}</option>`).join('');
+      let out='';
+      koStages.forEach(stage=>{
+        const stageMatches=MATCHES.filter(m=>m.grp===stage).sort((a,b)=>a.id.localeCompare(b.id));
+        if(!stageMatches.length) return;
+        out+=`<div style="font-size:11px;font-weight:700;color:var(--gold);letter-spacing:.4px;margin:12px 0 8px;text-transform:uppercase">${stageLabel[stage]||stage}</div>`;
+        stageMatches.forEach(m=>{
+          const settled=m.resolved?'opacity:.5;pointer-events:none;':'';
+          const dateTime=m.match_date+(m.kickoff_ist?' · '+m.kickoff_ist+' IST':'');
+          out+=`<div style="${settled}background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:9px 11px;margin-bottom:7px">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:7px">${m.id.toUpperCase()} · ${dateTime}${m.resolved?' · ✓ Settled':''}</div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <select id="ko_h_${m.id}" style="flex:1;min-width:110px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px">
+                <option value="TBD">TBD</option>
+                ${m.home!=='TBD'?`<option value="${esc(m.home)}" selected>${esc(m.home)}</option>`:''}
+                ${teamOptions}
+              </select>
+              <div style="font-size:13px;color:var(--muted);flex-shrink:0">vs</div>
+              <select id="ko_a_${m.id}" style="flex:1;min-width:110px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px">
+                <option value="TBD">TBD</option>
+                ${m.away!=='TBD'?`<option value="${esc(m.away)}" selected>${esc(m.away)}</option>`:''}
+                ${teamOptions}
+              </select>
+              <button onclick="saveKOFixture('${m.id}')" style="background:var(--gold);color:var(--dark);border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation;flex-shrink:0">Save</button>
+            </div>
+          </div>`;
+        });
+      });
+      return out||'<div style="color:var(--muted);font-size:13px">No knockout fixtures found.</div>';
+    })()}
+    <div id="ko-err" class="err" style="margin-top:6px"></div>
   </div>`;
 
   document.getElementById('pane-admin').innerHTML=html;
@@ -3399,130 +3436,36 @@ async function updateBet(){
 // ════════════════════════════════════════════════════════════════
 //  FIXTURE IMPORT — fetch all WC2026 fixtures from api-football
 // ════════════════════════════════════════════════════════════════
-async function importFixturesFromAPI(){
-  const statusEl=document.getElementById('import-status');
-  if(!statusEl) return;
-  statusEl.style.color='var(--warn)';
-  statusEl.textContent='Fetching fixtures from api-football...';
 
-  const RAPIDAPI_KEY='9ccccda5ebmsh35908237b362fe4p12568cjsn6a49fb26955c';
-  const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-  // Group mapping: api-football round string → our grp code
-  // WC2026 groups are A–L, knockouts are named rounds
-  function parseRound(round){
-    if(!round) return null;
-    const r=round.trim();
-    if(/^Group Stage/.test(r)){
-      // "Group Stage - A" etc
-      const m=r.match(/Group Stage - ([A-L])/);
-      return m?m[1]:null;
-    }
-    if(/Round of 32/i.test(r)) return 'R32';
-    if(/Round of 16/i.test(r)) return 'R16';
-    if(/Quarter-final/i.test(r)) return 'QF';
-    if(/Semi-final/i.test(r)) return 'SF';
-    if(/Final/i.test(r)&&!/Semi/i.test(r)) return 'Final';
-    return null;
+async function saveKOFixture(mid){
+  const m=MATCHES.find(x=>x.id===mid);
+  if(!m){toast('Match not found: '+mid);return;}
+  const home=document.getElementById('ko_h_'+mid)?.value||'TBD';
+  const away=document.getElementById('ko_a_'+mid)?.value||'TBD';
+  if(home===away&&home!=='TBD'){
+    document.getElementById('ko-err').textContent='Home and away teams cannot be the same';
+    return;
   }
-
-  // Flag emoji from country code
-  function flagEmoji(code){
-    if(!code||code.length!==2) return '🏳';
-    return String.fromCodePoint(...[...code.toUpperCase()].map(c=>0x1F1E6-65+c.charCodeAt(0)));
+  // Auto-lookup flags from group stage matches already in DB
+  const getFlagFor=(team)=>{
+    if(team==='TBD') return '🏳️';
+    return MATCHES.find(x=>x.home===team)?.home_flag
+      ||MATCHES.find(x=>x.away===team)?.away_flag
+      ||'🏳️';
+  };
+  const {error}=await sb.from('matches').update({
+    home, away,
+    home_flag:getFlagFor(home),
+    away_flag:getFlagFor(away),
+  }).eq('id',mid);
+  if(error){
+    document.getElementById('ko-err').textContent='Error: '+error.message;
+    return;
   }
-
-  try {
-    // Fetch all fixtures for WC2026 (league=1, season=2026)
-    const resp=await fetch('https://v3.football.api-sports.io/fixtures?league=1&season=2026',{
-      headers:{
-        'x-apisports-key': RAPIDAPI_KEY
-      }
-    });
-    const data=await resp.json();
-    const fixtures=data.response||[];
-
-    if(!fixtures.length){
-      statusEl.style.color='var(--red)';
-      statusEl.textContent='No fixtures returned — API may not have WC2026 data yet.';
-      return;
-    }
-
-    statusEl.textContent=`Got ${fixtures.length} fixtures. Importing...`;
-
-    let imported=0, skipped=0, errors=0;
-
-    for(const f of fixtures){
-      const grp=parseRound(f.league?.round);
-      if(!grp){skipped++;continue;}
-
-      // Parse date and kickoff in IST (UTC+5:30)
-      const kickoffUTC=new Date(f.fixture?.date);
-      if(isNaN(kickoffUTC)){skipped++;continue;}
-      const kickoffIST=new Date(kickoffUTC.getTime()+5.5*60*60*1000);
-      const matchDate=monthNames[kickoffIST.getUTCMonth()]+' '+kickoffIST.getUTCDate();
-      const hh=String(kickoffIST.getUTCHours()).padStart(2,'0');
-      const mm=String(kickoffIST.getUTCMinutes()).padStart(2,'0');
-      const kickoffISTStr=hh+':'+mm;
-
-      const homeName=f.teams?.home?.name||'TBD';
-      const awayName=f.teams?.away?.name||'TBD';
-      const homeCode=f.teams?.home?.country||f.teams?.home?.name?.slice(0,2)||'';
-      const awayCode=f.teams?.away?.country||f.teams?.away?.name?.slice(0,2)||'';
-
-      // Use api-football fixture id as our match id
-      const mid='api_'+f.fixture.id;
-
-      const row={
-        id: mid,
-        grp: grp,
-        home: homeName,
-        away: awayName,
-        home_flag: flagEmoji(f.teams?.home?.code||homeCode),
-        away_flag: flagEmoji(f.teams?.away?.code||awayCode),
-        match_date: matchDate,
-        kickoff_ist: kickoffISTStr,
-        resolved: false
-      };
-
-      // Upsert — safe to re-run
-      const {error}=await sb.from('matches').upsert(row,{onConflict:'id'});
-      if(error){errors++;console.error('Import error',mid,error.message);}
-      else imported++;
-    }
-
-    // Reload data
-    await loadAll();
-    groupsLastFetched=0;
-    renderAll();
-
-    statusEl.style.color='var(--success)';
-    statusEl.textContent=`✓ Imported ${imported} fixtures · ${skipped} skipped · ${errors} errors`;
-    toast('Fixtures imported! '+imported+' matches loaded.');
-
-  } catch(e){
-    statusEl.style.color='var(--red)';
-    statusEl.textContent='Error: '+e.message;
-  }
-}
-
-async function addMatch(){
-  if(!LEAGUE){toast('No league found');return;}
-  const id=document.getElementById('new-id').value.trim().toLowerCase();
-  const grp=document.getElementById('new-grp').value.trim();
-  const home=document.getElementById('new-home').value.trim();
-  const away=document.getElementById('new-away').value.trim();
-  const date=document.getElementById('new-date').value.trim();
-  const e=document.getElementById('match-err');
-  if(!id||!home||!away){e.textContent='ID, home and away are required';return;}
-  const {error}=await sb.from('matches').upsert({
-    id, grp:grp||'KO', home, away, match_date:date||'TBD',
-    home_flag:'🏳️', away_flag:'🏳️', resolved:false
-  });
-  if(error){e.textContent='Error: '+error.message;return;}
-  e.textContent='';
-  toast('Fixture saved!');
+  document.getElementById('ko-err').textContent='';
+  toast('✓ '+mid.toUpperCase()+': '+home+' vs '+away+' saved');
   await loadAll();
+  renderAll();
   renderAdmin();
 }
 
