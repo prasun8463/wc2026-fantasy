@@ -1,0 +1,64 @@
+name: Daily Supabase Backup
+
+on:
+  schedule:
+    - cron: '30 1 * * *'   # 1:30 AM UTC = 7:00 AM IST every day
+  workflow_dispatch:         # manually runnable from GitHub Actions tab
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client
+
+      - name: Run pg_dump
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          mkdir -p backups
+          TIMESTAMP=$(date +%Y-%m-%d)
+
+          pg_dump \
+            --host=${{ secrets.SUPABASE_DB_HOST }} \
+            --port=5432 \
+            --username=${{ secrets.SUPABASE_DB_USER }} \
+            --dbname=postgres \
+            --no-password \
+            --format=plain \
+            --table=public.users \
+            --table=public.leagues \
+            --table=public.matches \
+            --table=public.predictions \
+            --data-only \
+            --column-inserts \
+            > backups/backup-${TIMESTAMP}.sql
+
+          BYTES=$(wc -c < backups/backup-${TIMESTAMP}.sql)
+          echo "✓ Backup complete: ${BYTES} bytes → backups/backup-${TIMESTAMP}.sql"
+
+      - name: Keep only last 30 backups
+        run: |
+          cd backups
+          ls -t backup-*.sql 2>/dev/null | tail -n +31 | xargs --no-run-if-empty rm -f
+          echo "Files retained: $(ls backup-*.sql 2>/dev/null | wc -l)"
+
+      - name: Commit backup
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add backups/
+          if git diff --staged --quiet; then
+            echo "No changes to commit (backup unchanged)"
+          else
+            git commit -m "backup: $(date +%Y-%m-%d)"
+            git push
+          fi
