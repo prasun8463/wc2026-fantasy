@@ -9,7 +9,7 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # suppress Node.js 20 warning
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout repo
@@ -27,8 +27,6 @@ jobs:
           mkdir -p backups
           TIMESTAMP=$(date +%Y-%m-%d)
 
-          # Use Supabase session pooler (port 5432, IPv4) — direct DB (port 5432)
-          # is blocked from GitHub Actions runners. Pooler works reliably.
           pg_dump \
             --host=aws-0-ap-southeast-1.pooler.supabase.com \
             --port=5432 \
@@ -46,7 +44,7 @@ jobs:
 
           BYTES=$(wc -c < backups/backup-${TIMESTAMP}.sql)
           ROWS=$(grep -c "^INSERT" backups/backup-${TIMESTAMP}.sql || true)
-          echo "✓ Backup complete: ${BYTES} bytes, ${ROWS} INSERT statements → backups/backup-${TIMESTAMP}.sql"
+          echo "✓ Backup: ${BYTES} bytes, ${ROWS} rows → backups/backup-${TIMESTAMP}.sql"
 
       - name: Keep only last 30 backups
         run: |
