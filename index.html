@@ -367,7 +367,7 @@ const ROUND_DEFS=[
   {key:'r32',   label:'R32',         grps:['R32']},
   {key:'r16',   label:'R16',         grps:['R16']},
   {key:'qf',    label:'QF',          grps:['QF']},
-  {key:'sf',    label:'SF / Final',  grps:['SF','Final']},
+  {key:'sf',    label:'SF / Final',  grps:['SF','Final','3rd']},
 ];
 
 function calcRoundStats(username){
@@ -393,7 +393,7 @@ const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // UTC+5:30
 const KICKOFF_CUTOFF_MS = 5 * 60 * 1000;     // 5 min before kickoff
 const MATCH_DURATION_MS = 105 * 60 * 1000;       // 90 + 15 stoppage (group stage)
 const KNOCKOUT_DURATION_MS = 150 * 60 * 1000;    // 90 + 30 ET + 30 penalties (knockout fallback)
-const KNOCKOUT_STAGES = ['R32','R16','QF','SF','Final'];
+const KNOCKOUT_STAGES = ['R32','R16','QF','SF','Final','3rd'];
 function isKnockout(m){ return KNOCKOUT_STAGES.includes(m?.grp); }
 
 // ── Sanitization ────────────────────────────────────────────────
@@ -694,7 +694,7 @@ function betFor(match){
     if(grp==='R32') return parseInt(ba.r32)||parseInt(ba.group)||100;
     if(grp==='R16') return parseInt(ba.r16)||parseInt(ba.group)||100;
     if(grp==='QF')  return parseInt(ba.qf)||parseInt(ba.group)||100;
-    if(['SF','Final'].includes(grp)) return parseInt(ba.sf)||parseInt(ba.group)||100;
+    if(['SF','Final','3rd'].includes(grp)) return parseInt(ba.sf)||parseInt(ba.group)||100;
     return parseInt(ba.group)||100;
   }
   return typeof ba==='number'?ba:100;
@@ -722,7 +722,7 @@ function parseBetAmount(raw){
 
 
 function renderMatches(){
-  const groups=['All','A','B','C','D','E','F','G','H','I','J','K','L','R32','R16','QF','SF','Final'];
+  const groups=['All','A','B','C','D','E','F','G','H','I','J','K','L','R32','R16','QF','SF','3rd','Final'];
   let html=`<div class="filter-bar">`;
   groups.forEach(g=>html+=`<div class="fchip${g===matchFilter?' on':''}" onclick="setFilter('${g}')">${g==='All'?'All':g}</div>`);
   html+=`</div><div id="match-list"></div>`;
@@ -888,7 +888,7 @@ function renderMatchList(){
     let lastGrp='';
     matches.forEach(m=>{
       if(m.grp!==lastGrp){
-        out+=`<div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin:8px 0 4px;${isPast?'opacity:.6':''}">${['R32','R16','QF','SF','Final'].includes(m.grp)?m.grp:'Group '+m.grp}</div>`;
+        out+=`<div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin:8px 0 4px;${isPast?'opacity:.6':''}">${['R32','R16','QF','SF','Final','3rd'].includes(m.grp)?m.grp:'Group '+m.grp}</div>`;
         lastGrp=m.grp;
       }
       out+=renderMatchRow(m, forceFuture);
@@ -963,7 +963,7 @@ function openMatchSheet(mid){
   else if(status==='future') statusBadge=`<span class="badge b-future" style="margin-left:8px;font-size:11px">${m.kickoff_ist||'TBD'} IST</span>`;
 
   let html=`<div style="font-size:12px;color:var(--muted);margin-bottom:12px;display:flex;align-items:center">
-    ${['R32','R16','QF','SF','Final'].includes(m.grp)?m.grp:'Group '+m.grp} · ${m.match_date} · ${m.kickoff_ist||''} IST${statusBadge}
+    ${['R32','R16','QF','SF','Final','3rd'].includes(m.grp)?m.grp:'Group '+m.grp} · ${m.match_date} · ${m.kickoff_ist||''} IST${statusBadge}
   </div>`;
 
   // Score or match banner
@@ -1061,7 +1061,7 @@ function openMatchSheet(mid){
     // ── Bold Pick (knockouts only) ──
     let boldStripHtml='';
     if(isKnockout(m)){
-      const stageGrps=m.grp==='SF'||m.grp==='Final'?['SF','Final']:[m.grp];
+      const stageGrps=m.grp==='SF'||m.grp==='Final'||m.grp==='3rd'?['SF','Final','3rd']:[m.grp];
       const myBoldsInStage=stageGrps.flatMap(g=>MATCHES.filter(x=>x.grp===g)).reduce((cnt,mm)=>{
         if(mm.id===mid) return cnt; // exclude current match (we may be editing it)
         const myPick=(PREDS[mm.id]||[]).find(p=>p.username===ME.username&&p.bold===true);
@@ -1069,7 +1069,7 @@ function openMatchSheet(mid){
       },0);
       const isCurrentBold=isEditing&&myP&&myP.bold===true;
       const canBold=myBoldsInStage<1; // 1 bold per stage
-      const stageLabel=m.grp==='SF'||m.grp==='Final'?'SF/Final':m.grp;
+      const stageLabel=m.grp==='SF'||m.grp==='Final'||m.grp==='3rd'?'SF/Final':m.grp;
       const statusLine=isCurrentBold?'currently your bold for this stage':canBold?'1 bold available this stage':'already used this stage';
       boldStripHtml=`<div style="background:rgba(212,160,23,.04);border:1px solid rgba(212,160,23,.18);border-radius:8px;padding:10px 12px;margin-bottom:10px">
         <label style="display:flex;align-items:flex-start;gap:9px;cursor:${(canBold||isCurrentBold)?'pointer':'not-allowed'};opacity:${(canBold||isCurrentBold)?'1':'.55'}">
@@ -1153,7 +1153,7 @@ async function submitPredFromSheet(mid){
   const isBold=!!(boldEl&&boldEl.checked);
   // Defense in depth: re-validate stage limit before insert
   if(isBold&&m){
-    const stageGrps=m.grp==='SF'||m.grp==='Final'?['SF','Final']:[m.grp];
+    const stageGrps=m.grp==='SF'||m.grp==='Final'||m.grp==='3rd'?['SF','Final','3rd']:[m.grp];
     const existingBoldsInStage=stageGrps.flatMap(g=>MATCHES.filter(x=>x.grp===g)).reduce((cnt,mm)=>{
       if(mm.id===mid) return cnt;
       const myPick=(PREDS[mm.id]||[]).find(p=>p.username===ME.username&&p.bold===true);
@@ -1247,7 +1247,7 @@ function ppShowType(type){
   else if(ppActiveType==='refund') matches=settled.filter(m=>(m.resolved_winners||[]).includes(username)&&m.resolved_type==='refund');
 
   // Sort descending — most recent/latest stage first
-  const stageOrder={Final:0,SF:1,QF:2,R16:3,R32:4};
+  const stageOrder={Final:0,'3rd':0.5,SF:1,QF:2,R16:3,R32:4};
   matches.sort((a,b)=>{
     const sa=stageOrder[a.grp]??5, sb=stageOrder[b.grp]??5;
     if(sa!==sb) return sa-sb; // knockout stages first
@@ -1266,7 +1266,7 @@ function ppShowType(type){
   setTimeout(()=>{
     const el=document.getElementById('pp-match-list');
     if(!el) return;
-    const stageLabel={R32:'R32',R16:'R16',QF:'QF',SF:'SF',Final:'Final'};
+    const stageLabel={R32:'R32',R16:'R16',QF:'QF',SF:'SF','3rd':'3rd',Final:'Final'};
     const groupLabel=(grp)=>stageLabel[grp]?stageLabel[grp]:'Grp '+grp;
     let html='<div style="display:grid;grid-template-columns:1fr auto auto;gap:0;border-top:1px solid rgba(255,255,255,.06);margin-top:6px">';
     html+='<div style="font-size:10px;color:var(--muted);padding:5px 0 5px 0;font-weight:600">Match</div>'
@@ -3133,8 +3133,8 @@ function renderAdmin(){
       Kickoff times are pre-set from the fixture schedule.
     </div>
     ${(()=>{
-      const koStages=['R32','R16','QF','SF','Final'];
-      const stageLabel={'R32':'Round of 32','R16':'Round of 16','QF':'Quarter-finals','SF':'Semi-finals','Final':'Final & 3rd Place'};
+      const koStages=['R32','R16','QF','SF','3rd','Final'];
+      const stageLabel={'R32':'Round of 32','R16':'Round of 16','QF':'Quarter-finals','SF':'Semi-finals','3rd':'3rd Place Match','Final':'Final'};
       // All 48 WC2026 teams sorted alphabetically
       const allTeams=[
         'Algeria','Argentina','Australia','Austria','Belgium',
