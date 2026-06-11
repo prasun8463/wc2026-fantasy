@@ -773,12 +773,12 @@ function renderMatchList(){
 
   let html='';
 
-  function renderMatchRow(m, forceFuture){
+  function renderMatchRow(m){
     const arr=PREDS[m.id]||[];
     const myP=arr.find(p=>p.username===ME.username);
     const pot=arr.length*betFor(m);
     const potDisplay=pot>0?'₹'+pot+' pot':'₹'+betFor(m)+' to enter';
-    const status=forceFuture?'future':matchStatus(m);
+    const status=matchStatus(m);
     const canPredict=status==='open'&&!myP;
 
     let pickBadge='';
@@ -878,7 +878,7 @@ function renderMatchList(){
     </div>`;
   }
 
-  function renderDateGroup(g,isToday,isPast,forceFuture){
+  function renderDateGroup(g,isToday,isPast){
     const matches=g.matches;
     // Only compute status-based counts for today — future dates show match count, past show settled
     const settledCount=matches.filter(m=>m.resolved).length;
@@ -927,7 +927,7 @@ function renderMatchList(){
         out+=`<div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin:8px 0 4px;${isPast?'opacity:.6':''}">${['R32','R16','QF','SF','Final','3rd'].includes(m.grp)?m.grp:'Group '+m.grp}</div>`;
         lastGrp=m.grp;
       }
-      out+=renderMatchRow(m, forceFuture);
+      out+=renderMatchRow(m);
     });
     return out;
   }
@@ -973,7 +973,7 @@ function renderMatchList(){
   if(todayGroup) html+=renderDateGroup(todayGroup,true,false);
   if(futureGroups.length){
     html+=divider('Upcoming','#4a8a4a');
-    futureGroups.forEach(g=>{ html+=renderDateGroup(g,false,false,true); });
+    futureGroups.forEach(g=>{ html+=renderDateGroup(g,false,false); });
   }
   if(pastGroups.length){
     html+=divider('Past results','#3a6a3a');
