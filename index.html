@@ -743,6 +743,11 @@ function renderMatches(){
 }
 
 function setFilter(f){ matchFilter=f; renderMatches(); }
+function scrollToFirstOpen(){
+  const openRow=document.querySelector('.mrow[data-status="open"]')
+    || document.querySelector('.mrow[id]');
+  if(openRow) openRow.scrollIntoView({behavior:'smooth',block:'center'});
+}
 
 function renderMatchList(){
   const filtered=matchFilter==='All'?MATCHES:MATCHES.filter(m=>m.grp===matchFilter);
@@ -864,7 +869,7 @@ function renderMatchList(){
       status==='settled'&&myP?``:
       '';
 
-    return `<div class="mrow" id="mr_${m.id}" onclick="toggleMatchSheet('${m.id}')" style="cursor:pointer;${rowStyle}">
+    return `<div class="mrow" id="mr_${m.id}" data-status="${status}" onclick="toggleMatchSheet('${m.id}')" style="cursor:pointer;${rowStyle}">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
         <div style="flex:1;min-width:0">
           <div class="mteams" style="color:${isPast&&!myP?'var(--muted)':'var(--text)'}">${m.home_flag} ${m.home} <span style="color:var(--muted);font-weight:400;font-size:13px">vs</span> ${m.away} ${m.away_flag}</div>
@@ -961,7 +966,7 @@ function renderMatchList(){
     const stripBorder=allDone?'rgba(76,175,80,.3)':'rgba(212,160,23,.35)';
     const stripTextColor=allDone?'#6abf6a':'var(--gold)';
     const dotAnim=allDone?'':'animation:pulse 2s infinite;';
-    const scrollBtn=allDone?'':'<button onclick="document.querySelector(\'.mrow[id]\')?.scrollIntoView({behavior:\'smooth\',block:\'center\'})" style="background:var(--gold);color:var(--dark);border:none;border-radius:7px;padding:5px 11px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;touch-action:manipulation">Scroll ↓</button>';
+    const scrollBtn=allDone?'':'<button onclick="scrollToFirstOpen()" style="background:var(--gold);color:var(--dark);border:none;border-radius:7px;padding:5px 11px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;touch-action:manipulation">Scroll ↓</button>';
     html+='<div id="action-strip" style="display:flex;align-items:center;justify-content:space-between;padding:9px 13px;margin-bottom:10px;background:'+stripColor+';border:1px solid '+stripBorder+';border-radius:10px;gap:10px">'
          +'<div style="display:flex;align-items:center;gap:7px;flex:1;min-width:0">'
          +'<div style="width:7px;height:7px;border-radius:50%;background:'+stripTextColor+';flex-shrink:0;'+dotAnim+'"></div>'
