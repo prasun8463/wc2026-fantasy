@@ -126,6 +126,7 @@
 
   /* ── MATCH ROW ── */
   .mrow { border: 1px solid var(--border); border-radius: 11px; padding: 11px 13px; margin-bottom: 7px; touch-action: manipulation; }
+  .mrow[data-status="open"] { border-color: rgba(212,160,23,.55); border-left: 3px solid var(--gold); box-shadow: 0 0 0 1px rgba(212,160,23,.12), 0 2px 12px rgba(212,160,23,.08); }
   .mhead { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
   .mteams { font-size: 15px; font-weight: 700; }
   .mmeta { font-size: 12px; color: var(--muted); margin-top: 3px; }
@@ -743,11 +744,7 @@ function renderMatches(){
 }
 
 function setFilter(f){ matchFilter=f; renderMatches(); }
-function scrollToFirstOpen(){
-  const openRow=document.querySelector('.mrow[data-status="open"]')
-    || document.querySelector('.mrow[id]');
-  if(openRow) openRow.scrollIntoView({behavior:'smooth',block:'center'});
-}
+
 
 function renderMatchList(){
   const filtered=matchFilter==='All'?MATCHES:MATCHES.filter(m=>m.grp===matchFilter);
@@ -966,12 +963,10 @@ function renderMatchList(){
     const stripBorder=allDone?'rgba(76,175,80,.3)':'rgba(212,160,23,.35)';
     const stripTextColor=allDone?'#6abf6a':'var(--gold)';
     const dotAnim=allDone?'':'animation:pulse 2s infinite;';
-    const scrollBtn=allDone?'':'<button onclick="scrollToFirstOpen()" style="background:var(--gold);color:var(--dark);border:none;border-radius:7px;padding:5px 11px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;touch-action:manipulation">Scroll ↓</button>';
-    html+='<div id="action-strip" style="display:flex;align-items:center;justify-content:space-between;padding:9px 13px;margin-bottom:10px;background:'+stripColor+';border:1px solid '+stripBorder+';border-radius:10px;gap:10px">'
-         +'<div style="display:flex;align-items:center;gap:7px;flex:1;min-width:0">'
+    html+='<div id="action-strip" style="display:flex;align-items:center;padding:9px 13px;margin-bottom:10px;background:'+stripColor+';border:1px solid '+stripBorder+';border-radius:10px;gap:7px">'
          +'<div style="width:7px;height:7px;border-radius:50%;background:'+stripTextColor+';flex-shrink:0;'+dotAnim+'"></div>'
-         +'<span style="font-size:12px;color:'+stripTextColor+';font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+stripMsg+'</span>'
-         +'</div>'+scrollBtn+'</div>';
+         +'<span style="font-size:12px;color:'+stripTextColor+';font-weight:600;">'+stripMsg+'</span>'
+         +'</div>';
   }
 
   // Render: today → upcoming divider → future → past results divider → past
