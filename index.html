@@ -3074,6 +3074,32 @@ async function copyReminderMessage(){
   }
 }
 
+// ── Admin: one-click data backup via Supabase REST API ──
+async function downloadBackup(){
+  try{
+    toast('Downloading backup…');
+    const tables=['users','leagues','matches','predictions'];
+    const backup={_meta:{timestamp:new Date().toISOString(),tables}};
+    for(const t of tables){
+      const {data,error}=await sb.from(t).select('*');
+      if(error) throw new Error(t+': '+error.message);
+      backup[t]=data||[];
+    }
+    const json=JSON.stringify(backup,null,2);
+    const blob=new Blob([json],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    const d=new Date(new Date().getTime()+IST_OFFSET_MS);
+    const fname='wc2026-backup-'+d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0')+'_'+String(d.getUTCHours()).padStart(2,'0')+String(d.getUTCMinutes()).padStart(2,'0')+'.json';
+    a.href=url; a.download=fname; document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+    toast('✓ Saved: '+fname);
+  }catch(e){
+    console.error('Backup failed:',e);
+    toast('Backup failed: '+e.message);
+  }
+}
+
 function renderAdmin(){
   if(!LEAGUE||LEAGUE.admin_username!==ME.username){
     document.getElementById('pane-admin').innerHTML='<div class="empty" style="padding-top:40px">Only the league admin can access this panel.</div>';
@@ -3149,7 +3175,12 @@ function renderAdmin(){
       </div>
     </div>`;
 
-  let html=reminderHtml+lbShareHtml+`<div class="sec">Live scores ${liveBadge}</div>
+  let html=reminderHtml+lbShareHtml+`<div class="sec">Data backup</div>
+  <div class="card" style="margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
+    <div style="font-size:13px;color:var(--muted)">Download all users, matches, predictions as JSON</div>
+    <button onclick="downloadBackup()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--muted);cursor:pointer">⬇ Backup</button>
+  </div>
+  <div class="sec">Live scores ${liveBadge}</div>
   <div class="card" style="margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
     <div style="font-size:13px;color:var(--muted)">Polling every 5 minutes during match windows</div>
     <button onclick="fetchLiveScores()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--muted);cursor:pointer">↻ Refresh now</button>
