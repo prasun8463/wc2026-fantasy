@@ -664,12 +664,14 @@ function matchStatus(m){
   const kickoffIST=new Date(Date.UTC(2026,month,day,hh,mm));
   const kickoffUTC=new Date(kickoffIST.getTime()-IST_OFFSET_MS);
   const openUntil=new Date(kickoffUTC.getTime()-KICKOFF_CUTOFF_MS);
-  const opensAt=new Date(kickoffUTC.getTime()-12*60*60*1000); // 12h before kickoff
+  // All matches on a given IST date open at 12:00 PM IST the day before.
+  // e.g. Jun 12 matches (00:30, 07:30) both open Jun 11 12:00 PM IST.
+  // This gives one consistent reminder per day instead of per-match windows.
+  const opensAtIST=new Date(Date.UTC(2026,month,day-1,12,0)); // prev day noon IST
+  const opensAtUTC=new Date(opensAtIST.getTime()-IST_OFFSET_MS);
   const now=new Date();
   if(now<openUntil){
-    // Predictions open 12 hours before kickoff (regardless of calendar date)
-    // e.g. 00:30 IST match opens at 12:30 IST the previous afternoon
-    if(now>=opensAt) return 'open';
+    if(now>=opensAtUTC) return 'open';
     return 'future';
   }
   // Check live score API data first
@@ -825,24 +827,20 @@ function renderMatchList(){
         ?`<button style="background:var(--gold);color:var(--dark);border:none;border-radius:8px;padding:6px 13px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;touch-action:manipulation;-webkit-tap-highlight-color:transparent" onclick="event.stopPropagation();toggleMatchSheet('${m.id}')">Predict</button>`
         :`<div class="badge b-green" style="flex-shrink:0;font-size:11px">Predicted</div>`;
     } else {
-      // Compute "opens at" time = kickoff - 12h, formatted in IST
+      // Compute "opens at" = 12:00 PM IST the day before match_date
       const _opensAt=(()=>{
         if(!m.kickoff_ist||!m.match_date) return null;
         const _p=m.match_date.trim().split(' ');
         const _mon={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11}[_p[0]];
         const _day=parseInt(_p[1]);
-        const [_hh,_mm]=m.kickoff_ist.split(':').map(Number);
-        const _kickoffUTC=new Date(Date.UTC(2026,_mon,_day,_hh,_mm))-IST_OFFSET_MS;
-        const _opensUTC=new Date(_kickoffUTC-12*60*60*1000);
+        const _opensIST=new Date(Date.UTC(2026,_mon,_day-1,12,0));
+        const _opensUTC=new Date(_opensIST.getTime()-IST_OFFSET_MS);
         const _now=new Date();
-        if(_now>=_opensUTC) return null; // already open or past — shouldn't reach here
-        const _istMs=_opensUTC.getTime()+IST_OFFSET_MS;
-        const _istD=new Date(_istMs);
-        const _hStr=String(_istD.getUTCHours()).padStart(2,'0');
-        const _mStr=String(_istD.getUTCMinutes()).padStart(2,'0');
-        const _todayIST=new Date(new Date().getTime()+IST_OFFSET_MS);
-        const _sameDay=_istD.getUTCDate()===_todayIST.getUTCDate()&&_istD.getUTCMonth()===_todayIST.getUTCMonth();
-        return (_sameDay?'Opens ':'Opens '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][_istD.getUTCMonth()]+' '+_istD.getUTCDate()+' ')+_hStr+':'+_mStr;
+        if(_now>=_opensUTC) return null;
+        const _mNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const _todayIST=new Date(_now.getTime()+IST_OFFSET_MS);
+        const _sameDay=_opensIST.getUTCDate()===_todayIST.getUTCDate()&&_opensIST.getUTCMonth()===_todayIST.getUTCMonth();
+        return _sameDay?'Opens 12:00':('Opens '+_mNames[_opensIST.getUTCMonth()]+' '+_opensIST.getUTCDate()+' 12:00');
       })();
       rightHtml='<div style="flex-shrink:0;text-align:right">'
              +'<div class="badge b-future" style="font-size:11px;display:block;margin-bottom:2px">'+(m.kickoff_ist||'TBD')+' IST</div>'
@@ -2942,25 +2940,22 @@ function stopLivePolling(){
 
 // ── WhatsApp Reminder helpers ──
 function getTodayMatches(){
-  // Show reminder for any match kicking off within the next 12 hours (IST).
-  // This means the button appears ~12h before the first match of the day,
-  // so you can send the WhatsApp reminder well in advance.
-  const nowIST=new Date(new Date().getTime()+5.5*60*60*1000);
-  const windowEnd=new Date(nowIST.getTime()+12*60*60*1000); // now + 12h
-  const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const MONTH_NUM={Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
+  // Show reminder for all matches whose prediction window is currently open.
+  // Since all matches on a given IST date open together (prior day noon),
+  // this returns a batch per day — one reminder covers all matches.
+  const MONTH_NUM={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
   return MATCHES.filter(m=>{
     if(!m.kickoff_ist||!m.match_date) return false;
     if(m.resolved) return false;
-    // Parse match kickoff as an IST Date object
-    const parts=m.match_date.trim().split(' ');
-    const mon=MONTH_NUM[parts[0]]; const day=parseInt(parts[1]);
-    const [hh,mm]=m.kickoff_ist.split(':').map(Number);
-    // Build as UTC then treat as IST (same trick as matchStatus)
-    const kickoffIST=new Date(Date.UTC(2026,mon-1,day,hh,mm));
-    // Include if kickoff is in the future AND within 12h window
-    return kickoffIST>nowIST && kickoffIST<=windowEnd;
+    return matchStatus(m)==='open';
   }).sort((a,b)=>{
+    const da=a.match_date, db=b.match_date;
+    if(da!==db){
+      const pa=da.trim().split(' '), pb=db.trim().split(' ');
+      const ka=(MONTH_NUM[pa[0]]||0)*100+(parseInt(pa[1])||0);
+      const kb=(MONTH_NUM[pb[0]]||0)*100+(parseInt(pb[1])||0);
+      if(ka!==kb) return ka-kb;
+    }
     const [ah,am]=(a.kickoff_ist||'23:59').split(':').map(Number);
     const [bh,bm]=(b.kickoff_ist||'23:59').split(':').map(Number);
     return (ah*60+am)-(bh*60+bm);
