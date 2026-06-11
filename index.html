@@ -2885,10 +2885,25 @@ function stopLivePolling(){
 
 // ── WhatsApp Reminder helpers ──
 function getTodayMatches(){
+  // Show reminder for any match kicking off within the next 12 hours (IST).
+  // This means the button appears ~12h before the first match of the day,
+  // so you can send the WhatsApp reminder well in advance.
   const nowIST=new Date(new Date().getTime()+5.5*60*60*1000);
+  const windowEnd=new Date(nowIST.getTime()+12*60*60*1000); // now + 12h
   const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const todayStr=monthNames[nowIST.getUTCMonth()]+' '+nowIST.getUTCDate();
-  return MATCHES.filter(m=>m.match_date===todayStr).sort((a,b)=>{
+  const MONTH_NUM={Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
+  return MATCHES.filter(m=>{
+    if(!m.kickoff_ist||!m.match_date) return false;
+    if(m.resolved) return false;
+    // Parse match kickoff as an IST Date object
+    const parts=m.match_date.trim().split(' ');
+    const mon=MONTH_NUM[parts[0]]; const day=parseInt(parts[1]);
+    const [hh,mm]=m.kickoff_ist.split(':').map(Number);
+    // Build as UTC then treat as IST (same trick as matchStatus)
+    const kickoffIST=new Date(Date.UTC(2026,mon-1,day,hh,mm));
+    // Include if kickoff is in the future AND within 12h window
+    return kickoffIST>nowIST && kickoffIST<=windowEnd;
+  }).sort((a,b)=>{
     const [ah,am]=(a.kickoff_ist||'23:59').split(':').map(Number);
     const [bh,bm]=(b.kickoff_ist||'23:59').split(':').map(Number);
     return (ah*60+am)-(bh*60+bm);
@@ -2896,9 +2911,8 @@ function getTodayMatches(){
 }
 
 function generateWhatsAppMessage(matches){
-  const nowIST=new Date(new Date().getTime()+5.5*60*60*1000);
-  const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const dateStr=monthNames[nowIST.getUTCMonth()]+' '+nowIST.getUTCDate();
+  // Use the match date (not today) — reminder may be sent the day before
+  const dateStr=matches[0].match_date||'Today';
   const bet=betFor(matches[0]);
   let lines=[];
   lines.push('\u26bd *WC2026 Fantasy \u2014 '+dateStr+'*');
