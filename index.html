@@ -842,10 +842,10 @@ function renderMatchList(){
         const _sameDay=_istD.getUTCDate()===_todayIST.getUTCDate()&&_istD.getUTCMonth()===_todayIST.getUTCMonth();
         return (_sameDay?'Opens ':'Opens '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][_istD.getUTCMonth()]+' '+_istD.getUTCDate()+' ')+_hStr+':'+_mStr;
       })();
-      rightHtml=`<div style="flex-shrink:0;text-align:right">
-        <div class="badge b-future" style="font-size:11px;display:block;margin-bottom:2px">${m.kickoff_ist||'TBD'} IST</div>
-        ${_opensAt?`<div style="font-size:10px;color:var(--muted);text-align:center">${_opensAt}</div>`:''}
-      </div>`;
+      rightHtml='<div style="flex-shrink:0;text-align:right">'
+             +'<div class="badge b-future" style="font-size:11px;display:block;margin-bottom:2px">'+(m.kickoff_ist||'TBD')+' IST</div>'
+             +(_opensAt?'<div style="font-size:10px;color:var(--muted);text-align:center">'+_opensAt+'</div>':'')
+             +'</div>';
     }
 
     const isPast=status==='settled'||status==='inprogress'||status==='live'||status==='finished';
@@ -939,11 +939,9 @@ function renderMatchList(){
   }
 
   // ── Action strip — shows at top of match list when anything is open ──
-  // Counts open matches (predicted or not) and earliest closing time
   const openMatches=MATCHES.filter(m=>matchStatus(m)==='open'&&!m.resolved);
   const unpredictedOpen=openMatches.filter(m=>!(PREDS[m.id]||[]).find(p=>p.username===ME.username));
   if(openMatches.length>0){
-    // Find the earliest closing time (kickoff - 5 min) among open matches
     const earliest=openMatches.reduce((best,m)=>{
       const parts=m.match_date.trim().split(' ');
       const mon={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11}[parts[0]];
@@ -957,18 +955,18 @@ function renderMatchList(){
     const closesStr=closesIST?(String(closesIST.getUTCHours()).padStart(2,'0')+':'+String(closesIST.getUTCMinutes()).padStart(2,'0')+' IST'):'';
     const allDone=unpredictedOpen.length===0;
     const stripMsg=allDone
-      ? `All ${openMatches.length} open match${openMatches.length!==1?'es':''} predicted ✓`
-      : `${unpredictedOpen.length} match${unpredictedOpen.length!==1?'es':''} open to predict · closes ${closesStr}`;
+      ?('All '+openMatches.length+' open match'+(openMatches.length!==1?'es':'')+' predicted ✓')
+      :(unpredictedOpen.length+' match'+(unpredictedOpen.length!==1?'es':'')+' open to predict · closes '+closesStr);
     const stripColor=allDone?'rgba(76,175,80,.12)':'rgba(212,160,23,.1)';
     const stripBorder=allDone?'rgba(76,175,80,.3)':'rgba(212,160,23,.35)';
     const stripTextColor=allDone?'#6abf6a':'var(--gold)';
-    html+=`<div id="action-strip" style="display:flex;align-items:center;justify-content:space-between;padding:9px 13px;margin-bottom:10px;background:${stripColor};border:1px solid ${stripBorder};border-radius:10px;gap:10px">
-      <div style="display:flex;align-items:center;gap:7px;flex:1;min-width:0">
-        <div style="width:7px;height:7px;border-radius:50%;background:${stripTextColor};flex-shrink:0${allDone?'':';animation:pulse 2s infinite'}"></div>
-        <span style="font-size:12px;color:${stripTextColor};font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${stripMsg}</span>
-      </div>
-      ${!allDone?`<button onclick="document.querySelector('.mrow[id]')?.scrollIntoView({behavior:'smooth',block:'center'})" style="background:var(--gold);color:var(--dark);border:none;border-radius:7px;padding:5px 11px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;touch-action:manipulation">Scroll to ↓</button>`:''}
-    </div>`;
+    const dotAnim=allDone?'':'animation:pulse 2s infinite;';
+    const scrollBtn=allDone?'':'<button onclick="document.querySelector(\'.mrow[id]\')?.scrollIntoView({behavior:\'smooth\',block:\'center\'})" style="background:var(--gold);color:var(--dark);border:none;border-radius:7px;padding:5px 11px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;touch-action:manipulation">Scroll ↓</button>';
+    html+='<div id="action-strip" style="display:flex;align-items:center;justify-content:space-between;padding:9px 13px;margin-bottom:10px;background:'+stripColor+';border:1px solid '+stripBorder+';border-radius:10px;gap:10px">'
+         +'<div style="display:flex;align-items:center;gap:7px;flex:1;min-width:0">'
+         +'<div style="width:7px;height:7px;border-radius:50%;background:'+stripTextColor+';flex-shrink:0;'+dotAnim+'"></div>'
+         +'<span style="font-size:12px;color:'+stripTextColor+';font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+stripMsg+'</span>'
+         +'</div>'+scrollBtn+'</div>';
   }
 
   // Render: today → upcoming divider → future → past results divider → past
