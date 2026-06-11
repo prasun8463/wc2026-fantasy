@@ -596,6 +596,14 @@ async function loadAll(){
     const tb=(b.kickoff_ist||'99:99').replace(':','');
     return parseInt(ta)-parseInt(tb);
   });
+  // Warn if any group-stage matches are missing kickoff_ist (would freeze all predictions)
+  const missingKickoff=MATCHES.filter(m=>!m.kickoff_ist&&['A','B','C','D','E','F','G','H','I','J','K','L'].includes(m.grp));
+  if(missingKickoff.length){
+    console.error('⚠️ '+missingKickoff.length+' group matches missing kickoff_ist — matchStatus() will return future for all of them:', missingKickoff.map(m=>m.id));
+    // Surface as a toast for admin only
+    if(ME&&LEAGUE&&ME.username===LEAGUE.admin_username)
+      toast('⚠️ '+missingKickoff.length+' matches missing kickoff time — run fixture SQL');
+  }
   // Load predictions for this league
   if(MEMBERS.length){
     const usernames=MEMBERS.map(m=>m.username);
@@ -2368,7 +2376,7 @@ async function renderGroups(){
     E:['Germany','Curaçao','Ivory Coast','Ecuador'],
     F:['Netherlands','Japan','Tunisia','Sweden'],
     G:['Belgium','Egypt','Iran','New Zealand'],
-    H:['Spain','Cabo Verde','Saudi Arabia','Uruguay'],
+    H:['Spain','Cape Verde','Saudi Arabia','Uruguay'],
     I:['France','Senegal','Norway','Iraq'],
     J:['Argentina','Algeria','Austria','Jordan'],
     K:['Portugal','Uzbekistan','Colombia','DR Congo'],
@@ -2380,10 +2388,10 @@ async function renderGroups(){
     'Canada':'🇨🇦','Bosnia and Herzegovina':'🇧🇦','Qatar':'🇶🇦','Switzerland':'🇨🇭',
     'Brazil':'🇧🇷','Morocco':'🇲🇦','Haiti':'🇭🇹','Scotland':'🏴󠁧󠁢󠁳󠁣󠁴󠁿',
     'USA':'🇺🇸','Paraguay':'🇵🇾','Australia':'🇦🇺','Türkiye':'🇹🇷',
-    'Germany':'🇩🇪','Curaçao':'🌍','Ivory Coast':'🇨🇮','Ecuador':'🇪🇨',
+    'Germany':'🇩🇪','Curaçao':'🇨🇼','Ivory Coast':'🇨🇮','Ecuador':'🇪🇨',
     'Netherlands':'🇳🇱','Japan':'🇯🇵','Tunisia':'🇹🇳','Sweden':'🇸🇪',
     'Belgium':'🇧🇪','Egypt':'🇪🇬','Iran':'🇮🇷','New Zealand':'🇳🇿',
-    'Spain':'🇪🇸','Cabo Verde':'🇨🇻','Saudi Arabia':'🇸🇦','Uruguay':'🇺🇾',
+    'Spain':'🇪🇸','Cape Verde':'🇨🇻','Saudi Arabia':'🇸🇦','Uruguay':'🇺🇾',
     'France':'🇫🇷','Senegal':'🇸🇳','Norway':'🇳🇴','Iraq':'🇮🇶',
     'Argentina':'🇦🇷','Algeria':'🇩🇿','Austria':'🇦🇹','Jordan':'🇯🇴',
     'Portugal':'🇵🇹','Uzbekistan':'🇺🇿','Colombia':'🇨🇴','DR Congo':'🇨🇩',
@@ -2605,19 +2613,34 @@ function setGroupFilter(f){
 // Fetch live + today's finished matches from api-football
 async function fetchLiveScores(){
   try{
-    const today=new Date(new Date().getTime()+5.5*60*60*1000); // IST
-    const dd=String(today.getUTCDate()).padStart(2,'0');
-    const mo=String(today.getUTCMonth()+1).padStart(2,'0');
-    const yyyy=today.getUTCFullYear();
-    const dateStr=`${yyyy}-${mo}-${dd}`;
+    _trackApiCall(); // budget tracker — warns at 90/100 daily calls
+    // Fetch both IST date AND UTC date to catch matches that straddle midnight
+    // e.g. Mexico vs SA kicks off at 19:00 UTC Jun 11 = 00:30 IST Jun 12
+    // api-football uses UTC dates, so we must query the UTC date as well
+    const nowUTC=new Date();
+    const todayIST=new Date(nowUTC.getTime()+5.5*60*60*1000);
+    const fmtDate=d=>`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+    const dateStrIST=fmtDate(todayIST);
+    const dateStrUTC=fmtDate(nowUTC);
+    // If IST date == UTC date no need for a second call; only fetch UTC separately when they differ
+    const datesToFetch=dateStrIST===dateStrUTC?[dateStrIST]:[dateStrIST,dateStrUTC];
 
-    const res=await fetch(
-      `https://v3.football.api-sports.io/fixtures?league=${WC_LEAGUE_ID}&season=${WC_SEASON}&date=${dateStr}`,
-      { headers:{ 'x-apisports-key': RAPIDAPI_KEY } }
-    );
-    if(!res.ok) return;
-    const data=await res.json();
-    const fixtures=data.response||[];
+    const allFixtures=[];
+    for(const dateStr of datesToFetch){
+      const res=await fetch(
+        `https://v3.football.api-sports.io/fixtures?league=${WC_LEAGUE_ID}&season=${WC_SEASON}&date=${dateStr}`,
+        { headers:{ 'x-apisports-key': RAPIDAPI_KEY } }
+      );
+      if(!res.ok) continue;
+      const data=await res.json();
+      (data.response||[]).forEach(f=>allFixtures.push(f));
+    }
+    // de-dup by fixture id
+    const seenIds=new Set();
+    const fixtures=allFixtures.filter(f=>{ const id=f.fixture?.id; if(seenIds.has(id)) return false; seenIds.add(id); return true; });
+
+    const _unused_res=null; // suppress unused-var warning — res replaced by loop above
+    // fixtures already built above
     const newScores={};
     fixtures.forEach(f=>{
       const home=f.teams?.home?.name;
@@ -2672,7 +2695,7 @@ function normaliseTeamName(name){
     'Czech Republic':'Czechia',
     'DR Congo':'DR Congo','Congo DR':'DR Congo',
     'Ivory Coast':'Ivory Coast',"Côte d'Ivoire":'Ivory Coast',
-    'Cabo Verde':'Cabo Verde','Cape Verde':'Cabo Verde',
+    'Cabo Verde':'Cape Verde','Cape Verde':'Cape Verde',
     'Curacao':'Curaçao',
     'New Zealand':'New Zealand',
   };
@@ -2696,7 +2719,7 @@ function checkForNewFinished(newScores){
 const FT_TIMESTAMPS={};
 // PROD_MODE: 15 min delay (covers VAR, extra time wrap-up)
 // Testing: 10 min delay
-const AUTO_SETTLE_DELAY=PROD_MODE ? 15*60*1000 : 10*60*1000;
+function getAutoSettleDelay(){ return PROD_MODE ? 15*60*1000 : 10*60*1000; } // evaluated at runtime, not parse time
 
 // Auto-settle matches the API says are FT, 60 min after FT confirmed
 async function autoSettleFinished(){
@@ -2727,8 +2750,8 @@ async function autoSettleFinished(){
 
     // Only settle after delay elapsed (15 min in PROD_MODE)
     const elapsed=now-FT_TIMESTAMPS[m.id];
-    if(elapsed<AUTO_SETTLE_DELAY){
-      const minsLeft=Math.ceil((AUTO_SETTLE_DELAY-elapsed)/60000);
+    if(elapsed<getAutoSettleDelay()){
+      const minsLeft=Math.ceil((getAutoSettleDelay()-elapsed)/60000);
       console.log(`Auto-settle waiting: ${m.home} vs ${m.away} — ${minsLeft} min remaining (${live.status})`);
       continue;
     }
@@ -2806,23 +2829,54 @@ async function catchUpSettle(){
 }
 
 // Start polling — runs during match windows, continues until all settled
+// API budget tracker — free tier = 100 calls/day on api-sports.io
+// We use two intervals: 2 min when a match is actively live, 5 min otherwise.
+// stopLivePolling() fires when no match needs attention, saving calls.
+let _apiCallsToday=0;
+let _apiCallDate='';
+function _trackApiCall(){
+  const d=new Date(new Date().getTime()+5.5*60*60*1000);
+  const ds=d.getUTCFullYear()+'-'+(d.getUTCMonth()+1)+'-'+d.getUTCDate();
+  if(ds!==_apiCallDate){_apiCallDate=ds;_apiCallsToday=0;}
+  _apiCallsToday++;
+  if(_apiCallsToday>90) console.warn('⚠️ API calls today: '+_apiCallsToday+'/100 — nearing free tier limit');
+}
+
+function _liveMatchCount(){
+  return MATCHES.filter(m=>{
+    if(m.resolved) return false;
+    const s=matchStatus(m);
+    return s==='inprogress'||s==='live';
+  }).length;
+}
+
 function startLivePolling(){
   if(livePoller) return;
   fetchLiveScores(); // immediate first fetch
-  livePoller=setInterval(()=>{
-    // Poll if any match is live, in-progress, finished-but-unsettled,
-    // or recently FT (still in 60-min settle window)
-    const hasActivity=MATCHES.some(m=>{
-      if(m.resolved) return false;
-      const s=matchStatus(m);
-      if(s==='inprogress'||s==='live'||s==='finished') return true;
-      // Keep polling if we're in a settle window for this match
-      if(FT_TIMESTAMPS[m.id]) return true;
-      return false;
-    });
-    if(hasActivity) fetchLiveScores();
-    else stopLivePolling();
-  }, 5*60*1000); // every 5 minutes
+  // Use 2-min interval when matches are live, 5-min otherwise
+  const POLL_LIVE_MS   = 2*60*1000;  // 2 min — match in progress
+  const POLL_QUIET_MS  = 5*60*1000;  // 5 min — waiting for kickoff or settle window
+  let   _pollInterval  = POLL_QUIET_MS;
+
+  function schedulePoll(){
+    if(livePoller) clearInterval(livePoller);
+    livePoller=setInterval(()=>{
+      const liveNow=_liveMatchCount();
+      const hasPending=MATCHES.some(m=>{
+        if(m.resolved) return false;
+        const s=matchStatus(m);
+        if(s==='inprogress'||s==='live'||s==='finished') return true;
+        if(FT_TIMESTAMPS[m.id]) return true;
+        return false;
+      });
+      if(!hasPending){ stopLivePolling(); return; }
+      // Switch interval if live status changed
+      const desired=liveNow>0 ? POLL_LIVE_MS : POLL_QUIET_MS;
+      if(desired!==_pollInterval){ _pollInterval=desired; schedulePoll(); return; }
+      fetchLiveScores();
+    }, _pollInterval);
+  }
+  schedulePoll();
 }
 
 function stopLivePolling(){
@@ -3138,7 +3192,7 @@ function renderAdmin(){
       // All 48 WC2026 teams sorted alphabetically
       const allTeams=[
         'Algeria','Argentina','Australia','Austria','Belgium',
-        'Bolivia','Bosnia and Herzegovina','Brazil','Cabo Verde','Cameroon',
+        'Bolivia','Bosnia and Herzegovina','Brazil','Cape Verde','Cameroon',
         'Canada','Chile','Colombia','Costa Rica','Croatia',
         'Cuba','Curaçao','Czech Republic','DR Congo','Denmark',
         'Ecuador','Egypt','El Salvador','England','France',
@@ -3207,7 +3261,7 @@ const TEAM_RATINGS = {
   'Czech Republic':70,'Czechia':70,'Slovakia':69,'Ukraine':69,
   'Bosnia and Herzegovina':69,'Hungary':68,'Tunisia':68,'Greece':68,
   'DR Congo':66,'Nigeria':66,'Israel':65,'Mali':65,'Cameroon':65,
-  'Jordan':64,'Peru':64,'Cabo Verde':63,'Chile':63,'Venezuela':63,
+  'Jordan':64,'Peru':64,'Cape Verde':63,'Chile':63,'Venezuela':63,
   'Paraguay':63,'Bolivia':62,'South Africa':62,'Costa Rica':62,
   'Panama':61,'Honduras':61,'El Salvador':60,'Cuba':60,'Jamaica':59,
   'Cura\u00e7ao':59,'Trinidad and Tobago':58,'Haiti':58,
