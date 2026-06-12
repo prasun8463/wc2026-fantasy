@@ -3126,6 +3126,31 @@ async function runApiDiag(){
         el.textContent+='  ⚠ League not found! Errors: '+JSON.stringify(d3.errors||{})+'\n';
       }
     }
+    // Step 3: Test FREE alternative — worldcup26.ir (no key needed)
+    el.textContent+='\n--- Testing free alternative: worldcup26.ir ---\n';
+    try{
+      const r4=await fetch('https://worldcup26.ir/get/games');
+      if(!r4.ok) throw new Error('HTTP '+r4.status);
+      const d4=await r4.json();
+      const games=Array.isArray(d4)?d4:(d4.data||d4.games||d4.matches||[]);
+      el.textContent+='✓ worldcup26.ir: '+games.length+' matches returned\n';
+      const finished=games.filter(g=>{
+        const st=(g.status||g.matchStatus||'').toUpperCase();
+        return st==='FT'||st==='FINISHED'||st==='AET'||st==='PEN';
+      });
+      el.textContent+='  Finished: '+finished.length+'\n';
+      finished.slice(0,3).forEach(g=>{
+        const h=g.home_team||g.homeTeam||g.home_team_en||g.home||'?';
+        const a=g.away_team||g.awayTeam||g.away_team_en||g.away||'?';
+        const hs=g.home_score!=null?g.home_score:(g.score?.home||'?');
+        const as=g.away_score!=null?g.away_score:(g.score?.away||'?');
+        el.textContent+='  '+h+' '+hs+'-'+as+' '+a+'\n';
+      });
+      el.textContent+='\n✅ worldcup26.ir WORKS — can use as free live score source\n';
+    }catch(e4){
+      el.textContent+='❌ worldcup26.ir failed: '+e4.message+'\n';
+      el.textContent+='→ Use manual settle (above) as fallback.\n';
+    }
   }catch(e){
     el.textContent+='❌ Error: '+e.message;
   }
