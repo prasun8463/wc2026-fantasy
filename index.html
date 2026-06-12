@@ -3134,9 +3134,18 @@ async function runApiDiag(){
       const d4=await r4.json();
       const games=Array.isArray(d4)?d4:(d4.data||d4.games||d4.matches||[]);
       el.textContent+='✓ worldcup26.ir: '+games.length+' matches returned\n';
+      // Dump first 2 matches raw to see field names
+      games.slice(0,2).forEach((g,i)=>{
+        el.textContent+='\nMatch '+(i+1)+' raw fields:\n';
+        Object.keys(g).forEach(k=>{
+          const v=typeof g[k]==='object'?JSON.stringify(g[k]):g[k];
+          el.textContent+='  '+k+': '+v+'\n';
+        });
+      });
       const finished=games.filter(g=>{
-        const st=(g.status||g.matchStatus||'').toUpperCase();
-        return st==='FT'||st==='FINISHED'||st==='AET'||st==='PEN';
+        const st=(g.status||g.matchStatus||g.time_elapsed||'').toUpperCase();
+        const fin=(g.finished||'').toUpperCase();
+        return fin==='TRUE'||st==='FT'||st==='FINISHED'||st==='AET'||st==='PEN';
       });
       el.textContent+='  Finished: '+finished.length+'\n';
       finished.slice(0,3).forEach(g=>{
