@@ -355,7 +355,10 @@ let PREDS = {};      // { match_id: [ {username, pred_home, pred_away} ] }
 let matchFilter = 'All';
 
 // ── Live score state ──────────────────────────────────────────
-const RAPIDAPI_KEY = '72c3fbeb3130fc32f1bdf600f71a23f9'; // api-sports.io direct key
+const RAPIDAPI_KEY = '9ccccda5ebmsh35908237b362fe4p12568cjsn6a49fb26955c';
+const API_HOST = 'api-football-v1.p.rapidapi.com';
+const API_BASE = 'https://'+API_HOST+'/v3';
+function apiHeaders(){ return {'x-rapidapi-key':RAPIDAPI_KEY,'x-rapidapi-host':API_HOST}; }
 const WC_LEAGUE_ID = 1;     // FIFA World Cup in api-football v3
 const WC_SEASON    = 2026;
 let LIVE_SCORES    = {};    // { "Home vs Away": { status, home, away, minute } }
@@ -2683,8 +2686,8 @@ async function fetchLiveScores(){
     const allFixtures=[];
     for(const dateStr of datesToFetch){
       const res=await fetch(
-        `https://v3.football.api-sports.io/fixtures?league=${WC_LEAGUE_ID}&season=${WC_SEASON}&date=${dateStr}`,
-        { headers:{ 'x-apisports-key': RAPIDAPI_KEY } }
+        `${API_BASE}/fixtures?league=${WC_LEAGUE_ID}&season=${WC_SEASON}&date=${dateStr}`,
+        { headers: apiHeaders() }
       );
       if(!res.ok) continue;
       const data=await res.json();
@@ -2851,8 +2854,8 @@ async function catchUpSettle(){
     try{
       _trackApiCall();
       const res=await fetch(
-        'https://v3.football.api-sports.io/fixtures?league='+WC_LEAGUE_ID+'&season='+WC_SEASON+'&date='+apiDate,
-        {headers:{'x-apisports-key':RAPIDAPI_KEY}}
+        API_BASE+'/fixtures?league='+WC_LEAGUE_ID+'&season='+WC_SEASON+'&date='+apiDate,
+        {headers:apiHeaders()}
       );
       if(!res.ok) continue;
       const data=await res.json();
@@ -3095,7 +3098,7 @@ async function runApiDiag(){
   el.textContent='Testing API connection...\n';
   try{
     // Step 1: Account status
-    const r1=await fetch('https://v3.football.api-sports.io/status',{headers:{'x-apisports-key':RAPIDAPI_KEY}});
+    const r1=await fetch(API_BASE+'/status',{headers:apiHeaders()});
     const d1=await r1.json();
     const acct=d1.response||{};
     const sub=acct.subscription||{};
@@ -3104,7 +3107,7 @@ async function runApiDiag(){
     el.textContent+='  Today: '+req.current+'/'+req.limit_day+' calls used\n\n';
 
     // Step 2: Test fixture fetch for Jun 11 (Mexico vs SA)
-    const r2=await fetch('https://v3.football.api-sports.io/fixtures?league='+WC_LEAGUE_ID+'&season='+WC_SEASON+'&date=2026-06-11',{headers:{'x-apisports-key':RAPIDAPI_KEY}});
+    const r2=await fetch(API_BASE+'/fixtures?league='+WC_LEAGUE_ID+'&season='+WC_SEASON+'&date=2026-06-11',{headers:apiHeaders()});
     const d2=await r2.json();
     const fix=d2.response||[];
     el.textContent+='Fixtures for 2026-06-11: '+fix.length+' returned\n';
@@ -3113,7 +3116,7 @@ async function runApiDiag(){
     } else {
       el.textContent+='  ⚠ No fixtures found!\n';
       // Check if league=1 has any data at all
-      const r3=await fetch('https://v3.football.api-sports.io/leagues?id=1&season=2026',{headers:{'x-apisports-key':RAPIDAPI_KEY}});
+      const r3=await fetch(API_BASE+'/leagues?id=1&season=2026',{headers:apiHeaders()});
       const d3=await r3.json();
       el.textContent+='\nLeague check (id=1, season=2026):\n';
       if(d3.response&&d3.response.length>0){
