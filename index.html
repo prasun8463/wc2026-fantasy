@@ -2857,6 +2857,8 @@ async function catchUpSettle(){
       if(!res.ok) continue;
       const data=await res.json();
       const fixtures=data.response||[];
+      console.log('Catch-up API '+apiDate+': '+fixtures.length+' fixtures returned');
+      fixtures.forEach(f=>console.log('  → '+f.teams?.home?.name+' vs '+f.teams?.away?.name+' status='+f.fixture?.status?.short+' score='+f.goals?.home+'-'+f.goals?.away));
 
       for(const fix of fixtures){
         const apiHome=normaliseTeamName(fix.teams?.home?.name||'');
@@ -2889,7 +2891,10 @@ async function catchUpSettle(){
   }
 
   if(caught>0){ await loadAll(); renderAll(); }
-  else console.log('Catch-up settle: nothing to settle ✓');
+  else{
+    console.log('Catch-up settle: nothing to settle ✓');
+    if(unsettled.length>0) toast('Catch-up: '+unsettled.length+' unsettled, API returned no FT matches. Check console.',5000);
+  }
 }
 
 // Start polling — runs during match windows, continues until all settled
@@ -3083,6 +3088,25 @@ async function copyReminderMessage(){
   }
 }
 
+// ── Admin: manual settle for any match ──
+async function manualSettle(mid){
+  const hEl=document.getElementById('ms_h_'+mid);
+  const aEl=document.getElementById('ms_a_'+mid);
+  if(!hEl||!aEl){ toast('Input not found'); return; }
+  const h=parseInt(hEl.value);
+  const a=parseInt(aEl.value);
+  if(isNaN(h)||isNaN(a)||h<0||a<0){ toast('Enter valid scores'); return; }
+  if(!confirm('Settle '+mid+': '+h+'–'+a+'?')) return;
+  try{
+    await settleWithScore(mid, h, a);
+    toast('✓ Settled: '+h+'–'+a);
+    await loadAll(); renderAll();
+  }catch(e){
+    toast('Error: '+e.message);
+    console.error('Manual settle error:', e);
+  }
+}
+
 // ── Admin: one-click data backup via Supabase REST API ──
 async function downloadBackup(){
   try{
@@ -3184,7 +3208,24 @@ function renderAdmin(){
       </div>
     </div>`;
 
-  let html=reminderHtml+lbShareHtml+`<div class="sec">Data backup</div>
+  // Manual settle section for unresolved matches
+  const unresolvedMatches=MATCHES.filter(m=>!m.resolved&&m.home!=='TBD'&&m.away!=='TBD'&&matchStatus(m)!=='future'&&matchStatus(m)!=='open');
+  let manualSettleHtml='';
+  if(unresolvedMatches.length>0){
+    let rows='';
+    unresolvedMatches.forEach(m=>{
+      rows+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+           +'<span style="font-size:12px;color:var(--text);flex:1">'+m.home_flag+m.home+' vs '+m.away+m.away_flag+'</span>'
+           +'<input id="ms_h_'+m.id+'" type="number" min="0" style="width:36px;padding:4px;border-radius:6px;border:1px solid var(--border);background:var(--dark);color:var(--text);text-align:center;font-size:13px" placeholder="H">'
+           +'<span style="color:var(--muted)">–</span>'
+           +'<input id="ms_a_'+m.id+'" type="number" min="0" style="width:36px;padding:4px;border-radius:6px;border:1px solid var(--border);background:var(--dark);color:var(--text);text-align:center;font-size:13px" placeholder="A">'
+           +'<button onclick="manualSettle(this.dataset.mid)" data-mid="'+m.id+'" style="background:var(--gold);color:var(--dark);border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">Settle</button>'
+           +'</div>';
+    });
+    manualSettleHtml='<div class="sec">Manual settle ('+unresolvedMatches.length+' pending)</div><div class="card">'+rows+'</div>';
+  }
+
+  let html=reminderHtml+lbShareHtml+manualSettleHtml+`<div class="sec">Data backup</div>
   <div class="card" style="margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
     <div style="font-size:13px;color:var(--muted)">Download all users, matches, predictions as JSON</div>
     <button onclick="downloadBackup()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--muted);cursor:pointer">⬇ Backup</button>
