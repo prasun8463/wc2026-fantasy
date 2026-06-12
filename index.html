@@ -3088,6 +3088,46 @@ async function copyReminderMessage(){
   }
 }
 
+// ── Admin: API diagnostics ──
+async function runApiDiag(){
+  const el=document.getElementById('api-diag-result');
+  if(!el) return;
+  el.textContent='Testing API connection...\n';
+  try{
+    // Step 1: Account status
+    const r1=await fetch('https://v3.football.api-sports.io/status',{headers:{'x-apisports-key':RAPIDAPI_KEY}});
+    const d1=await r1.json();
+    const acct=d1.response||{};
+    const sub=acct.subscription||{};
+    const req=acct.requests||{};
+    el.textContent+='✓ Account: '+sub.plan+' ('+sub.end+')\n';
+    el.textContent+='  Today: '+req.current+'/'+req.limit_day+' calls used\n\n';
+
+    // Step 2: Test fixture fetch for Jun 11 (Mexico vs SA)
+    const r2=await fetch('https://v3.football.api-sports.io/fixtures?league='+WC_LEAGUE_ID+'&season='+WC_SEASON+'&date=2026-06-11',{headers:{'x-apisports-key':RAPIDAPI_KEY}});
+    const d2=await r2.json();
+    const fix=d2.response||[];
+    el.textContent+='Fixtures for 2026-06-11: '+fix.length+' returned\n';
+    if(fix.length>0){
+      fix.forEach(f=>{ el.textContent+='  '+f.teams?.home?.name+' vs '+f.teams?.away?.name+' → '+f.fixture?.status?.short+' '+f.goals?.home+'-'+f.goals?.away+'\n'; });
+    } else {
+      el.textContent+='  ⚠ No fixtures found!\n';
+      // Check if league=1 has any data at all
+      const r3=await fetch('https://v3.football.api-sports.io/leagues?id=1&season=2026',{headers:{'x-apisports-key':RAPIDAPI_KEY}});
+      const d3=await r3.json();
+      el.textContent+='\nLeague check (id=1, season=2026):\n';
+      if(d3.response&&d3.response.length>0){
+        const lg=d3.response[0].league||{};
+        el.textContent+='  Found: '+lg.name+' ('+lg.type+')\n';
+      } else {
+        el.textContent+='  ⚠ League not found! Errors: '+JSON.stringify(d3.errors||{})+'\n';
+      }
+    }
+  }catch(e){
+    el.textContent+='❌ Error: '+e.message;
+  }
+}
+
 // ── Admin: manual settle for any match ──
 async function manualSettle(mid){
   const hEl=document.getElementById('ms_h_'+mid);
@@ -3229,6 +3269,14 @@ function renderAdmin(){
   <div class="card" style="margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
     <div style="font-size:13px;color:var(--muted)">Download all users, matches, predictions as JSON</div>
     <button onclick="downloadBackup()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--muted);cursor:pointer">⬇ Backup</button>
+  </div>
+  <div class="sec">API diagnostics</div>
+  <div class="card" id="api-diag-card" style="margin-bottom:4px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="font-size:13px;color:var(--muted)">Test live scores API connection</div>
+      <button onclick="runApiDiag()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--muted);cursor:pointer">🔍 Test API</button>
+    </div>
+    <div id="api-diag-result" style="font-size:11px;color:var(--muted);white-space:pre-wrap"></div>
   </div>
   <div class="sec">Live scores ${liveBadge}</div>
   <div class="card" style="margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
