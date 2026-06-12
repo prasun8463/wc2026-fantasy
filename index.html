@@ -2671,77 +2671,53 @@ function setGroupFilter(f){
 // Fetch live + today's finished matches from api-football
 async function fetchLiveScores(){
   try{
-    _trackApiCall(); // budget tracker — warns at 90/100 daily calls
-    // Fetch both IST date AND UTC date to catch matches that straddle midnight
-    // e.g. Mexico vs SA kicks off at 19:00 UTC Jun 11 = 00:30 IST Jun 12
-    // api-football uses UTC dates, so we must query the UTC date as well
-    const nowUTC=new Date();
-    const todayIST=new Date(nowUTC.getTime()+5.5*60*60*1000);
-    const fmtDate=d=>`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
-    const dateStrIST=fmtDate(todayIST);
-    const dateStrUTC=fmtDate(nowUTC);
-    // If IST date == UTC date no need for a second call; only fetch UTC separately when they differ
-    const datesToFetch=dateStrIST===dateStrUTC?[dateStrIST]:[dateStrIST,dateStrUTC];
+    _trackApiCall();
+    const res=await fetch('https://worldcup26.ir/get/games');
+    if(!res.ok) return;
+    const apiGames=await res.json();
+    const games=Array.isArray(apiGames)?apiGames:(apiGames.data||[]);
 
-    const allFixtures=[];
-    for(const dateStr of datesToFetch){
-      const res=await fetch(
-        `${API_BASE}/fixtures?league=${WC_LEAGUE_ID}&season=${WC_SEASON}&date=${dateStr}`,
-        { headers: apiHeaders() }
-      );
-      if(!res.ok) continue;
-      const data=await res.json();
-      (data.response||[]).forEach(f=>allFixtures.push(f));
+    let updated=0;
+    for(const g of games){
+      const homeEn=g.home_team_name_en||'';
+      const awayEn=g.away_team_name_en||'';
+      if(!homeEn||!awayEn) continue;
+
+      const key=normaliseTeamName(homeEn)+'_'+normaliseTeamName(awayEn);
+      const elapsed=(g.time_elapsed||'').toLowerCase();
+      const fin=(g.finished||'').toUpperCase()==='TRUE';
+      const hs=parseInt(g.home_score);
+      const as_=parseInt(g.away_score);
+
+      // Map worldcup26.ir statuses to our internal status codes
+      let status='NS'; // not started
+      if(fin||elapsed==='finished') status='FT';
+      else if(elapsed==='notstarted') status='NS';
+      else if(elapsed&&elapsed!=='null') status='LIVE'; // any other value = in progress
+
+      if(status==='NS') continue; // skip not-started matches
+
+      LIVE_SCORES[key]={
+        home:isNaN(hs)?null:hs,
+        away:isNaN(as_)?null:as_,
+        status:status,
+        elapsed:g.time_elapsed||'',
+        homeScorers:g.home_scorers||null,
+        awayScorers:g.away_scorers||null
+      };
+      updated++;
     }
-    // de-dup by fixture id
-    const seenIds=new Set();
-    const fixtures=allFixtures.filter(f=>{ const id=f.fixture?.id; if(seenIds.has(id)) return false; seenIds.add(id); return true; });
 
-    const _unused_res=null; // suppress unused-var warning — res replaced by loop above
-    // fixtures already built above
-    const newScores={};
-    fixtures.forEach(f=>{
-      const home=f.teams?.home?.name;
-      const away=f.teams?.away?.name;
-      const status=f.fixture?.status?.short;
-      const goalsH=f.goals?.home;
-      const goalsA=f.goals?.away;
-      const minute=f.fixture?.status?.elapsed;
-      if(home&&away){
-        const key=normaliseTeamName(home)+'_'+normaliseTeamName(away);
-        newScores[key]={status, home:goalsH, away:goalsA, minute,
-                        rawHome:home, rawAway:away};
-      }
-    });
-
-    const hadNewFT=checkForNewFinished(newScores);
-    LIVE_SCORES=newScores;
-    lastPollTime=Date.now();
-
-    // Re-render live areas
-    renderMatchList();
-    if(document.getElementById('pane-admin').innerHTML) renderAdmin();
-
-    // Always check auto-settle — needed to catch 60-min window expiry
-    // even if no new FT detected in this poll cycle
-    const hasAnyFT=MATCHES.some(m=>{
-      if(m.resolved) return false;
-      const live=LIVE_SCORES[normaliseTeamName(m.home)+'_'+normaliseTeamName(m.away)];
-      return live&&['FT','AET','PEN'].includes(live.status);
-    });
-    const hasPendingWindows=Object.keys(FT_TIMESTAMPS).some(mid=>{
-      const m=MATCHES.find(x=>x.id===mid);
-      return m&&!m.resolved;
-    });
-    if(hadNewFT||hasAnyFT||hasPendingWindows){
-      await autoSettleFinished();
+    if(updated>0){
+      renderMatchList();
+      autoSettleFinished();
     }
   }catch(e){
-    console.warn('Live score fetch failed:',e);
+    console.warn('Live score fetch error:', e.message);
   }
 }
 
-// Normalise team names to match our DB names
+
 function normaliseTeamName(name){
   const map={
     'Korea Republic':'South Korea',
@@ -2753,7 +2729,7 @@ function normaliseTeamName(name){
     'Czech Republic':'Czechia',
     'DR Congo':'DR Congo','Congo DR':'DR Congo',
     'Ivory Coast':'Ivory Coast',"Côte d'Ivoire":'Ivory Coast',
-    'Cabo Verde':'Cape Verde','Cape Verde':'Cape Verde',
+    'Cabo Verde':'Cape Verde','Cape Verde':'Cape Verde','Czech Republic':'Czechia','Czechia':'Czechia',
     'Curacao':'Curaçao',
     'New Zealand':'New Zealand',
   };
@@ -2828,75 +2804,48 @@ async function autoSettleFinished(){
 // Queries BOTH the IST date AND prior day (UTC date may differ for late-night IST matches).
 async function catchUpSettle(){
   if(!LEAGUE||!ME||ME.username!==LEAGUE.admin_username) return;
-
   const unsettled=MATCHES.filter(m=>!m.resolved&&m.home!=='TBD'&&m.away!=='TBD');
   if(!unsettled.length) return;
 
-  const MMAP={Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
-  let caught=0;
+  try{
+    toast('Checking for finished matches…');
+    const res=await fetch('https://worldcup26.ir/get/games');
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const apiGames=await res.json();
+    const games=Array.isArray(apiGames)?apiGames:(apiGames.data||[]);
+    console.log('Catch-up: worldcup26.ir returned '+games.length+' matches');
 
-  // Collect all unique API dates to query — for each IST match_date,
-  // also query the previous day since early-morning IST matches (00:00–05:30)
-  // fall on the prior UTC date.
-  const apiDates=new Set();
-  for(const m of unsettled){
-    const [mon,day]=m.match_date.split(' ');
-    const mm=MMAP[mon]||6;
-    const d=parseInt(day);
-    // IST date
-    apiDates.add('2026-'+String(mm).padStart(2,'0')+'-'+String(d).padStart(2,'0'));
-    // Previous day (UTC date for late-night IST matches)
-    const prev=new Date(Date.UTC(2026,mm-1,d-1));
-    apiDates.add(prev.getUTCFullYear()+'-'+String(prev.getUTCMonth()+1).padStart(2,'0')+'-'+String(prev.getUTCDate()).padStart(2,'0'));
-  }
+    const finishedGames=games.filter(g=>(g.finished||'').toUpperCase()==='TRUE');
+    console.log('Catch-up: '+finishedGames.length+' finished matches');
 
-  for(const apiDate of apiDates){
-    try{
-      _trackApiCall();
-      const res=await fetch(
-        API_BASE+'/fixtures?league='+WC_LEAGUE_ID+'&season='+WC_SEASON+'&date='+apiDate,
-        {headers:apiHeaders()}
+    let caught=0;
+    for(const fg of finishedGames){
+      const apiHome=normaliseTeamName(fg.home_team_name_en||'');
+      const apiAway=normaliseTeamName(fg.away_team_name_en||'');
+      const gh=parseInt(fg.home_score);
+      const ga=parseInt(fg.away_score);
+      if(isNaN(gh)||isNaN(ga)) continue;
+
+      const m=unsettled.find(x=>
+        !x.resolved
+        && normaliseTeamName(x.home)===apiHome
+        && normaliseTeamName(x.away)===apiAway
       );
-      if(!res.ok) continue;
-      const data=await res.json();
-      const fixtures=data.response||[];
-      console.log('Catch-up API '+apiDate+': '+fixtures.length+' fixtures returned');
-      fixtures.forEach(f=>console.log('  → '+f.teams?.home?.name+' vs '+f.teams?.away?.name+' status='+f.fixture?.status?.short+' score='+f.goals?.home+'-'+f.goals?.away));
+      if(!m) continue;
 
-      for(const fix of fixtures){
-        const apiHome=normaliseTeamName(fix.teams?.home?.name||'');
-        const apiAway=normaliseTeamName(fix.teams?.away?.name||'');
-        const status=fix.fixture?.status?.short;
-        const gh=fix.goals?.home;
-        const ga=fix.goals?.away;
-        if(gh==null||ga==null) continue;
-
-        // Find matching unsettled match by normalised team name
-        const m=unsettled.find(x=>
-          !x.resolved
-          && normaliseTeamName(x.home)===apiHome
-          && normaliseTeamName(x.away)===apiAway
-        );
-        if(!m) continue;
-
-        const koMatch=isKnockout(m);
-        const definitiveStatuses=koMatch?['AET','PEN']:['FT','AET','PEN'];
-        if(!definitiveStatuses.includes(status)) continue;
-
-        await settleWithScore(m.id, gh, ga);
-        const suffix=status==='PEN'?' (pen)':status==='AET'?' (aet)':'';
-        toast('⚡ Catch-up settled: '+m.home+' '+gh+'–'+ga+' '+m.away+suffix, 4000);
-        caught++;
-      }
-    }catch(e){
-      console.warn('Catch-up settle error for '+apiDate, e.message);
+      console.log('Settling: '+m.home+' '+gh+'-'+ga+' '+m.away+' ('+m.id+')');
+      await settleWithScore(m.id, gh, ga);
+      toast('⚡ Settled: '+m.home+' '+gh+'–'+ga+' '+m.away, 4000);
+      caught++;
     }
-  }
 
-  if(caught>0){ await loadAll(); renderAll(); }
-  else{
-    console.log('Catch-up settle: nothing to settle ✓');
-    if(unsettled.length>0) toast('Catch-up: '+unsettled.length+' unsettled, API returned no FT matches. Check console.',5000);
+    if(caught>0){ await loadAll(); renderAll(); }
+    else if(unsettled.length>0){
+      console.log('Catch-up: no new matches to settle');
+    }
+  }catch(e){
+    console.warn('Catch-up settle error:', e.message);
+    toast('Catch-up failed: '+e.message+' — use manual settle', 5000);
   }
 }
 
