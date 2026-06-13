@@ -2974,8 +2974,91 @@ function generateLeaderboardMessage(){
   return msg;
 }
 
-async function copyLeaderboard(){
-  const msg=generateLeaderboardMessage();
+function generateStageBreakdownMessage(){
+  if(!LEAGUE||!MEMBERS||!MEMBERS.length) return '';
+  const sortedMembers=[...MEMBERS].sort((a,b)=>{
+    const sa=calcRoundStats(a.username), sb_=calcRoundStats(b.username);
+    return sb_.overall.pl-sa.overall.pl;
+  });
+  const settledCount=MATCHES.filter(m=>m.resolved).length;
+  const dt=new Date(Date.now()+IST_OFFSET_MS);
+  const dStr=MONTH_NAMES[dt.getUTCMonth()]+' '+dt.getUTCDate();
+
+  // Find which stages have activity
+  const activeStages=ROUND_DEFS.filter(r=>MATCHES.some(m=>r.grps.includes(m.grp)&&m.resolved));
+
+  let msg='📊 *Stage P/L Breakdown*\n';
+  msg+='_'+LEAGUE.name+' · '+dStr+'_\n';
+  msg+='_'+settledCount+' matches settled_\n\n';
+
+  // Build header row
+  const stageLabels=activeStages.map(r=>r.label.replace(' Stage','').replace('SF / ',''));
+  // Use monospace block for alignment
+  msg+='```\n';
+
+  // Column widths
+  const nameW=12;
+  const stgW=8;
+
+  // Header
+  let hdr='Player'.padEnd(nameW);
+  activeStages.forEach(r=>{
+    const lbl=r.key==='group'?'Grp':r.key==='sf'?'SF/F':r.key.toUpperCase();
+    hdr+=lbl.padStart(stgW);
+  });
+  hdr+='P/L'.padStart(stgW);
+  msg+=hdr+'\n';
+  msg+='─'.repeat(hdr.length)+'\n';
+
+  // Rows
+  const medals=['🥇','🥈','🥉'];
+  sortedMembers.forEach((u,i)=>{
+    const s=calcRoundStats(u.username);
+    const hasAny=s.overall.bet>0;
+    if(!hasAny) return;
+
+    let name=u.username;
+    if(name.length>nameW-1) name=name.slice(0,nameW-2)+'…';
+    let row=name.padEnd(nameW);
+
+    activeStages.forEach(r=>{
+      const pl=s[r.key]?.pl||0;
+      const plStr=pl>0?'+'+pl:pl===0?'—':''+pl;
+      row+=plStr.padStart(stgW);
+    });
+
+    const opl=s.overall.pl;
+    const oplStr=opl>0?'+'+opl:opl===0?'0':''+opl;
+    row+=oplStr.padStart(stgW);
+    msg+=row+'\n';
+  });
+
+  msg+='```\n';
+  msg+='_Updated '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})+' IST_';
+  return msg;
+}
+
+async function copyStageBreakdown(){
+  const msg=generateStageBreakdownMessage();
+  try {
+    await navigator.clipboard.writeText(msg);
+    toast('✓ Stage breakdown copied — paste in WhatsApp', 3000);
+  } catch(e) {
+    const ta=document.createElement('textarea');
+    ta.value=msg; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); toast('✓ Copied', 3000); }
+    catch(err) { toast('Could not copy — long-press text below to select'); }
+    document.body.removeChild(ta);
+  }
+}
+
+function shareStageBreakdownWhatsApp(){
+  const msg=generateStageBreakdownMessage();
+  window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
+}
+
+async function copyLeaderboard(){  const msg=generateLeaderboardMessage();
   try {
     await navigator.clipboard.writeText(msg);
     toast('\u2713 Leaderboard copied — paste in WhatsApp', 3000);
@@ -3220,6 +3303,22 @@ function renderAdmin(){
       </div>
     </div>`;
 
+  // Stage breakdown share
+  const stgMsg=generateStageBreakdownMessage();
+  const stgShareHtml=stgMsg?`
+    <div class="sec">Share stage breakdown</div>
+    <div class="card" style="margin-bottom:4px">
+      <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:12px;line-height:1.6;color:var(--text);font-family:monospace;white-space:pre-wrap;margin-bottom:12px;max-height:280px;overflow-y:auto">${esc(stgMsg).replace(/\*([^*]+)\*/g,'<strong>$1</strong>').replace(/_([^_]+)_/g,'<em style="opacity:.75">$1</em>')}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-gold" onclick="shareStageBreakdownWhatsApp()" style="width:auto;padding:10px 20px;font-size:14px;touch-action:manipulation">
+          📲 Open in WhatsApp
+        </button>
+        <button onclick="copyStageBreakdown()" style="background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;padding:10px 18px;cursor:pointer;font-weight:600;touch-action:manipulation">
+          📋 Copy
+        </button>
+      </div>
+    </div>`:'';
+
   // Manual settle section for unresolved matches
   const unresolvedMatches=MATCHES.filter(m=>!m.resolved&&m.home!=='TBD'&&m.away!=='TBD'&&matchStatus(m)!=='future'&&matchStatus(m)!=='open');
   let manualSettleHtml='';
@@ -3237,7 +3336,7 @@ function renderAdmin(){
     manualSettleHtml='<div class="sec">Manual settle ('+unresolvedMatches.length+' pending)</div><div class="card">'+rows+'</div>';
   }
 
-  let html=reminderHtml+lbShareHtml+manualSettleHtml+`<div class="sec">Data backup</div>
+  let html=reminderHtml+lbShareHtml+stgShareHtml+manualSettleHtml+`<div class="sec">Data backup</div>
   <div class="card" style="margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
     <div style="font-size:13px;color:var(--muted)">Download all users, matches, predictions as JSON</div>
     <button onclick="downloadBackup()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--muted);cursor:pointer">⬇ Backup</button>
@@ -3250,12 +3349,7 @@ function renderAdmin(){
     </div>
     <div id="settle-debug" style="font-size:11px;color:var(--muted);white-space:pre-wrap"></div>
   </div>
-<div class="sec">Live scores</div>
-  <div class="card" style="margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
-    <div style="font-size:13px;color:var(--muted)">Polling every 5 minutes during match windows</div>
-    <button onclick="fetchLiveScores()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--muted);cursor:pointer">↻ Refresh now</button>
-  </div>
-  <div class="sec">Bet amounts by stage</div>
+<div class="sec">Bet amounts by stage</div>
   <div class="card">
     <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Locked stages have existing predictions or results and cannot be changed. Changes save to the database for all future calculations.</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
