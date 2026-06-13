@@ -2675,7 +2675,7 @@ async function fetchLiveScores(){
     const res=await fetch('https://worldcup26.ir/get/games');
     if(!res.ok) return;
     const apiGames=await res.json();
-    const games=Array.isArray(apiGames)?apiGames:(apiGames.data||[]);
+    const games=Array.isArray(apiGames)?apiGames:(apiGames.games||apiGames.data||apiGames.matches||[]);
 
     let updated=0;
     for(const g of games){
@@ -2812,7 +2812,7 @@ async function catchUpSettle(){
     const res=await fetch('https://worldcup26.ir/get/games');
     if(!res.ok) throw new Error('HTTP '+res.status);
     const apiGames=await res.json();
-    const games=Array.isArray(apiGames)?apiGames:(apiGames.data||[]);
+    const games=Array.isArray(apiGames)?apiGames:(apiGames.games||apiGames.data||apiGames.matches||[]);
     console.log('Catch-up: worldcup26.ir returned '+games.length+' matches');
 
     const finishedGames=games.filter(g=>(g.finished||'').toUpperCase()==='TRUE');
@@ -3067,9 +3067,12 @@ async function debugCatchUpSettle(){
     const res=await fetch('https://worldcup26.ir/get/games');
     if(!res.ok){ el.textContent+='❌ HTTP '+res.status+'\n'; return; }
     const apiGames=await res.json();
-    const games=Array.isArray(apiGames)?apiGames:(apiGames.data||[]);
+    const games=Array.isArray(apiGames)?apiGames:(apiGames.games||apiGames.data||apiGames.matches||[]);
     el.textContent+='✓ Got '+games.length+' matches from API\n';
-
+    if(games.length===0){
+      el.textContent+='Response keys: '+Object.keys(apiGames).join(', ')+'\n';
+      el.textContent+='Response preview: '+JSON.stringify(apiGames).slice(0,500)+'\n';
+    }
     const finishedGames=games.filter(g=>(g.finished||'').toUpperCase()==='TRUE');
     el.textContent+='Finished matches: '+finishedGames.length+'\n';
     finishedGames.forEach(fg=>{
