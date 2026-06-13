@@ -382,8 +382,10 @@ function calcRoundStats(username){
     });
     stats[r.key]={bet:spent, won:earned, pl:earned-spent};
   });
-  const ud=MEMBERS.find(x=>x.username===username);
-  stats.overall={bet:ud?.spent||0, won:ud?.earned||0, pl:(ud?.earned||0)-(ud?.spent||0)};
+  // Overall = sum of all stage values (not from DB — avoids race condition drift)
+  let totalBet=0, totalWon=0;
+  ROUND_DEFS.forEach(r=>{ totalBet+=stats[r.key].bet; totalWon+=stats[r.key].won; });
+  stats.overall={bet:totalBet, won:totalWon, pl:totalWon-totalBet};
   return stats;
 }
 // ── Constants ──────────────────────────────────────────────────
@@ -3579,8 +3581,10 @@ async function settleWithScore(mid, h, a){
     resolved_winners:winnerNames
   }).eq('id',mid);
   for(const p of parts){
-    const ud=MEMBERS.find(x=>x.username===p.username);
-    const curEarned=ud?.earned||0; const curSpent=ud?.spent||0;
+    // Fetch FRESH values from DB — not stale MEMBERS (prevents race condition when settling multiple matches)
+    const {data:freshUser}=await sb.from('users').select('earned,spent').eq('username',p.username).single();
+    const curEarned=freshUser?.earned||0;
+    const curSpent=freshUser?.spent||0;
     const betAmt=betFor(m);
     const earnAdd=winnerNames.includes(p.username)?share:0;
     await sb.from('users').update({spent:curSpent+betAmt,earned:curEarned+earnAdd}).eq('username',p.username);
@@ -3623,10 +3627,11 @@ async function settle(mid){
     resolved_winners:winnerNames
   }).eq('id',mid);
 
-  // Update each player's earned/spent
+  // Update each player's earned/spent (fresh DB read to avoid race conditions)
   for(const p of parts){
-    const ud=MEMBERS.find(x=>x.username===p.username);
-    const curEarned=ud?.earned||0; const curSpent=ud?.spent||0;
+    const {data:freshUser}=await sb.from('users').select('earned,spent').eq('username',p.username).single();
+    const curEarned=freshUser?.earned||0;
+    const curSpent=freshUser?.spent||0;
     const earnAdd=winnerNames.includes(p.username)?share:0;
     const betAmt=betFor(m);
     await sb.from('users').update({spent:curSpent+betAmt, earned:curEarned+earnAdd}).eq('username',p.username);
