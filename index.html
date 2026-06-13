@@ -3040,6 +3040,87 @@ async function copyReminderMessage(){
   }
 }
 
+// ── Admin: debug catch-up settle with visible output ──
+async function debugCatchUpSettle(){
+  const el=document.getElementById('settle-debug');
+  if(!el) return;
+  el.textContent='Starting catch-up settle...\n';
+
+  if(!LEAGUE){ el.textContent+='❌ No LEAGUE loaded\n'; return; }
+  if(!ME){ el.textContent+='❌ No user logged in\n'; return; }
+  if(ME.username!==LEAGUE.admin_username){
+    el.textContent+='❌ Not admin. Logged in as: '+ME.username+', admin is: '+LEAGUE.admin_username+'\n';
+    return;
+  }
+  el.textContent+='✓ Admin check passed ('+ME.username+')\n';
+
+  const unsettled=MATCHES.filter(m=>!m.resolved&&m.home!=='TBD'&&m.away!=='TBD');
+  el.textContent+='Unsettled matches in DB: '+unsettled.length+'\n';
+  if(!unsettled.length){ el.textContent+='Nothing to settle.\n'; return; }
+  unsettled.slice(0,5).forEach(m=>{
+    el.textContent+='  '+m.id+': '+m.home+' vs '+m.away+' ('+m.match_date+')\n';
+  });
+  if(unsettled.length>5) el.textContent+='  ... and '+(unsettled.length-5)+' more\n';
+
+  el.textContent+='\nFetching worldcup26.ir...\n';
+  try{
+    const res=await fetch('https://worldcup26.ir/get/games');
+    if(!res.ok){ el.textContent+='❌ HTTP '+res.status+'\n'; return; }
+    const apiGames=await res.json();
+    const games=Array.isArray(apiGames)?apiGames:(apiGames.data||[]);
+    el.textContent+='✓ Got '+games.length+' matches from API\n';
+
+    const finishedGames=games.filter(g=>(g.finished||'').toUpperCase()==='TRUE');
+    el.textContent+='Finished matches: '+finishedGames.length+'\n';
+    finishedGames.forEach(fg=>{
+      el.textContent+='  '+fg.home_team_name_en+' '+fg.home_score+'-'+fg.away_score+' '+fg.away_team_name_en+'\n';
+    });
+
+    el.textContent+='\nMatching to DB...\n';
+    let caught=0;
+    for(const fg of finishedGames){
+      const apiHome=normaliseTeamName(fg.home_team_name_en||'');
+      const apiAway=normaliseTeamName(fg.away_team_name_en||'');
+      const gh=parseInt(fg.home_score);
+      const ga=parseInt(fg.away_score);
+      if(isNaN(gh)||isNaN(ga)){
+        el.textContent+='  ⚠ Invalid score for '+fg.home_team_name_en+' vs '+fg.away_team_name_en+'\n';
+        continue;
+      }
+
+      const m=unsettled.find(x=>
+        !x.resolved
+        && normaliseTeamName(x.home)===apiHome
+        && normaliseTeamName(x.away)===apiAway
+      );
+
+      if(!m){
+        el.textContent+='  ⚠ No DB match for: '+apiHome+' vs '+apiAway+'\n';
+        continue;
+      }
+
+      el.textContent+='  ✓ Matched '+m.id+': '+m.home+' vs '+m.away+' → '+gh+'-'+ga+'\n';
+      el.textContent+='    Settling...\n';
+      try{
+        await settleWithScore(m.id, gh, ga);
+        el.textContent+='    ✅ Settled!\n';
+        caught++;
+      }catch(se){
+        el.textContent+='    ❌ Settle error: '+se.message+'\n';
+      }
+    }
+
+    el.textContent+='\nDone. Settled '+caught+' match(es).\n';
+    if(caught>0){
+      await loadAll();
+      renderAll();
+      el.textContent+='Leaderboard updated!\n';
+    }
+  }catch(e){
+    el.textContent+='❌ Fetch error: '+e.message+'\n';
+  }
+}
+
 // ── Admin: API diagnostics ──
 async function runApiDiag(){
   const el=document.getElementById('api-diag-result');
@@ -3255,6 +3336,14 @@ function renderAdmin(){
   <div class="card" style="margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
     <div style="font-size:13px;color:var(--muted)">Download all users, matches, predictions as JSON</div>
     <button onclick="downloadBackup()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--muted);cursor:pointer">⬇ Backup</button>
+  </div>
+  <div class="sec">Auto-settle</div>
+  <div class="card" style="margin-bottom:4px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="font-size:13px;color:var(--muted)">Fetch scores from worldcup26.ir and settle finished matches</div>
+      <button onclick="debugCatchUpSettle()" style="background:var(--gold);color:var(--dark);border:none;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">⚡ Run now</button>
+    </div>
+    <div id="settle-debug" style="font-size:11px;color:var(--muted);white-space:pre-wrap"></div>
   </div>
   <div class="sec">API diagnostics</div>
   <div class="card" id="api-diag-card" style="margin-bottom:4px">
