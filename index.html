@@ -355,15 +355,9 @@ let PREDS = {};      // { match_id: [ {username, pred_home, pred_away} ] }
 let matchFilter = 'All';
 
 // ── Live score state ──────────────────────────────────────────
-const RAPIDAPI_KEY = '9ccccda5ebmsh35908237b362fe4p12568cjsn6a49fb26955c';
-const API_HOST = 'api-football-v1.p.rapidapi.com';
-const API_BASE = 'https://'+API_HOST+'/v3';
-function apiHeaders(){ return {'x-rapidapi-key':RAPIDAPI_KEY,'x-rapidapi-host':API_HOST}; }
-const WC_LEAGUE_ID = 1;     // FIFA World Cup in api-football v3
-const WC_SEASON    = 2026;
+// Live scores powered by worldcup26.ir (free, no key needed)
 let LIVE_SCORES    = {};    // { "Home vs Away": { status, home, away, minute } }
 let livePoller     = null;  // interval handle
-let lastPollTime   = 0;
 
 // ── Round definitions & helpers (used by Leaderboard + Dashboard) ──
 const ROUND_DEFS=[
@@ -2665,13 +2659,11 @@ function setGroupFilter(f){
 }
 
 // ════════════════════════════════════════════════════════════════
-//  LIVE SCORE ENGINE — api-football via api-sports.io (direct)
+//  LIVE SCORE ENGINE — worldcup26.ir (free, no key needed)
 // ════════════════════════════════════════════════════════════════
 
-// Fetch live + today's finished matches from api-football
 async function fetchLiveScores(){
   try{
-    _trackApiCall();
     const res=await fetch('https://worldcup26.ir/get/games');
     if(!res.ok) return;
     const apiGames=await res.json();
@@ -2850,18 +2842,7 @@ async function catchUpSettle(){
 }
 
 // Start polling — runs during match windows, continues until all settled
-// API budget tracker — free tier = 100 calls/day on api-sports.io
-// We use two intervals: 2 min when a match is actively live, 5 min otherwise.
-// stopLivePolling() fires when no match needs attention, saving calls.
-let _apiCallsToday=0;
-let _apiCallDate='';
-function _trackApiCall(){
-  const d=new Date(new Date().getTime()+5.5*60*60*1000);
-  const ds=d.getUTCFullYear()+'-'+(d.getUTCMonth()+1)+'-'+d.getUTCDate();
-  if(ds!==_apiCallDate){_apiCallDate=ds;_apiCallsToday=0;}
-  _apiCallsToday++;
-  if(_apiCallsToday>90) console.warn('⚠️ API calls today: '+_apiCallsToday+'/100 — nearing free tier limit');
-}
+
 
 function _liveMatchCount(){
   return MATCHES.filter(m=>{
@@ -3124,80 +3105,6 @@ async function debugCatchUpSettle(){
   }
 }
 
-// ── Admin: API diagnostics ──
-async function runApiDiag(){
-  const el=document.getElementById('api-diag-result');
-  if(!el) return;
-  el.textContent='Testing API connection...\n';
-  try{
-    // Step 1: Account status
-    const r1=await fetch(API_BASE+'/status',{headers:apiHeaders()});
-    const d1=await r1.json();
-    const acct=d1.response||{};
-    const sub=acct.subscription||{};
-    const req=acct.requests||{};
-    el.textContent+='✓ Account: '+sub.plan+' ('+sub.end+')\n';
-    el.textContent+='  Today: '+req.current+'/'+req.limit_day+' calls used\n\n';
-
-    // Step 2: Test fixture fetch for Jun 11 (Mexico vs SA)
-    const r2=await fetch(API_BASE+'/fixtures?league='+WC_LEAGUE_ID+'&season='+WC_SEASON+'&date=2026-06-11',{headers:apiHeaders()});
-    const d2=await r2.json();
-    const fix=d2.response||[];
-    el.textContent+='Fixtures for 2026-06-11: '+fix.length+' returned\n';
-    if(fix.length>0){
-      fix.forEach(f=>{ el.textContent+='  '+f.teams?.home?.name+' vs '+f.teams?.away?.name+' → '+f.fixture?.status?.short+' '+f.goals?.home+'-'+f.goals?.away+'\n'; });
-    } else {
-      el.textContent+='  ⚠ No fixtures found!\n';
-      // Check if league=1 has any data at all
-      const r3=await fetch(API_BASE+'/leagues?id=1&season=2026',{headers:apiHeaders()});
-      const d3=await r3.json();
-      el.textContent+='\nLeague check (id=1, season=2026):\n';
-      if(d3.response&&d3.response.length>0){
-        const lg=d3.response[0].league||{};
-        el.textContent+='  Found: '+lg.name+' ('+lg.type+')\n';
-      } else {
-        el.textContent+='  ⚠ League not found! Errors: '+JSON.stringify(d3.errors||{})+'\n';
-      }
-    }
-    // Step 3: Test FREE alternative — worldcup26.ir (no key needed)
-    el.textContent+='\n--- Testing free alternative: worldcup26.ir ---\n';
-    try{
-      const r4=await fetch('https://worldcup26.ir/get/games');
-      if(!r4.ok) throw new Error('HTTP '+r4.status);
-      const d4=await r4.json();
-      const games=Array.isArray(d4)?d4:(d4.data||d4.games||d4.matches||[]);
-      el.textContent+='✓ worldcup26.ir: '+games.length+' matches returned\n';
-      // Dump first 2 matches raw to see field names
-      games.slice(0,2).forEach((g,i)=>{
-        el.textContent+='\nMatch '+(i+1)+' raw fields:\n';
-        Object.keys(g).forEach(k=>{
-          const v=typeof g[k]==='object'?JSON.stringify(g[k]):g[k];
-          el.textContent+='  '+k+': '+v+'\n';
-        });
-      });
-      const finished=games.filter(g=>{
-        const st=(g.status||g.matchStatus||g.time_elapsed||'').toUpperCase();
-        const fin=(g.finished||'').toUpperCase();
-        return fin==='TRUE'||st==='FT'||st==='FINISHED'||st==='AET'||st==='PEN';
-      });
-      el.textContent+='  Finished: '+finished.length+'\n';
-      finished.slice(0,3).forEach(g=>{
-        const h=g.home_team||g.homeTeam||g.home_team_en||g.home||'?';
-        const a=g.away_team||g.awayTeam||g.away_team_en||g.away||'?';
-        const hs=g.home_score!=null?g.home_score:(g.score?.home||'?');
-        const as=g.away_score!=null?g.away_score:(g.score?.away||'?');
-        el.textContent+='  '+h+' '+hs+'-'+as+' '+a+'\n';
-      });
-      el.textContent+='\n✅ worldcup26.ir WORKS — can use as free live score source\n';
-    }catch(e4){
-      el.textContent+='❌ worldcup26.ir failed: '+e4.message+'\n';
-      el.textContent+='→ Use manual settle (above) as fallback.\n';
-    }
-  }catch(e){
-    el.textContent+='❌ Error: '+e.message;
-  }
-}
-
 // ── Admin: manual settle for any match ──
 async function manualSettle(mid){
   const hEl=document.getElementById('ms_h_'+mid);
@@ -3294,13 +3201,6 @@ function renderAdmin(){
 
   const anyUnlocked=!groupLocked||!r32Locked||!r16Locked||!qfLocked||!sfLocked;
 
-  // Live score status indicator
-  const lastPollStr=lastPollTime?new Date(lastPollTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'Never';
-  const liveCount=Object.keys(LIVE_SCORES).length;
-  const liveBadge=liveCount>0
-    ?`<span style="font-size:11px;color:var(--success);margin-left:8px">🔴 ${liveCount} live fixture${liveCount!==1?'s':''} · Updated ${lastPollStr}</span>`
-    :`<span style="font-size:11px;color:var(--muted);margin-left:8px">No live data · Last checked ${lastPollStr}</span>`;
-
   // ── Leaderboard share section ──
   const lbPreviewMsg=generateLeaderboardMessage();
   const lbShareHtml=`
@@ -3348,15 +3248,7 @@ function renderAdmin(){
     </div>
     <div id="settle-debug" style="font-size:11px;color:var(--muted);white-space:pre-wrap"></div>
   </div>
-  <div class="sec">API diagnostics</div>
-  <div class="card" id="api-diag-card" style="margin-bottom:4px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <div style="font-size:13px;color:var(--muted)">Test live scores API connection</div>
-      <button onclick="runApiDiag()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--muted);cursor:pointer">🔍 Test API</button>
-    </div>
-    <div id="api-diag-result" style="font-size:11px;color:var(--muted);white-space:pre-wrap"></div>
-  </div>
-  <div class="sec">Live scores ${liveBadge}</div>
+<div class="sec">Live scores</div>
   <div class="card" style="margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
     <div style="font-size:13px;color:var(--muted)">Polling every 5 minutes during match windows</div>
     <button onclick="fetchLiveScores()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--muted);cursor:pointer">↻ Refresh now</button>
