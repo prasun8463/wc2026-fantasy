@@ -3320,7 +3320,25 @@ function renderAdmin(){
     </div>`:'';
 
   // Manual settle section for unresolved matches
-  const unresolvedMatches=MATCHES.filter(m=>!m.resolved&&m.home!=='TBD'&&m.away!=='TBD'&&matchStatus(m)!=='future'&&matchStatus(m)!=='open');
+  const unresolvedMatches=MATCHES.filter(m=>{
+    if(m.resolved||m.home==='TBD'||m.away==='TBD') return false;
+    const s=matchStatus(m);
+    // Only show in manual settle if match is finished or well past expected end time
+    if(s==='finished') return true;
+    // Fallback: if no live data, show after match duration + 30 min buffer
+    if(s==='inprogress'||s==='live'){
+      const parts=m.match_date.trim().split(' ');
+      const mon={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11}[parts[0]];
+      const day=parseInt(parts[1]);
+      const [hh,mm]=(m.kickoff_ist||'23:59').split(':').map(Number);
+      const kickIST=new Date(Date.UTC(2026,mon,day,hh,mm));
+      const kickUTC=new Date(kickIST.getTime()-IST_OFFSET_MS);
+      const dur=isKnockout(m)?KNOCKOUT_DURATION_MS:MATCH_DURATION_MS;
+      const endPlus30=new Date(kickUTC.getTime()+dur+30*60*1000);
+      return new Date()>=endPlus30;
+    }
+    return false;
+  });
   let manualSettleHtml='';
   if(unresolvedMatches.length>0){
     let rows='';
