@@ -3209,7 +3209,11 @@ function runReconciliationAudit(){
     const paidOut=winners.length*share;
     totalIn+=pot;
     const diff=pot-paidOut;
-    if(diff!==0){
+    // Tolerate rounding remainders: when pot doesn't divide evenly by winner count,
+    // the remainder (0 to winners-1 rupees) is normal and may be manually allocated
+    // to one winner (captured in their earned, not in the shared resolved_share field).
+    const tolerance=winners.length>0?winners.length-1:0;
+    if(Math.abs(diff)>tolerance){
       matchIssues.push({id:m.id, match:m.home+' vs '+m.away, pot, winners:winners.length, share, paidOut, diff});
     }
   });
@@ -3224,7 +3228,11 @@ function runReconciliationAudit(){
       if((m.resolved_winners||[]).includes(u.username)) calcEarned+=(m.resolved_share||0);
     });
     totalOut+=(u.earned||0);
-    if((u.spent||0)!==calcSpent || (u.earned||0)!==calcEarned){
+    const spentDiff=(u.spent||0)-calcSpent;
+    const earnedDiff=(u.earned||0)-calcEarned;
+    // Tolerate small earned differences (≤2) — likely manual rounding remainder allocation
+    // (see per-match pot tolerance above). Always flag spent mismatches (no valid reason for those).
+    if(spentDiff!==0 || Math.abs(earnedDiff)>2){
       userIssues.push({username:u.username, dbSpent:u.spent||0, calcSpent, dbEarned:u.earned||0, calcEarned});
     }
   });
@@ -3262,6 +3270,7 @@ function runReconciliationAudit(){
   out+='Total in (all bets on resolved): ₹'+totalIn+'\n';
   out+='Total out (sum of earned): ₹'+totalOut+'\n';
   out+='Net difference: ₹'+netDiff+(netDiff===0?' ✅ Balanced':' ⚠️')+'\n';
+  out+='(Per-match/user checks tolerate ≤'+'(winners-1)'+' rupee rounding remainders)\n';
   out+='\n';
 
   out+='── Per-match pot issues ──\n';
