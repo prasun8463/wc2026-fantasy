@@ -3190,6 +3190,111 @@ async function debugCatchUpSettle(){
   }
 }
 
+// ── Admin: ledger reconciliation audit (runs entirely client-side) ──
+function runReconciliationAudit(){
+  const el=document.getElementById('audit-result');
+  if(!el) return;
+
+  const resolvedMatches=MATCHES.filter(m=>m.resolved);
+  let totalIn=0, totalOut=0;
+
+  // Section 1: per-match pot vs payout
+  const matchIssues=[];
+  resolvedMatches.forEach(m=>{
+    const preds=PREDS[m.id]||[];
+    const bet=betFor(m);
+    const pot=preds.length*bet;
+    const winners=m.resolved_winners||[];
+    const share=m.resolved_share||0;
+    const paidOut=winners.length*share;
+    totalIn+=pot;
+    const diff=pot-paidOut;
+    if(diff!==0){
+      matchIssues.push({id:m.id, match:m.home+' vs '+m.away, pot, winners:winners.length, share, paidOut, diff});
+    }
+  });
+
+  // Section 2: per-user spent/earned vs recalculated
+  const userIssues=[];
+  MEMBERS.forEach(u=>{
+    let calcSpent=0, calcEarned=0;
+    resolvedMatches.forEach(m=>{
+      const myP=(PREDS[m.id]||[]).find(p=>p.username===u.username);
+      if(myP) calcSpent+=betFor(m);
+      if((m.resolved_winners||[]).includes(u.username)) calcEarned+=(m.resolved_share||0);
+    });
+    totalOut+=(u.earned||0);
+    if((u.spent||0)!==calcSpent || (u.earned||0)!==calcEarned){
+      userIssues.push({username:u.username, dbSpent:u.spent||0, calcSpent, dbEarned:u.earned||0, calcEarned});
+    }
+  });
+
+  // Section 5: orphan predictions
+  const orphanPreds=[];
+  Object.keys(PREDS).forEach(mid=>{
+    const matchExists=MATCHES.find(m=>m.id===mid);
+    (PREDS[mid]||[]).forEach(p=>{
+      if(!matchExists) orphanPreds.push({match_id:mid, username:p.username, issue:'no match'});
+      else if(!MEMBERS.find(u=>u.username===p.username)) orphanPreds.push({match_id:mid, username:p.username, issue:'no user'});
+    });
+  });
+
+  // Section 6: phantom winners (winner never predicted)
+  const phantomWinners=[];
+  resolvedMatches.forEach(m=>{
+    (m.resolved_winners||[]).forEach(w=>{
+      if(!(PREDS[m.id]||[]).find(p=>p.username===w)) phantomWinners.push({id:m.id, match:m.home+' vs '+m.away, winner:w});
+    });
+  });
+
+  // Section 7: duplicate predictions
+  const dupes=[];
+  Object.keys(PREDS).forEach(mid=>{
+    const seen={};
+    (PREDS[mid]||[]).forEach(p=>{ seen[p.username]=(seen[p.username]||0)+1; });
+    Object.entries(seen).forEach(([u,c])=>{ if(c>1) dupes.push({match_id:mid, username:u, count:c}); });
+  });
+
+  // ── Render report ──
+  const netDiff=totalIn-totalOut;
+  let out='';
+  out+='Matches settled: '+resolvedMatches.length+'\n';
+  out+='Total in (all bets on resolved): ₹'+totalIn+'\n';
+  out+='Total out (sum of earned): ₹'+totalOut+'\n';
+  out+='Net difference: ₹'+netDiff+(netDiff===0?' ✅ Balanced':' ⚠️')+'\n';
+  out+='\n';
+
+  out+='── Per-match pot issues ──\n';
+  if(matchIssues.length===0) out+='✓ None — all pots fully distributed\n';
+  else matchIssues.forEach(i=>{
+    out+='⚠️ '+i.id+' ('+i.match+'): pot=₹'+i.pot+', '+i.winners+' winner(s) × ₹'+i.share+' = ₹'+i.paidOut+', diff=₹'+i.diff+'\n';
+  });
+  out+='\n';
+
+  out+='── Per-user balance issues ──\n';
+  if(userIssues.length===0) out+='✓ None — all users match calculated values\n';
+  else userIssues.forEach(i=>{
+    out+='⚠️ '+i.username+': spent DB=₹'+i.dbSpent+' calc=₹'+i.calcSpent+' | earned DB=₹'+i.dbEarned+' calc=₹'+i.calcEarned+'\n';
+  });
+  out+='\n';
+
+  out+='── Orphan predictions ──\n';
+  if(orphanPreds.length===0) out+='✓ None\n';
+  else orphanPreds.forEach(i=>{ out+='⚠️ '+i.match_id+' / '+i.username+': '+i.issue+'\n'; });
+  out+='\n';
+
+  out+='── Phantom winners ──\n';
+  if(phantomWinners.length===0) out+='✓ None\n';
+  else phantomWinners.forEach(i=>{ out+='⚠️ '+i.id+' ('+i.match+'): '+i.winner+' is a winner but never predicted\n'; });
+  out+='\n';
+
+  out+='── Duplicate predictions ──\n';
+  if(dupes.length===0) out+='✓ None\n';
+  else dupes.forEach(i=>{ out+='⚠️ '+i.match_id+' / '+i.username+': '+i.count+' rows\n'; });
+
+  el.textContent=out;
+}
+
 // ── Admin: manual settle for any match ──
 async function manualSettle(mid){
   const hEl=document.getElementById('ms_h_'+mid);
@@ -3354,7 +3459,15 @@ function renderAdmin(){
     manualSettleHtml='<div class="sec">Manual settle ('+unresolvedMatches.length+' pending)</div><div class="card">'+rows+'</div>';
   }
 
-  let html=reminderHtml+lbShareHtml+stgShareHtml+manualSettleHtml+`<div class="sec">Data backup</div>
+  let html=reminderHtml+lbShareHtml+stgShareHtml+manualSettleHtml+`<div class="sec">Ledger audit</div>
+  <div class="card" style="margin-bottom:4px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="font-size:13px;color:var(--muted)">Check pot math, balances & data integrity</div>
+      <button onclick="runReconciliationAudit()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--muted);cursor:pointer">🔍 Run audit</button>
+    </div>
+    <div id="audit-result" style="font-size:11px;color:var(--muted);white-space:pre-wrap"></div>
+  </div>
+  <div class="sec">Data backup</div>
   <div class="card" style="margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
     <div style="font-size:13px;color:var(--muted)">Download all users, matches, predictions as JSON</div>
     <button onclick="downloadBackup()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--muted);cursor:pointer">⬇ Backup</button>
