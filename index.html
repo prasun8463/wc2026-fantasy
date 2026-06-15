@@ -2684,10 +2684,16 @@ async function fetchLiveScores(){
       const as_=parseInt(g.away_score);
 
       // Map worldcup26.ir statuses to our internal status codes
+      // IMPORTANT: time_elapsed is the real-time indicator; finished field can be stale/premature.
+      // Priority: time_elapsed first, finished field only as fallback.
       let status='NS'; // not started
-      if(fin||elapsed==='finished') status='FT';
-      else if(elapsed==='notstarted') status='NS';
-      else if(elapsed&&elapsed!=='null') status='LIVE'; // any other value = in progress
+      if(elapsed==='finished') status='FT';
+      else if(elapsed==='notstarted'||elapsed===''||elapsed==='null'||!elapsed){
+        // No live activity — check finished field as fallback
+        if(fin) status='FT';
+        else status='NS';
+      }
+      else status='LIVE'; // any other time_elapsed value (e.g. "45", "HT", "90+3") = in progress
 
       if(status==='NS') continue; // skip not-started matches
 
@@ -2809,7 +2815,7 @@ async function catchUpSettle(){
     const games=Array.isArray(apiGames)?apiGames:(apiGames.games||apiGames.data||apiGames.matches||[]);
     console.log('Catch-up: worldcup26.ir returned '+games.length+' matches');
 
-    const finishedGames=games.filter(g=>(g.finished||'').toUpperCase()==='TRUE');
+    const finishedGames=games.filter(g=>{ const te=(g.time_elapsed||'').toLowerCase(); const fin=(g.finished||'').toUpperCase()==='TRUE'; return te==='finished'||(fin&&(te===''||te==='notstarted'||te==='null'||!te)); });
     console.log('Catch-up: '+finishedGames.length+' finished matches');
 
     let caught=0;
@@ -3139,7 +3145,7 @@ async function debugCatchUpSettle(){
       el.textContent+='Response keys: '+Object.keys(apiGames).join(', ')+'\n';
       el.textContent+='Response preview: '+JSON.stringify(apiGames).slice(0,500)+'\n';
     }
-    const finishedGames=games.filter(g=>(g.finished||'').toUpperCase()==='TRUE');
+    const finishedGames=games.filter(g=>{ const te=(g.time_elapsed||'').toLowerCase(); const fin=(g.finished||'').toUpperCase()==='TRUE'; return te==='finished'||(fin&&(te===''||te==='notstarted'||te==='null'||!te)); });
     el.textContent+='Finished matches: '+finishedGames.length+'\n';
     finishedGames.forEach(fg=>{
       el.textContent+='  '+fg.home_team_name_en+' '+fg.home_score+'-'+fg.away_score+' '+fg.away_team_name_en+'\n';
