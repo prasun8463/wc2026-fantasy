@@ -677,9 +677,15 @@ function matchStatus(m){
   const liveKey=normaliseTeamName(m.home)+'_'+normaliseTeamName(m.away);
   const live=LIVE_SCORES[liveKey];
   if(live){
-    if(live.status==='FT'||live.status==='AET'||live.status==='PEN') return 'finished';
-    if(live.status==='1H'||live.status==='HT'||live.status==='2H'||
-       live.status==='ET'||live.status==='BT'||live.status==='P') return 'live';
+    if(['FT','AET','PEN'].includes(live.status)){
+      // Don't trust FT from the API until minimum match duration has actually elapsed.
+      // worldcup26.ir can flag "finished" during stoppage time before the final whistle.
+      // Group: 105 min (90 + 15 stoppage), Knockout: 150 min (90 + 30 ET + 30 pens)
+      const minDur=isKnockout(m)?KNOCKOUT_DURATION_MS:MATCH_DURATION_MS;
+      if(now>=new Date(kickoffUTC.getTime()+minDur)) return 'finished';
+      return 'live'; // API says FT too early — show as live until enough time passes
+    }
+    return 'live'; // any live data present = match in progress
   }
   // Fallback: knockouts can run 150 mins (incl. ET + penalties), group stage 105 mins
   const durMs=isKnockout(m)?KNOCKOUT_DURATION_MS:MATCH_DURATION_MS;
