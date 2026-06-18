@@ -353,6 +353,7 @@ let MEMBERS = [];    // league member usernames
 let MATCHES = [];    // all matches
 let PREDS = {};      // { match_id: [ {username, pred_home, pred_away} ] }
 let matchFilter = 'All';
+let matchSubTab = 'upcoming'; // 'upcoming' or 'settled'
 
 // ── Live score state ──────────────────────────────────────────
 // Live scores powered by worldcup26.ir (free, no key needed)
@@ -742,19 +743,29 @@ function parseBetAmount(raw){
 
 
 function renderMatches(){
+  const settledCount=MATCHES.filter(m=>m.resolved).length;
+  let html='<div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:8px">';
+  html+='<div onclick="setSubTab(\x27upcoming\x27)" style="flex:1;text-align:center;padding:10px 0;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid '+(matchSubTab==='upcoming'?'var(--gold)':'transparent')+';color:'+(matchSubTab==='upcoming'?'var(--gold)':'var(--muted)')+'">Upcoming</div>';
+  html+='<div onclick="setSubTab(\x27settled\x27)" style="flex:1;text-align:center;padding:10px 0;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid '+(matchSubTab==='settled'?'var(--gold)':'transparent')+';color:'+(matchSubTab==='settled'?'var(--gold)':'var(--muted)')+'">Settled'+(settledCount>0?' ('+settledCount+')':'')+'</div>';
+  html+='</div>';
   const groups=['All','A','B','C','D','E','F','G','H','I','J','K','L','R32','R16','QF','SF','3rd','Final'];
-  let html=`<div class="filter-bar">`;
-  groups.forEach(g=>html+=`<div class="fchip${g===matchFilter?' on':''}" onclick="setFilter('${g}')">${g==='All'?'All':g}</div>`);
-  html+=`</div><div id="match-list"></div>`;
+  html+='<div class="filter-bar">';
+  groups.forEach(g=>html+='<div class="fchip'+(g===matchFilter?' on':'')+'" onclick="setFilter(\x27'+g+'\x27)">'+(g==='All'?'All':g)+'</div>');
+  html+='</div><div id="match-list"></div>';
   document.getElementById('pane-matches').innerHTML=html;
   renderMatchList();
 }
 
+function setSubTab(t){ matchSubTab=t; renderMatches(); }
 function setFilter(f){ matchFilter=f; renderMatches(); }
 
 
 function renderMatchList(){
-  const filtered=matchFilter==='All'?MATCHES:MATCHES.filter(m=>m.grp===matchFilter);
+  // Filter by sub-tab first, then by group
+  const subFiltered=matchSubTab==='settled'
+    ? MATCHES.filter(m=>m.resolved)
+    : MATCHES.filter(m=>!m.resolved);
+  const filtered=matchFilter==='All'?subFiltered:subFiltered.filter(m=>m.grp===matchFilter);
   const monthOrder={Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
   function dateSortKey(d){if(!d||d==='TBD')return 9999;const p=d.trim().split(' ');return(monthOrder[p[0]]||0)*100+(parseInt(p[1])||0);}
 
@@ -943,7 +954,8 @@ function renderMatchList(){
     </div>`;
   }
 
-  // ── Action strip — shows at top of match list when anything is open ──
+  // ── Action strip — only in upcoming tab ──
+  if(matchSubTab==='upcoming'){
   const openMatches=MATCHES.filter(m=>matchStatus(m)==='open'&&!m.resolved);
   const unpredictedOpen=openMatches.filter(m=>!(PREDS[m.id]||[]).find(p=>p.username===ME.username));
   if(openMatches.length>0){
@@ -971,18 +983,21 @@ function renderMatchList(){
          +'<span style="font-size:12px;color:'+stripTextColor+';font-weight:600;">'+stripMsg+'</span>'
          +'</div>';
   }
+  } // end upcoming-only action strip
 
-  // Render: today → upcoming divider → future → past results divider → past
-  if(todayGroup) html+=renderDateGroup(todayGroup,true,false);
-  if(futureGroups.length){
-    html+=divider('Upcoming','#4a8a4a');
-    futureGroups.forEach(g=>{ html+=renderDateGroup(g,false,false); });
+  if(matchSubTab==='settled'){
+    // Settled tab: all resolved matches, most recent first
+    const settledGroups=byDate.sort((a,b)=>b.key-a.key);
+    settledGroups.forEach(g=>{ html+=renderDateGroup(g,false,true); });
+    if(!html) html='<div class="empty" style="text-align:center;color:var(--muted);padding:40px 0;font-size:13px">No settled matches yet.</div>';
+  } else {
+    // Upcoming tab: today → future (no past results here)
+    if(todayGroup) html+=renderDateGroup(todayGroup,true,false);
+    if(futureGroups.length){
+      futureGroups.forEach(g=>{ html+=renderDateGroup(g,false,false); });
+    }
+    if(!html) html='<div class="empty" style="text-align:center;color:var(--muted);padding:40px 0;font-size:13px">No upcoming matches in this group.</div>';
   }
-  if(pastGroups.length){
-    html+=divider('Past results','#3a6a3a');
-    pastGroups.forEach(g=>{ html+=renderDateGroup(g,false,true); });
-  }
-  if(!html) html=`<div class="empty">No matches in this group.</div>`;
 
   const el=document.getElementById('match-list');
   if(el)el.innerHTML=html;
