@@ -1460,68 +1460,88 @@ function renderLB(){
     return {u,exact,outcome_win,wrong,participated,skipped,acc,biggestWin,streak};
   });
 
-  // ── League header + Podium ──
-  let headerHtml='';
-  let podiumHtml='';
-  {
-    const settledCount=settledMatches.length;
-    const totalMatches=MATCHES.length;
-
-    // League header
-    headerHtml='<div style="text-align:center;margin-bottom:16px">'
-      +'<div style="font-size:10px;color:var(--muted);font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">'+esc(LEAGUE.name)+'</div>'
-      +'<div style="font-size:11px;color:rgba(255,255,255,.3)">'+settledCount+' of '+totalMatches+' matches settled</div>'
-    +'</div>';
-
-    // Podium — top 3 by P/L%
-    if(settledCount>0 && sortedMembers.length>=3){
-      const top3=sortedMembers.slice(0,3).map((u,i)=>{
-        const s=calcRoundStats(u.username);
-        const ps=playerStats.find(x=>x.u.username===u.username);
-        const pct=plPct(s.overall.bet,s.overall.won);
-        const pl=s.overall.pl;
-        return {u,pct,pl,acc:ps?ps.acc:0,i};
-      });
-      // Reorder for display: [1]=2nd, [0]=1st, [2]=3rd
-      const ordered=[top3[1],top3[0],top3[2]];
-      const podColors=[
-        {bg:'linear-gradient(180deg,rgba(192,192,192,.12),rgba(192,192,192,.03)',bd:'rgba(192,192,192,.3)',bb:'2px solid rgba(192,192,192,.4)',tc:'#c0c0c0',pad:'16px 8px 14px'},
-        {bg:'linear-gradient(180deg,rgba(212,160,23,.18),rgba(212,160,23,.04)',bd:'rgba(212,160,23,.5)',bb:'3px solid rgba(212,160,23,.6)',tc:'#f0c060',pad:'26px 8px 18px'},
-        {bg:'linear-gradient(180deg,rgba(205,127,50,.12),rgba(205,127,50,.03)',bd:'rgba(205,127,50,.3)',bb:'2px solid rgba(205,127,50,.4)',tc:'#cd7f32',pad:'12px 8px 12px'}
-      ];
-      const podWidths=['95px','112px','95px'];
-      const podRankSize=['18px','22px','16px'];
-
-      podiumHtml='<div style="display:flex;align-items:flex-end;justify-content:center;gap:6px;margin:0 auto 18px;padding:0 12px">';
-      ordered.forEach((p,di)=>{
-        const c=podColors[di];
-        const w=podWidths[di];
-        const rs=podRankSize[di];
-        const plColor2=p.pl>0?'#5DCAA5':p.pl<0?'#E24B4A':'var(--muted)';
-        podiumHtml+='<div style="text-align:center;border-radius:14px 14px 0 0;width:'+w+';padding:'+c.pad+';background:'+c.bg+');border:1px solid '+c.bd+';border-bottom:'+c.bb+'">'
-          +'<div style="font-size:'+rs+';color:'+c.tc+';margin-bottom:6px">'+(p.i+1)+'</div>'
-          +'<div style="font-size:12px;font-weight:600;color:#e8e8e8;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.u.username)+'</div>'
-          +'<div style="font-size:18px;font-weight:700;color:'+plColor2+';margin-bottom:1px">'+(p.pct>0?'+':'')+p.pct+'%</div>'
-          +'<div style="font-size:10px;color:'+plColor2+';margin-bottom:3px">('+(p.pl>0?'+':'')+'\u20b9'+p.pl+')</div>'
-          +'<div style="font-size:9px;color:#6a8a6a;letter-spacing:.3px">'+p.acc+'% wins</div>'
-        +'</div>';
-      });
-      podiumHtml+='</div>';
-    } else if(settledCount===0){
-      // Empty state
-      const openCount=MATCHES.filter(m=>matchStatus(m)==='open').length;
-      if(openCount>0){
-        podiumHtml='<div style="background:linear-gradient(135deg,rgba(212,160,23,.15),rgba(212,160,23,.05));border:1px solid rgba(212,160,23,.4);border-radius:14px;padding:18px 16px;margin-bottom:14px;text-align:center">'
-          +'<div style="font-size:24px;margin-bottom:6px">\u26BD</div>'
-          +'<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">Make your first prediction</div>'
-          +'<div style="font-size:12px;color:var(--muted);margin-bottom:12px">'+openCount+' match'+(openCount!==1?'es':'')+' open · everyone starts at zero</div>'
-          +'<button onclick="goTab(\'matches\')" style="background:var(--gold);color:var(--dark);border:none;border-radius:8px;padding:9px 22px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation">Predict now \u2192</button>'
-        +'</div>';
+  // ── Idea 1: Rank movement arrows (compare today vs yesterday via localStorage) ──
+  function istDateStr(offset=0){
+    const d=new Date(Date.now()+5.5*60*60*1000+offset);
+    return d.toISOString().slice(0,10);
+  }
+  const todayKey='wc2026_ranks_'+istDateStr();
+  const yestKey='wc2026_ranks_'+istDateStr(-864e5);
+  const todayRanks={};
+  sortedMembers.forEach((u,i)=>todayRanks[u.username]=i+1);
+  // Save today's ranks every render — captures latest standings for comparison
+  // Yesterday's key is never overwritten so we always have a stable baseline
+  try{ localStorage.setItem(todayKey,JSON.stringify(todayRanks)); }catch(e){}
+  let yestRanks={};
+  try{const y=localStorage.getItem(yestKey);if(y)yestRanks=JSON.parse(y);}catch(e){}
+  // If no yesterday data, use previous saved state if any (for same-day testing)
+  if(!Object.keys(yestRanks).length){
+    try{
+      // Look for any older rank key to compare against
+      const keys=Object.keys(localStorage).filter(k=>k.startsWith('wc2026_ranks_')&&k!==todayKey);
+      if(keys.length){
+        const latest=keys.sort().pop();
+        const old=localStorage.getItem(latest);
+        if(old) yestRanks=JSON.parse(old);
       }
+    }catch(e){}
+  }
+  function rankMovement(username){
+    const cur=todayRanks[username], prev=yestRanks[username];
+    if(!prev||prev===cur) return '';
+    const diff=prev-cur;
+    if(diff>0) return '<span style="font-size:11px;color:var(--success);font-weight:700;flex-shrink:0;margin-right:2px">▲'+diff+'</span>';
+    return '<span style="font-size:11px;color:var(--red);font-weight:700;flex-shrink:0;margin-right:2px">▼'+Math.abs(diff)+'</span>';
+  }
+
+  // ── REDESIGN C2/H4: Personal hero card (or empty state for new users) ──
+  let heroHtml='';
+  {
+    const meStats=playerStats.find(p=>p.u.username===ME.username);
+    const meRank=sortedMembers.findIndex(u=>u.username===ME.username)+1;
+    const meData=sortedMembers.find(u=>u.username===ME.username);
+    const meBet=meData?.spent||0;
+    const meWon=meData?.earned||0;
+    const mePL=meWon-meBet;
+    const mePct=plPct(meBet,meWon);
+    const myParticipated=meStats?meStats.participated:0;
+    const myMovement=rankMovement(ME.username);
+    const totalPlayers=sortedMembers.length;
+
+    if(myParticipated===0&&MATCHES.some(m=>matchStatus(m)==='open')){
+      // Empty state — new user, hasn't predicted, but matches are open
+      const openCount=MATCHES.filter(m=>matchStatus(m)==='open').length;
+      heroHtml='<div style="background:linear-gradient(135deg,rgba(212,160,23,.15),rgba(212,160,23,.05));border:1px solid rgba(212,160,23,.4);border-radius:14px;padding:18px 16px;margin-bottom:14px;text-align:center">'
+        +'<div style="font-size:24px;margin-bottom:6px">🎯</div>'
+        +'<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">Make your first prediction</div>'
+        +'<div style="font-size:12px;color:var(--muted);margin-bottom:12px">'+openCount+' match'+(openCount!==1?'es':'')+' open today · everyone starts at zero</div>'
+        +'<button onclick="goTab(\'matches\')" style="background:var(--gold);color:var(--dark);border:none;border-radius:8px;padding:9px 22px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation">Predict today\'s matches →</button>'
+      +'</div>';
+    } else if(meStats&&meBet>0){
+      // Hero card — user has placed predictions, show their position
+      const rankIcon=meRank===1?'🥇':meRank===2?'🥈':meRank===3?'🥉':'';
+      const rankSuffix=meRank===1?'st':meRank===2?'nd':meRank===3?'rd':'th';
+      const plColor2=mePL>0?'var(--success)':mePL<0?'var(--red)':'var(--muted)';
+      const plPctColor=mePct>0?'var(--success)':mePct<0?'var(--red)':'var(--muted)';
+      const accDisp=meStats.acc;
+      heroHtml='<div style="background:linear-gradient(135deg,rgba(55,138,221,.1),rgba(55,138,221,.02));border:1px solid rgba(55,138,221,.3);border-radius:14px;padding:14px 16px;margin-bottom:14px">'
+        +'<div style="font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.5px;margin-bottom:6px">YOUR POSITION</div>'
+        +'<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px">'
+          +(rankIcon?'<div style="font-size:24px">'+rankIcon+'</div>':'')
+          +'<div style="font-size:22px;font-weight:700;color:var(--text)">'+meRank+rankSuffix+'</div>'
+          +'<div style="font-size:13px;color:var(--muted)">of '+totalPlayers+'</div>'
+          +(myMovement?'<div style="margin-left:auto">'+myMovement.replace('font-size:11px','font-size:13px')+'</div>':'')
+        +'</div>'
+        +'<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">'
+          +'<div style="font-size:20px;font-weight:700;color:'+plPctColor+'">'+(mePct>0?'+':'')+mePct+'%</div>'
+          +'<div style="font-size:13px;color:'+plColor2+'">('+(mePL>0?'+':'')+'\u20b9'+mePL+')</div>'
+        +'</div>'
+        +'<div style="font-size:11px;color:var(--muted)">'+myParticipated+' match'+(myParticipated!==1?'es':'')+' · '+accDisp+'% hit rate · \u20b9'+meBet+' staked</div>'
+      +'</div>';
     }
   }
 
-  // ── Today's action banner ──
+  // ── Idea 3: Today's action banner ──
   const openToday=MATCHES.filter(m=>matchStatus(m)==='open');
   const liveNow=MATCHES.filter(m=>{const s=matchStatus(m);return s==='live'||s==='inprogress';});
   let bannerHtml='';
@@ -1590,41 +1610,60 @@ function renderLB(){
     }
   }
 
-  // ── Build standings rows with P/L bars ──
-  let standingsHtml='<div class="sec">Full standings</div>';
-  {
-    // Find max P/L% for bar scaling
-    const allPcts=sortedMembers.map(u=>{const s=calcRoundStats(u.username);return Math.abs(plPct(s.overall.bet,s.overall.won));});
-    const maxPct=Math.max(...allPcts,1);
-
-    standingsHtml+='<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:10px;margin-bottom:4px">';
+  // ── Build standings rows ──
+  let standingsHtml='<div class="sec">Leaderboard</div>';
+  if(settledMatches.length===0){
+    standingsHtml+='<div class="card" style="text-align:center;color:var(--muted);font-size:13px;padding:20px">No settled matches yet.</div>';
+    sortedMembers.forEach((u,i)=>{
+      const isMe=u.username===ME.username;
+      const pc=Object.values(PREDS).filter(arr=>arr.find(p=>p.username===u.username)).length;
+      const active0=ppActiveUser===u.username;
+      const bgMe0=active0?'rgba(212,160,23,.06)':(isMe?'rgba(55,138,221,.08)':'var(--card)');
+      const bdMe0=active0?'rgba(212,160,23,.4)':(isMe?'rgba(55,138,221,.3)':'rgba(255,255,255,.09)');
+      const blMe0=isMe?'border-left:3px solid var(--info);':'';
+      standingsHtml+='<div onclick="showPlayerPopup(\''+esc(u.username)+'\')" style="cursor:pointer;background:'+bgMe0+';border:1px solid '+bdMe0+';'+blMe0+'border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:6px">'
+        +'<div style="font-size:14px;font-weight:700;color:var(--muted);width:28px;text-align:center">'+(i+1)+'</div>'
+        +'<div class="av" style="background:'+avc(u.username)+';width:38px;height:38px;font-size:13px">'+ini(u.username)+'</div>'
+        +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:15px;font-weight:700;color:'+(isMe?'var(--info)':'var(--text)')+'">'+esc(u.username)+(isMe?' <span style="font-size:10px;color:var(--muted)">(you)</span>':'')+'</div>'
+          +'<div style="font-size:11px;color:var(--muted)">'+pc+' predictions</div>'
+        +'</div>'
+        +rankMovement(u.username)
+        +'<div style="color:rgba(255,255,255,.25);font-size:14px">'+(active0?'&#x2227;':'&#x203a;')+'</div>'
+      +'</div>'
+      +(active0?buildPlayerInline(u.username):'');
+    });
+  } else {
     sortedMembers.forEach((u,i)=>{
       const isMe=u.username===ME.username;
       const ps=playerStats.find(x=>x.u.username===u.username);
       const s=calcRoundStats(u.username);
       const active=ppActiveUser===u.username;
-      const pct=plPct(s.overall.bet,s.overall.won);
-      const pl=s.overall.pl;
-      const barW=maxPct>0?Math.max(2,Math.round(Math.abs(pct)/maxPct*100)):0;
-      const barCol=pl>0?'#5DCAA5':pl<0?'#E24B4A':'#888780';
-      const plCol=pl>0?'#5DCAA5':pl<0?'#E24B4A':'var(--muted)';
-      const rankCol=i===0?'#f0c060':i===1?'#c0c0c0':i===2?'#cd7f32':'#6a8a6a';
-      const meBg=isMe?'background:rgba(55,138,221,.06);border-radius:8px;':'';
-      const meName=isMe?'color:#85B7EB;font-weight:600':'color:#c8c8c8';
-      const mePctCol=isMe?'#85B7EB':plCol;
-      const meAmtCol=isMe?'#85B7EB':'#6a8a6a';
-
-      standingsHtml+='<div onclick="showPlayerPopup(\''+esc(u.username)+'\')" style="cursor:pointer;'+meBg+'display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.05)">'
-        +'<div style="font-size:13px;font-weight:600;color:'+rankCol+';width:20px;text-align:center;flex-shrink:0">'+(i+1)+'</div>'
-        +'<div style="font-size:13px;'+meName+';flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(u.username)+'</div>'
-        +'<div style="width:60px;height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;flex-shrink:0"><div style="height:100%;width:'+barW+'%;background:'+barCol+';border-radius:3px"></div></div>'
-        +'<div style="font-size:13px;font-weight:700;color:'+mePctCol+';width:48px;text-align:right;flex-shrink:0">'+(pct>0?'+':'')+pct+'%</div>'
-        +'<div style="font-size:10px;color:'+meAmtCol+';width:50px;text-align:right;flex-shrink:0">('+(pl>0?'+':'')+'\u20b9'+pl+')</div>'
+      const bgMe=active?'rgba(212,160,23,.06)':(isMe?'rgba(55,138,221,.08)':'var(--card)');
+      const bdMe=active?'rgba(212,160,23,.4)':(isMe?'rgba(55,138,221,.3)':'rgba(255,255,255,.09)');
+      const blMe=isMe?'border-left:3px solid var(--info);':'';
+      // Medals only for top 3 with positive P/L — losing money doesn't earn a medal
+      const showMedal=i<3 && s.overall.pl>0;
+      const rankDisplay=showMedal?medals[i]:(i+1);
+      const rankSize=showMedal?26:14;
+      standingsHtml+='<div onclick="showPlayerPopup(\''+esc(u.username)+'\')" style="cursor:pointer;background:'+bgMe+';border:1px solid '+bdMe+';'+blMe+'border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:6px">'
+        +'<div style="font-size:'+rankSize+'px;font-weight:700;color:var(--muted);width:28px;text-align:center;flex-shrink:0">'+rankDisplay+'</div>'
+        +'<div class="av" style="background:'+avc(u.username)+';width:38px;height:38px;font-size:13px;flex-shrink:0">'+ini(u.username)+'</div>'
+        +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:15px;font-weight:700;color:'+(isMe?'var(--info)':'var(--text)')+'">'+esc(u.username)+(isMe?' <span style="font-size:10px;color:var(--muted)">(you)</span>':'')+'</div>'
+          +'<div style="font-size:11px;color:var(--muted)">'+ps.participated+' played · '+(ps.participated>0?ps.acc+'% hit':'no data')+'</div>'
+        +'</div>'
+        +rankMovement(u.username)
+        +'<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'
+          +'<div style="text-align:right">'
+            +'<div style="font-size:16px;font-weight:700;color:'+plColor(s.overall.pl)+'">'+fmtPct(plPct(s.overall.bet,s.overall.won))+'</div>'
+            +(s.overall.bet>0?'<div style="font-size:10px;color:'+plColor(s.overall.pl)+';opacity:.65;margin-top:1px">'+fmtPL(s.overall.pl)+'</div>':'')
+          +'</div>'
+          +'<div style="color:rgba(255,255,255,.25);font-size:14px">'+(active?'&#x2227;':'&#x203a;')+'</div>'
+        +'</div>'
       +'</div>'
       +(active?buildPlayerInline(u.username):'');
     });
-    standingsHtml+='</div>';
-    standingsHtml+='<div style="text-align:center;font-size:10px;color:rgba(255,255,255,.25);margin-bottom:14px">Tap any row for match-by-match breakdown</div>';
   }
 
   // ── Stage P&L table ──
@@ -1696,8 +1735,37 @@ function renderLB(){
       +'<div style="font-size:10px;color:var(--muted);margin-bottom:14px">Dimmed = not yet started · Tap any player row to see match details</div>';
   }
 
-  const html=headerHtml+podiumHtml+bannerHtml+storyHtml+standingsHtml+tableHtml;
+  // ── Recent results ──
+  let recentHtml='';
+  {
+    const _nowIST=new Date(new Date().getTime()+5.5*60*60*1000);
+    const _yday=new Date(_nowIST.getTime()-24*60*60*1000);
+    const _ydayStr=MONTH_NAMES[_yday.getUTCMonth()]+' '+_yday.getUTCDate();
+    const _ydayKey=dateKey(_ydayStr);
+    const recentMatches=settledMatches.filter(m=>dateKey(m.match_date)===_ydayKey);
+    if(recentMatches.length){
+      const typeLabel={exact:'Exact',outcome:'Outcome',refund:'Void'};
+      recentHtml='<div class="sec" style="margin-top:4px">Recent results <span style="font-size:12px;font-weight:400;color:var(--muted)">· '+_ydayStr+'</span></div>';
+      recentMatches.forEach(m=>{
+        const allPreds=PREDS[m.id]||[];
+        recentHtml+='<div onclick="rrToggle(\''+m.id+'\')" style="cursor:pointer;background:var(--card);border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:11px 13px;margin-bottom:7px;display:flex;align-items:center;justify-content:space-between;gap:8px">'
+          +'<div style="flex:1;min-width:0">'
+            +'<div style="font-weight:700;font-size:13px">'+m.home_flag+m.home+' <span style="color:var(--gold)">'+m.result_home+'\u2013'+m.result_away+'</span> '+m.away+m.away_flag+'</div>'
+            +'<div style="font-size:11px;color:var(--muted);margin-top:2px">Grp '+m.grp+' · '+allPreds.length+' prediction'+(allPreds.length!==1?'s':'')+' · '+(m.resolved_type?typeLabel[m.resolved_type]||m.resolved_type:'')+'</div>'
+          +'</div>'
+          +'<div style="color:rgba(255,255,255,.25);font-size:14px;flex-shrink:0">&#x203a;</div>'
+        +'</div>';
+      });
+    }
+  }
+
+  const html=heroHtml+bannerHtml+storyHtml+standingsHtml+tableHtml+recentHtml;
   document.getElementById('pane-lb').innerHTML=html;
+}
+
+// ── Recent results — tap opens same match sheet as matches tab ──
+function rrToggle(mid){
+  toggleMatchSheet(mid);
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -3462,7 +3530,82 @@ function renderAdmin(){
       ? `<button class="btn btn-gold btn-sm" onclick="updateBet()" style="width:auto;padding:8px 20px">Save bet amounts</button>`
       : `<div style="font-size:12px;color:var(--muted);font-style:italic">All stages are locked — predictions are in progress.</div>`}
   </div>
-  `;
+  <div class="sec">Enter results (${unsettled.length} remaining)</div>`;
+
+  // Group unsettled by settleable vs not
+  // Settleable = API says FT, OR 105 mins have elapsed since kickoff (fallback)
+  const settleable=unsettled.filter(m=>{ const s=matchStatus(m); return s==='finished'; });
+  const inProgress=unsettled.filter(m=>{ const s=matchStatus(m); return s==='inprogress'||s==='live'; });
+  const notYet=unsettled.filter(m=>{ const s=matchStatus(m); return s==='open'||s==='future'; });
+
+  if(settleable.length){
+    settleable.forEach(m=>{
+      const s=matchStatus(m);
+      const liveM=liveDataFor(m);
+      const liveScore=liveM&&liveM.home!=null?`FT · ${liveM.home}–${liveM.away}`:'';
+      const hasLive=liveM&&liveM.home!=null;
+      const isFinished=s==='finished';
+      html+=`<div class="admin-row" ${isFinished?'style="border-color:rgba(76,175,80,.3);background:rgba(76,175,80,.04)"':''}>
+        <div style="font-size:13px;font-weight:600;margin-bottom:7px">${m.home_flag}${m.home} vs ${m.away}${m.away_flag}
+          <span style="font-weight:400;color:var(--muted)">· ${m.match_date} · ${m.kickoff_ist||''} IST</span>
+          <span class="badge ${isFinished?'':'b-warn'}" style="margin-left:6px;font-size:10px;${isFinished?'background:rgba(76,175,80,.2);border:1px solid rgba(76,175,80,.4);color:var(--success)':''}">${isFinished?'Full Time':'In progress'}</span>
+          ${liveScore?`<span style="font-size:11px;color:var(--success);margin-left:4px">· ${liveScore}</span>`:''}
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+          ${hasLive ? `
+          <input id="ah_${m.id}" type="number" min="0" max="20" placeholder="${m.home.slice(0,4)}" value="${liveM.home}" style="width:80px;margin:0" />
+          <div class="score-sep">–</div>
+          <input id="aa_${m.id}" type="number" min="0" max="20" placeholder="${m.away.slice(0,4)}" value="${liveM.away}" style="width:80px;margin:0" />
+          <button class="btn btn-gold btn-sm" onclick="settle('${m.id}')" style="width:auto;padding:7px 12px;margin:0">Settle</button>
+          ` : PROD_MODE ? `
+          <span style="font-size:12px;color:var(--success);font-style:italic">⚡ Will auto-settle via API after match ends</span>
+          ` : `
+          <span style="font-size:12px;color:var(--muted);font-style:italic">No live score · random score will be used</span>
+          <button class="btn btn-gold btn-sm" onclick="settleRandom('${m.id}')" style="width:auto;padding:7px 14px;margin:0">Settle</button>
+          `}
+        </div>
+      </div>`;
+    });
+  } else {
+    html+=`<div style="text-align:center;padding:16px;color:var(--muted);font-size:13px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;margin-bottom:8px">
+      No matches ready to settle yet — matches become settleable after kickoff
+    </div>`;
+  }
+
+  if(inProgress.length){
+    html+=`<div style="font-size:12px;font-weight:600;color:var(--warn);margin:12px 0 6px;letter-spacing:.4px;text-transform:uppercase">In progress — settle unlocks after 105 mins (${inProgress.length})</div>`;
+    inProgress.forEach(m=>{
+      html+=`<div style="background:rgba(232,160,32,.04);border:1px solid rgba(232,160,32,.2);border-radius:10px;padding:10px 13px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;opacity:.85">
+        <div style="font-size:13px;color:var(--text)">${m.home_flag}${m.home} vs ${m.away}${m.away_flag}
+          <span style="color:var(--muted);font-weight:400"> · ${m.match_date} · ${m.kickoff_ist||''} IST</span>
+        </div>
+        <span class="badge b-warn" style="font-size:10px;flex-shrink:0;animation:pulse 1.5s infinite">Live</span>
+      </div>`;
+    });
+  }
+
+  if(notYet.length){
+    html+=`<div style="font-size:12px;font-weight:600;color:var(--muted);margin:12px 0 6px;letter-spacing:.4px;text-transform:uppercase">Not yet played (${notYet.length})</div>`;
+    notYet.forEach(m=>{
+      const s=matchStatus(m);
+      html+=`<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:10px 13px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;opacity:.7">
+        <div style="font-size:13px;color:var(--muted)">${m.home_flag}${m.home} vs ${m.away}${m.away_flag}
+          <span style="color:var(--muted);font-weight:400"> · ${m.match_date} · ${m.kickoff_ist||''} IST</span>
+        </div>
+        <span class="badge b-future" style="font-size:10px;flex-shrink:0">${s==='open'?'Open to predict':'Upcoming'}</span>
+      </div>`;
+    });
+  }
+
+  if(settled.length){
+    html+=`<div class="sec">Settled (${settled.length})</div>`;
+    settled.slice().reverse().slice(0,8).forEach(m=>{
+      html+=`<div class="card" style="font-size:12px">
+        <div style="font-weight:600">${m.home_flag}${m.home} ${m.result_home}–${m.result_away} ${m.away}${m.away_flag}</div>
+        <div style="color:var(--muted);margin-top:2px">Pot ₹${m.resolved_pot} · ${m.resolved_type} · Winners: ${(m.resolved_winners||[]).join(', ')||'none'} · ₹${m.resolved_share} each</div>
+      </div>`;
+    });
+  }
 
   html+=`<div class="sec">Knockout bracket — update teams</div>
   <div class="card" style="margin-bottom:4px">
