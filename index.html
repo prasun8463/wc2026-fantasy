@@ -2976,6 +2976,29 @@ async function copyReminderMessage(){
   }
 }
 
+// ── Admin: test worldcup26.ir /get/groups response shape ──
+async function debugGroupsApi(){
+  const el=document.getElementById('settle-debug');
+  if(!el) return;
+  el.textContent='Fetching worldcup26.ir/get/groups...\n';
+  try{
+    const res=await fetch('https://worldcup26.ir/get/groups');
+    if(!res.ok){ el.textContent+='❌ HTTP '+res.status+'\n'; return; }
+    const data=await res.json();
+    const groups=Array.isArray(data)?data:(data.groups||data.data||[]);
+    el.textContent+='✓ Got '+groups.length+' group entries\n\n';
+    if(groups.length){
+      el.textContent+='First entry raw fields:\n';
+      Object.keys(groups[0]).forEach(k=>{
+        const v=typeof groups[0][k]==='object'?JSON.stringify(groups[0][k]):groups[0][k];
+        el.textContent+='  '+k+': '+v+'\n';
+      });
+    }
+  }catch(e){
+    el.textContent+='❌ Fetch error: '+e.message+'\n';
+  }
+}
+
 // ── Admin: debug catch-up settle with visible output ──
 async function debugCatchUpSettle(){
   const el=document.getElementById('settle-debug');
@@ -3356,6 +3379,7 @@ function renderAdmin(){
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <div style="font-size:13px;color:var(--muted)">Fetch scores from worldcup26.ir and settle finished matches</div>
       <button onclick="debugCatchUpSettle()" style="background:var(--gold);color:var(--dark);border:none;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">⚡ Run now</button>
+      <button onclick="debugGroupsApi()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--muted);cursor:pointer;margin-left:6px">🔍 Test groups API</button>
     </div>
     <div id="settle-debug" style="font-size:11px;color:var(--muted);white-space:pre-wrap"></div>
   </div>
