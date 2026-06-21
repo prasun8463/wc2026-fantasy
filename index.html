@@ -2259,6 +2259,50 @@ function renderHowToClassic(){
 //  GROUPS — live standings computed from Supabase match results
 // ════════════════════════════════════════════════════════════════
 let groupsLastFetched = 0;
+// Live group standings from worldcup26.ir — cached to avoid refetching on every render
+let LIVE_GROUP_STANDINGS = null; // {A:[{name,mp,w,d,l,gf,ga,pts},...], B:[...], ...}
+let liveGroupsFetchedAt = 0;
+
+// Fetch live group standings from worldcup26.ir (free, no key).
+// Falls back silently to null on any failure — caller uses DB calc instead.
+async function fetchLiveGroupStandings(){
+  try{
+    const [groupsRes,teamsRes]=await Promise.all([
+      fetch('https://worldcup26.ir/get/groups'),
+      fetch('https://worldcup26.ir/get/teams')
+    ]);
+    if(!groupsRes.ok||!teamsRes.ok) return null;
+    const groupsData=await groupsRes.json();
+    const teamsData=await teamsRes.json();
+    const groups=Array.isArray(groupsData)?groupsData:(groupsData.groups||groupsData.data||[]);
+    const teams=Array.isArray(teamsData)?teamsData:(teamsData.teams||teamsData.data||[]);
+    if(!groups.length||!teams.length) return null;
+
+    // Build team_id -> name_en lookup
+    const teamNameById={};
+    teams.forEach(t=>{ teamNameById[String(t.id)]=t.name_en||t.name||''; });
+
+    const result={};
+    groups.forEach(g=>{
+      const letter=g.name;
+      if(!letter) return;
+      result[letter]=(g.teams||[]).map(t=>({
+        name: normaliseTeamName(teamNameById[String(t.team_id)]||''),
+        mp: parseInt(t.mp)||0,
+        w: parseInt(t.w)||0,
+        d: parseInt(t.d)||0,
+        l: parseInt(t.l)||0,
+        gf: parseInt(t.gf)||0,
+        ga: parseInt(t.ga)||0,
+        pts: parseInt(t.pts)||0
+      })).sort((a,b)=>b.pts-a.pts||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf);
+    });
+    return result;
+  }catch(e){
+    console.warn('fetchLiveGroupStandings failed:', e.message);
+    return null;
+  }
+}
 
 async function renderGroups(){
   const el = document.getElementById('pane-groups');
@@ -2277,6 +2321,12 @@ async function renderGroups(){
       return dk(a.match_date)-dk(b.match_date);
     });
     groupsLastFetched = now;
+  }
+
+  // Fetch live standings from worldcup26.ir if cache is empty or >5 min old
+  if(!LIVE_GROUP_STANDINGS || (now-liveGroupsFetchedAt)>5*60*1000){
+    const live=await fetchLiveGroupStandings();
+    if(live){ LIVE_GROUP_STANDINGS=live; liveGroupsFetchedAt=now; }
   }
 
   const GROUP_TEAMS = {
@@ -2310,6 +2360,21 @@ async function renderGroups(){
   };
 
   function getGroupStandings(grpLetter, teams){
+    // Prefer live worldcup26.ir data — immune to bugs in our own settle pipeline
+    if(LIVE_GROUP_STANDINGS && LIVE_GROUP_STANDINGS[grpLetter]){
+      const live=LIVE_GROUP_STANDINGS[grpLetter];
+      // Map live entries onto our team list (in case of name mismatches, fall back to 0-row)
+      const byName={};
+      live.forEach(t=>{ byName[t.name]=t; });
+      const rows=teams.map(t=>{
+        const norm=normaliseTeamName(t);
+        const found=byName[norm];
+        return found?{name:t,mp:found.mp,w:found.w,d:found.d,l:found.l,gf:found.gf,ga:found.ga,pts:found.pts}
+                     :{name:t,mp:0,w:0,d:0,l:0,gf:0,ga:0,pts:0};
+      });
+      return rows.sort((a,b)=>b.pts-a.pts||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf);
+    }
+    // Fallback: calculate from our own DB (used if worldcup26.ir is unreachable)
     const stats = {};
     teams.forEach(t=>{ stats[t]={mp:0,w:0,d:0,l:0,gf:0,ga:0,pts:0}; });
     MATCHES.filter(m=>m.grp===grpLetter&&m.resolved&&m.result_home!=null).forEach(m=>{
@@ -2329,10 +2394,14 @@ async function renderGroups(){
   const lastRefresh = new Date(groupsLastFetched).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   const activeFilter = window._groupFilter||'All';
   const groups = Object.keys(GROUP_TEAMS);
+  const usingLive = !!LIVE_GROUP_STANDINGS;
+  const sourceLabel = usingLive
+    ? '<span style="color:var(--success)">● Live</span> · '+new Date(liveGroupsFetchedAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})
+    : '<span style="color:var(--muted)">○ App data</span> · '+lastRefresh;
 
   // ── Filter chips ──
   let html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-    <div style="font-size:11px;color:var(--muted)">Last updated: ${lastRefresh}</div>
+    <div style="font-size:11px;color:var(--muted)">${sourceLabel}</div>
     <button onclick="refreshGroups()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:11px;color:var(--muted);cursor:pointer">↻ Refresh</button>
   </div>
   <div class="filter-bar" style="margin-bottom:14px">
@@ -2508,8 +2577,9 @@ async function renderGroups(){
 
 async function refreshGroups(){
   groupsLastFetched = 0;
+  liveGroupsFetchedAt = 0; // force re-fetch of live standings too
   await renderGroups();
-  toast('Tournament view refreshed!');
+  toast(LIVE_GROUP_STANDINGS?'Tournament view refreshed (live)!':'Tournament view refreshed (app data — live source unavailable)');
 }
 
 function setGroupFilter(f){
