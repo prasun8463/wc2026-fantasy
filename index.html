@@ -1468,6 +1468,9 @@ function renderLB(){
     streak=onStreak;
     const acc=participated>0?Math.round(((exact+outcome_win)/participated)*100):0;
     const last5=form.slice(-5);
+    if(u.username===ME?.username){
+      console.log('[insights debug] '+u.username+': participated='+participated+' boldTotal='+boldTotal+' safeTotal='+safeTotal+' settledMatches.length='+settledMatches.length+' skipped='+skipped);
+    }
     return {u,exact,outcome_win,wrong,participated,skipped,acc,biggestWin,streak,boldTotal,boldWin,safeTotal,safeWin,last5};
   });
 
@@ -1508,8 +1511,8 @@ function renderLB(){
       const boldPct=myStats.boldTotal>0?Math.round(myStats.boldWin/myStats.boldTotal*100):null;
       const safePct=myStats.safeTotal>0?Math.round(myStats.safeWin/myStats.safeTotal*100):null;
 
-      insightsHtml='<div style="background:var(--card);border-radius:12px;border:1px solid rgba(255,255,255,.08);padding:14px 15px;margin-bottom:14px">'
-        +'<div style="font-size:12px;color:var(--gold);font-weight:600;margin-bottom:2px">Your insights</div>'
+      insightsHtml='<div class="sec" style="margin-bottom:8px">Your insights</div>'
+        +'<div style="background:var(--card);border-radius:12px;border:1px solid rgba(255,255,255,.08);padding:14px 15px;margin-bottom:14px">'
         +'<div style="font-size:11px;color:var(--muted);margin-bottom:12px">'+esc(ME.username)+' · '+myStats.participated+' prediction'+(myStats.participated!==1?'s':'')+' made</div>';
 
       if(myStats.last5.length>0){
@@ -1532,14 +1535,14 @@ function renderLB(){
         if(boldPct!==null){
           insightsHtml+='<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">'
             +'<span style="font-size:13px;flex-shrink:0">🎯</span>'
-            +'<span style="font-size:12px;flex:1;color:var(--text)">Bold picks <span style="color:var(--muted)">('+myStats.boldWin+' of '+myStats.boldTotal+')</span></span>'
+            +'<span style="font-size:12px;flex:1;color:var(--text)">Bold correct picks <span style="color:var(--muted)">('+myStats.boldWin+' of '+myStats.boldTotal+')</span></span>'
             +'<span style="font-size:12px;font-weight:700;color:var(--text)">'+boldPct+'%</span>'
           +'</div>';
         }
         if(safePct!==null){
           insightsHtml+='<div style="display:flex;align-items:center;gap:7px">'
             +'<span style="font-size:13px;flex-shrink:0">🛡️</span>'
-            +'<span style="font-size:12px;flex:1;color:var(--text)">Safe picks <span style="color:var(--muted)">('+myStats.safeWin+' of '+myStats.safeTotal+')</span></span>'
+            +'<span style="font-size:12px;flex:1;color:var(--text)">'+(boldPct!==null?'Non-bold correct picks':'Correct picks')+' <span style="color:var(--muted)">('+myStats.safeWin+' of '+myStats.safeTotal+')</span></span>'
             +'<span style="font-size:12px;font-weight:700;color:var(--text)">'+safePct+'%</span>'
           +'</div>';
         }
