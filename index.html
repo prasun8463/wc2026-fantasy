@@ -2994,6 +2994,24 @@ async function debugGroupsApi(){
         el.textContent+='  '+k+': '+v+'\n';
       });
     }
+
+    el.textContent+='\nFetching worldcup26.ir/get/teams...\n';
+    const res2=await fetch('https://worldcup26.ir/get/teams');
+    if(!res2.ok){ el.textContent+='❌ HTTP '+res2.status+'\n'; return; }
+    const data2=await res2.json();
+    const teams=Array.isArray(data2)?data2:(data2.teams||data2.data||[]);
+    el.textContent+='✓ Got '+teams.length+' teams\n\n';
+    if(teams.length){
+      el.textContent+='First team raw fields:\n';
+      Object.keys(teams[0]).forEach(k=>{
+        const v=typeof teams[0][k]==='object'?JSON.stringify(teams[0][k]):teams[0][k];
+        el.textContent+='  '+k+': '+v+'\n';
+      });
+      el.textContent+='\nSample team_id -> name mapping (first 6):\n';
+      teams.slice(0,6).forEach(t=>{
+        el.textContent+='  '+(t.id||t._id||t.team_id)+' -> '+(t.name_en||t.name||t.team_name_en)+'\n';
+      });
+    }
   }catch(e){
     el.textContent+='❌ Fetch error: '+e.message+'\n';
   }
