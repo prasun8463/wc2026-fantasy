@@ -1465,58 +1465,27 @@ function renderLB(){
   });
 
   // ── League header ──
-  let headerHtml='';
+  const headerHtml='<div style="text-align:center;margin-bottom:16px">'
+    +'<div style="font-size:10px;color:var(--muted);font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">'+esc(LEAGUE.name)+'</div>'
+    +'<div style="font-size:11px;color:rgba(255,255,255,.3)">'+settledMatches.length+' of '+MATCHES.length+' matches settled</div>'
+  +'</div>';
+
+  // Empty state — no matches settled yet, encourage first prediction
   let podiumHtml='';
-  {
-    const settledCount=settledMatches.length;
-    const totalMatches=MATCHES.length;
-
-    headerHtml='<div style="text-align:center;margin-bottom:16px">'
-      +'<div style="font-size:10px;color:var(--muted);font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">'+esc(LEAGUE.name)+'</div>'
-      +'<div style="font-size:11px;color:rgba(255,255,255,.3)">'+settledCount+' of '+totalMatches+' matches settled</div>'
-    +'</div>';
-
-    // Empty state — no matches settled yet, encourage first prediction
-    if(settledCount===0){
-      const openCount=MATCHES.filter(m=>matchStatus(m)==='open').length;
-      if(openCount>0){
-        podiumHtml='<div style="background:linear-gradient(135deg,rgba(212,160,23,.15),rgba(212,160,23,.05));border:1px solid rgba(212,160,23,.4);border-radius:14px;padding:18px 16px;margin-bottom:14px;text-align:center">'
-          +'<div style="font-size:24px;margin-bottom:6px">\u26BD</div>'
-          +'<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">Make your first prediction</div>'
-          +'<div style="font-size:12px;color:var(--muted);margin-bottom:12px">'+openCount+' match'+(openCount!==1?'es':'')+' open · everyone starts at zero</div>'
-          +'<button onclick="goTab(\'matches\')" style="background:var(--gold);color:var(--dark);border:none;border-radius:8px;padding:9px 22px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation">Predict now \u2192</button>'
-        +'</div>';
-      }
+  if(settledMatches.length===0){
+    const openCount=MATCHES.filter(m=>matchStatus(m)==='open').length;
+    if(openCount>0){
+      podiumHtml='<div style="background:linear-gradient(135deg,rgba(212,160,23,.15),rgba(212,160,23,.05));border:1px solid rgba(212,160,23,.4);border-radius:14px;padding:18px 16px;margin-bottom:14px;text-align:center">'
+        +'<div style="font-size:24px;margin-bottom:6px">⚽</div>'
+        +'<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">Make your first prediction</div>'
+        +'<div style="font-size:12px;color:var(--muted);margin-bottom:12px">'+openCount+' match'+(openCount!==1?'es':'')+' open · everyone starts at zero</div>'
+        +'<button onclick="goTab(\'matches\')" style="background:var(--gold);color:var(--dark);border:none;border-radius:8px;padding:9px 22px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation">Predict now →</button>'
+      +'</div>';
     }
   }
 
-  // ── Today's action banner ──
-  const openToday=MATCHES.filter(m=>matchStatus(m)==='open');
-  const liveNow=MATCHES.filter(m=>{const s=matchStatus(m);return s==='live'||s==='inprogress';});
-  let bannerHtml='';
-  if(openToday.length>0||liveNow.length>0){
-    const isLive=liveNow.length>0;
-    const msg=isLive
-      ? liveNow.length+' match'+(liveNow.length!==1?'es':'')+' live right now'
-      : openToday.length+' match'+(openToday.length!==1?'es':'')+' open to predict today';
-    const sub=isLive?'Scores updating live':(()=>{
-      const soonest=[...openToday].sort((a,b)=>(a.kickoff_ist||'').localeCompare(b.kickoff_ist||''))[0];
-      return soonest&&soonest.kickoff_ist?'First kickoff at '+soonest.kickoff_ist+' IST':'Predict before kickoff';
-    })();
-    const col=isLive?'rgba(76,175,80,.1)':'rgba(212,160,23,.07)';
-    const bdr=isLive?'rgba(76,175,80,.35)':'rgba(212,160,23,.35)';
-    const tc=isLive?'var(--success)':'var(--gold)';
-    bannerHtml='<div onclick="goTab(\'matches\')" style="cursor:pointer;background:'+col+';border:1px solid '+bdr+';border-radius:10px;padding:11px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px">'
-      +'<div>'
-        +'<div style="font-size:13px;font-weight:700;color:'+tc+'">'+(isLive?'🔴':'⚽')+' '+msg+'</div>'
-        +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+sub+'</div>'
-      +'</div>'
-      +'<div style="font-size:12px;color:var(--muted);flex-shrink:0">Go →</div>'
-    +'</div>';
-  }
-
-  // Story highlights removed — reverted to simple list design
-  let storyHtml='';
+  const bannerHtml='';
+  const storyHtml='';
 
   // ── Build standings rows with P/L bars ──
   let standingsHtml='<div class="sec">Full standings</div>';
