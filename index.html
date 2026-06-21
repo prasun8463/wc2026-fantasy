@@ -1512,7 +1512,7 @@ function renderLB(){
       const safePct=myStats.safeTotal>0?Math.round(myStats.safeWin/myStats.safeTotal*100):null;
 
       insightsHtml='<div class="sec" style="margin-bottom:8px">Your insights</div>'
-        +'<div style="background:var(--card);border-radius:12px;border:1px solid rgba(255,255,255,.08);padding:14px 15px;margin-bottom:14px">'
+        +'<div style="background:linear-gradient(135deg,rgba(212,160,23,.08),rgba(212,160,23,.02));border-radius:12px;border:1px solid rgba(212,160,23,.4);box-shadow:0 0 0 1px rgba(212,160,23,.1),0 4px 16px rgba(212,160,23,.12);padding:14px 15px;margin-bottom:14px">'
         +'<div style="font-size:11px;color:var(--muted);margin-bottom:12px">'+esc(ME.username)+' · '+myStats.participated+' prediction'+(myStats.participated!==1?'s':'')+' made</div>';
 
       if(myStats.last5.length>0){
@@ -2474,27 +2474,39 @@ async function renderGroups(){
   groups.forEach(g=>{ html+=`<div class="fchip${activeFilter===g?' on':''}" onclick="setGroupFilter('${g}')">Grp ${g}</div>`; });
   html+=`</div>`;
 
-  // ── BRACKET VIEW (All) ──
+  // ── BRACKET VIEW (All) — Butterfly layout per official FIFA bracket tree ──
   if(activeFilter==='All'){
-    // Define R32 matchups (from official WC2026 schedule)
-    const R32 = [
-      {label:'R32 — 1',home:'2nd Group A',away:'2nd Group B'},
-      {label:'R32 — 2',home:'1st Group C',away:'2nd Group F'},
-      {label:'R32 — 3',home:'1st Group E',away:'Best 3rd place'},
-      {label:'R32 — 4',home:'1st Group F',away:'2nd Group C'},
-      {label:'R32 — 5',home:'2nd Group E',away:'2nd Group I'},
-      {label:'R32 — 6',home:'1st Group I',away:'Best 3rd place'},
-      {label:'R32 — 7',home:'1st Group A',away:'Best 3rd place'},
-      {label:'R32 — 8',home:'1st Group L',away:'Best 3rd place'},
-      {label:'R32 — 9',home:'1st Group G',away:'Best 3rd place'},
-      {label:'R32 — 10',home:'1st Group D',away:'Best 3rd place'},
-      {label:'R32 — 11',home:'1st Group H',away:'2nd Group J'},
-      {label:'R32 — 12',home:'2nd Group K',away:'2nd Group L'},
-      {label:'R32 — 13',home:'1st Group B',away:'Best 3rd place'},
-      {label:'R32 — 14',home:'2nd Group D',away:'2nd Group G'},
-      {label:'R32 — 15',home:'1st Group J',away:'2nd Group H'},
-      {label:'R32 — 16',home:'1st Group K',away:'Best 3rd place'},
+    // R32 matches in official FIFA numbering (73-88), ordered left-half then right-half
+    // so the visual layout matches the actual bracket tree below.
+    // LEFT HALF feeds SF 101 (top of final): matches 73,74,75,77,81,82,83,84
+    // RIGHT HALF feeds SF 102 (bottom of final): matches 76,78,79,80,85,86,87,88
+    const R32_LEFT = [
+      {num:74,home:'1st Group E',away:'Best 3rd place'},
+      {num:77,home:'1st Group I',away:'Best 3rd place'},
+      {num:73,home:'2nd Group A',away:'2nd Group B'},
+      {num:75,home:'1st Group F',away:'2nd Group C'},
+      {num:83,home:'2nd Group K',away:'2nd Group L'},
+      {num:84,home:'1st Group H',away:'2nd Group J'},
+      {num:81,home:'1st Group D',away:'Best 3rd place'},
+      {num:82,home:'1st Group G',away:'Best 3rd place'},
     ];
+    const R32_RIGHT = [
+      {num:76,home:'1st Group C',away:'2nd Group F'},
+      {num:78,home:'2nd Group E',away:'2nd Group I'},
+      {num:79,home:'1st Group A',away:'Best 3rd place'},
+      {num:80,home:'1st Group L',away:'Best 3rd place'},
+      {num:86,home:'1st Group J',away:'2nd Group H'},
+      {num:88,home:'2nd Group D',away:'2nd Group G'},
+      {num:85,home:'1st Group B',away:'Best 3rd place'},
+      {num:87,home:'1st Group K',away:'Best 3rd place'},
+    ];
+    // R16 pairings (each pair = 2 R32 winners). Order matches R32_LEFT/RIGHT grouping above.
+    const R16_LEFT_LABELS  = ['R16 — W74 v W77','R16 — W73 v W75','R16 — W83 v W84','R16 — W81 v W82'];
+    const R16_RIGHT_LABELS = ['R16 — W76 v W78','R16 — W79 v W80','R16 — W86 v W88','R16 — W85 v W87'];
+    const QF_LEFT_LABELS  = ['QF — W89 v W90','QF — W93 v W94'];
+    const QF_RIGHT_LABELS = ['QF — W91 v W92','QF — W95 v W96'];
+    const SF_LEFT_LABEL  = 'SF — W97 v W98';
+    const SF_RIGHT_LABEL = 'SF — W99 v W100';
 
     // Try to fill team names from standings
     function getTop(grp, pos){
@@ -2504,7 +2516,7 @@ async function renderGroups(){
       return {name:t.name, flag:FLAGS[t.name]||'🏳️'};
     }
 
-    function slotHTML(label, resolved=false, score=''){
+    function slotHTML(label){
       const parts = label.split(' ');
       const pos = parts[0]==='1st'?1:parts[0]==='2nd'?2:null;
       const grpLetter = parts[1]==='Group'?parts[2]:null;
@@ -2514,81 +2526,89 @@ async function renderGroups(){
       const flag = team?(FLAGS[team.name]||'🏳️'):'';
       const name = team?team.name:label;
       const nameColor = team?'var(--text)':isBest3rd?'#4a6a4a':'var(--muted)';
-      return `<div style="display:flex;align-items:center;gap:5px;padding:3px 0">
-        <span style="font-size:12px;width:18px;flex-shrink:0">${flag}</span>
-        <span style="font-size:11px;font-weight:${team?600:400};color:${nameColor};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
-        ${resolved?`<span style="font-size:11px;font-weight:700;color:var(--gold);width:14px;text-align:right">${score}</span>`:''}
+      return `<div style="display:flex;align-items:center;gap:4px;padding:2px 0">
+        <span style="font-size:11px;width:15px;flex-shrink:0">${flag}</span>
+        <span style="font-size:10px;font-weight:${team?600:400};color:${nameColor};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
       </div>`;
     }
 
-    // Group matches into pairs for R32 display (2 columns of 8)
-    const half1=R32.slice(0,8), half2=R32.slice(8,16);
+    function matchCard(home,away,gold){
+      const bg=gold?'rgba(212,160,23,.08)':'var(--card)';
+      const bd=gold?'rgba(212,160,23,.35)':'var(--border)';
+      return `<div style="background:${bg};border:1px solid ${bd};border-radius:7px;padding:5px 6px">
+        <div style="border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:2px;margin-bottom:2px">${slotHTML(home)}</div>
+        ${slotHTML(away)}
+      </div>`;
+    }
+    function tbdCard(gold){
+      const bg=gold?'rgba(212,160,23,.08)':'var(--card)';
+      const bd=gold?'rgba(212,160,23,.35)':'var(--border)';
+      return `<div style="background:${bg};border:1px solid ${bd};border-radius:7px;padding:5px 6px">
+        <div style="border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:2px;margin-bottom:2px">${slotHTML('TBD')}</div>
+        ${slotHTML('TBD')}
+      </div>`;
+    }
+
+    function colHeader(label,gold){
+      return `<div style="font-size:9px;font-weight:600;color:${gold?'var(--gold)':'var(--muted)'};letter-spacing:.5px;text-transform:uppercase;text-align:center;padding:5px 2px;margin-bottom:5px;border-bottom:1px solid ${gold?'rgba(212,160,23,.35)':'var(--border)'}">${label}</div>`;
+    }
 
     html+=`<div class="sec">Knockout bracket</div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Teams populate as group stage settles · Scroll right on small screens</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Teams populate as group stage settles · Scroll to see both sides</div>
     <div style="overflow-x:auto;margin-bottom:16px">
-    <div style="min-width:640px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;align-items:start">
+    <div style="min-width:920px;display:grid;grid-template-columns:88px 88px 88px 90px 88px 88px 88px;gap:6px;align-items:start">
 
-      <!-- R32 -->
+      <!-- R32 LEFT -->
       <div>
-        <div style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;text-align:center;padding:6px 4px;margin-bottom:6px;border-bottom:1px solid var(--border)">Round of 32</div>
-        <div style="display:flex;flex-direction:column;gap:5px">`;
-
-    R32.forEach(m=>{
-      html+=`<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 8px">
-        <div style="border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:3px;margin-bottom:3px">${slotHTML(m.home)}</div>
-        ${slotHTML(m.away)}
-      </div>`;
-    });
-
+        ${colHeader('R32')}
+        <div style="display:flex;flex-direction:column;gap:4px">`;
+    R32_LEFT.forEach(m=>{ html+=matchCard(m.home,m.away,false); });
     html+=`</div></div>
 
-      <!-- R16 -->
+      <!-- R16 LEFT -->
       <div>
-        <div style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;text-align:center;padding:6px 4px;margin-bottom:6px;border-bottom:1px solid var(--border)">Round of 16</div>
-        <div style="display:flex;flex-direction:column;gap:5px;padding-top:16px">`;
-    for(let i=0;i<8;i++){
-      html+=`<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-bottom:11px">
-        <div style="border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:3px;margin-bottom:3px">${slotHTML('TBD')}</div>
-        ${slotHTML('TBD')}
-      </div>`;
-    }
+        ${colHeader('R16')}
+        <div style="display:flex;flex-direction:column;gap:4px;padding-top:14px">`;
+    for(let i=0;i<4;i++){ html+=`<div style="margin-bottom:9px">${tbdCard(false)}</div>`; }
     html+=`</div></div>
 
-      <!-- QF -->
+      <!-- QF LEFT -->
       <div>
-        <div style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;text-align:center;padding:6px 4px;margin-bottom:6px;border-bottom:1px solid var(--border)">Quarter-finals</div>
-        <div style="display:flex;flex-direction:column;gap:5px;padding-top:56px">`;
-    for(let i=0;i<4;i++){
-      html+=`<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-bottom:55px">
-        <div style="border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:3px;margin-bottom:3px">${slotHTML('TBD')}</div>
-        ${slotHTML('TBD')}
-      </div>`;
-    }
+        ${colHeader('QF')}
+        <div style="display:flex;flex-direction:column;gap:4px;padding-top:46px">`;
+    for(let i=0;i<2;i++){ html+=`<div style="margin-bottom:44px">${tbdCard(false)}</div>`; }
     html+=`</div></div>
 
-      <!-- SF -->
+      <!-- FINAL (center) -->
       <div>
-        <div style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;text-align:center;padding:6px 4px;margin-bottom:6px;border-bottom:1px solid var(--border)">Semi-finals</div>
-        <div style="display:flex;flex-direction:column;gap:5px;padding-top:136px">`;
-    for(let i=0;i<2;i++){
-      html+=`<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-bottom:180px">
-        <div style="border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:3px;margin-bottom:3px">${slotHTML('TBD')}</div>
-        ${slotHTML('TBD')}
-      </div>`;
-    }
-    html+=`</div></div>
-
-      <!-- Final -->
-      <div>
-        <div style="font-size:10px;font-weight:600;color:var(--gold);letter-spacing:.6px;text-transform:uppercase;text-align:center;padding:6px 4px;margin-bottom:6px;border-bottom:1px solid rgba(212,160,23,.35)">Final · Jul 19</div>
-        <div style="display:flex;flex-direction:column;gap:5px;padding-top:296px">
-          <div style="background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.35);border-radius:8px;padding:8px 10px">
-            <div style="border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:3px;margin-bottom:3px">${slotHTML('TBD')}</div>
-            ${slotHTML('TBD')}
-          </div>
+        ${colHeader('Final · Jul 19',true)}
+        <div style="display:flex;flex-direction:column;padding-top:110px">
+          ${tbdCard(true)}
         </div>
+        <div style="font-size:9px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;text-align:center;padding:5px 2px;margin:14px 0 5px;border-bottom:1px solid var(--border)">3rd place</div>
+        <div>${tbdCard(false)}</div>
       </div>
+
+      <!-- QF RIGHT -->
+      <div>
+        ${colHeader('QF')}
+        <div style="display:flex;flex-direction:column;gap:4px;padding-top:46px">`;
+    for(let i=0;i<2;i++){ html+=`<div style="margin-bottom:44px">${tbdCard(false)}</div>`; }
+    html+=`</div></div>
+
+      <!-- R16 RIGHT -->
+      <div>
+        ${colHeader('R16')}
+        <div style="display:flex;flex-direction:column;gap:4px;padding-top:14px">`;
+    for(let i=0;i<4;i++){ html+=`<div style="margin-bottom:9px">${tbdCard(false)}</div>`; }
+    html+=`</div></div>
+
+      <!-- R32 RIGHT -->
+      <div>
+        ${colHeader('R32')}
+        <div style="display:flex;flex-direction:column;gap:4px">`;
+    R32_RIGHT.forEach(m=>{ html+=matchCard(m.home,m.away,false); });
+    html+=`</div></div>
 
     </div></div>`;
 
