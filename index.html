@@ -1437,6 +1437,8 @@ function renderLB(){
   // ── Per-player stats ──
   const playerStats=sortedMembers.map(u=>{
     let exact=0,outcome_win=0,wrong=0,participated=0,skipped=0,biggestWin=0,onStreak=0,streak=0;
+    let boldTotal=0,boldWin=0,safeTotal=0,safeWin=0;
+    const form=[]; // chronological W/L for last-5 strip
     // Sort settled matches chronologically for correct stats/streak
     const sortedSettled=[...settledMatches].sort((a,b)=>dateKey(a.match_date)-dateKey(b.match_date));
     sortedSettled.forEach(m=>{
@@ -1444,6 +1446,10 @@ function renderLB(){
       if(!myP){skipped++;return;}
       participated++;
       const won=(m.resolved_winners||[]).includes(u.username);
+      const isWin=(isExactType(m.resolved_type)||m.resolved_type==='outcome')&&won;
+      if(myP.bold){ boldTotal++; if(isWin) boldWin++; }
+      else { safeTotal++; if(isWin) safeWin++; }
+      if(m.resolved_type!=='refund') form.push(isWin?'W':'L');
       if(isExactType(m.resolved_type)&&won){exact++;if(m.resolved_share>biggestWin)biggestWin=m.resolved_share;}
       else if(m.resolved_type==='outcome'&&won){outcome_win++;if(m.resolved_share>biggestWin)biggestWin=m.resolved_share;}
       else if(m.resolved_type==='refund'){}  // refund: neutral, don't count
@@ -1461,7 +1467,8 @@ function renderLB(){
     }
     streak=onStreak;
     const acc=participated>0?Math.round(((exact+outcome_win)/participated)*100):0;
-    return {u,exact,outcome_win,wrong,participated,skipped,acc,biggestWin,streak};
+    const last5=form.slice(-5);
+    return {u,exact,outcome_win,wrong,participated,skipped,acc,biggestWin,streak,boldTotal,boldWin,safeTotal,safeWin,last5};
   });
 
   // ── League header ──
@@ -1486,6 +1493,62 @@ function renderLB(){
 
   const bannerHtml='';
   const storyHtml='';
+
+  // ── Your insights card ──
+  let insightsHtml='';
+  {
+    const myStats=playerStats.find(p=>p.u.username===ME.username);
+    if(myStats&&myStats.participated>0){
+      const formStrip=myStats.last5.map(r=>{
+        const win=r==='W';
+        const bg=win?'rgba(76,175,80,.15)':'rgba(226,75,74,.15)';
+        const col=win?'#5DCAA5':'#E24B4A';
+        return '<div style="flex:1;height:28px;border-radius:7px;background:'+bg+';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:'+col+'">'+r+'</div>';
+      }).join('');
+      const boldPct=myStats.boldTotal>0?Math.round(myStats.boldWin/myStats.boldTotal*100):null;
+      const safePct=myStats.safeTotal>0?Math.round(myStats.safeWin/myStats.safeTotal*100):null;
+
+      insightsHtml='<div style="background:var(--card);border-radius:12px;border:1px solid rgba(255,255,255,.08);padding:14px 15px;margin-bottom:14px">'
+        +'<div style="font-size:12px;color:var(--gold);font-weight:600;margin-bottom:2px">Your insights</div>'
+        +'<div style="font-size:11px;color:var(--muted);margin-bottom:12px">'+esc(ME.username)+' · '+myStats.participated+' prediction'+(myStats.participated!==1?'s':'')+' made</div>';
+
+      if(myStats.last5.length>0){
+        insightsHtml+='<div style="display:flex;gap:6px;margin-bottom:10px">'+formStrip+'</div>';
+      }
+
+      insightsHtml+='<div style="display:flex;gap:8px;margin-bottom:10px">'
+        +'<div style="flex:1;background:rgba(255,255,255,.03);border-radius:8px;padding:8px;text-align:center">'
+          +'<div style="font-size:17px;font-weight:700;color:var(--text)">'+myStats.acc+'%</div>'
+          +'<div style="font-size:9px;color:var(--muted);margin-top:2px">Hit rate</div>'
+        +'</div>'
+        +'<div style="flex:1;background:rgba(255,255,255,.03);border-radius:8px;padding:8px;text-align:center">'
+          +'<div style="font-size:17px;font-weight:700;color:var(--text)">'+myStats.exact+'</div>'
+          +'<div style="font-size:9px;color:var(--muted);margin-top:2px">Exact scores</div>'
+        +'</div>'
+      +'</div>';
+
+      if(boldPct!==null||safePct!==null){
+        insightsHtml+='<div style="border-top:1px solid rgba(255,255,255,.06);padding-top:10px">';
+        if(boldPct!==null){
+          insightsHtml+='<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">'
+            +'<span style="font-size:13px;flex-shrink:0">🎯</span>'
+            +'<span style="font-size:12px;flex:1;color:var(--text)">Bold picks <span style="color:var(--muted)">('+myStats.boldWin+' of '+myStats.boldTotal+')</span></span>'
+            +'<span style="font-size:12px;font-weight:700;color:var(--text)">'+boldPct+'%</span>'
+          +'</div>';
+        }
+        if(safePct!==null){
+          insightsHtml+='<div style="display:flex;align-items:center;gap:7px">'
+            +'<span style="font-size:13px;flex-shrink:0">🛡️</span>'
+            +'<span style="font-size:12px;flex:1;color:var(--text)">Safe picks <span style="color:var(--muted)">('+myStats.safeWin+' of '+myStats.safeTotal+')</span></span>'
+            +'<span style="font-size:12px;font-weight:700;color:var(--text)">'+safePct+'%</span>'
+          +'</div>';
+        }
+        insightsHtml+='</div>';
+      }
+
+      insightsHtml+='</div>';
+    }
+  }
 
   // ── Build standings rows with P/L bars ──
   let standingsHtml='<div class="sec">Full standings</div>';
@@ -1596,7 +1659,7 @@ function renderLB(){
       +'<div style="font-size:10px;color:var(--muted);margin-bottom:14px">Dimmed = not yet started · Tap any player row to see match details</div>';
   }
 
-  const html=headerHtml+podiumHtml+bannerHtml+storyHtml+standingsHtml+tableHtml;
+  const html=headerHtml+podiumHtml+bannerHtml+storyHtml+insightsHtml+standingsHtml+tableHtml;
   document.getElementById('pane-lb').innerHTML=html;
 }
 
