@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#0f1a0f">
+<meta name="theme-color" content="#0a140a">
 <title>WC2026 Fantasy</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
 </script>
@@ -12,19 +12,19 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
   :root {
-    --green: #1a7a3c;
-    --green-mid: #22a04f;
-    --gold: #d4a017;
-    --gold-light: #f0c040;
-    --dark: #0f1a0f;
-    --card: #162616;
-    --border: rgba(255,255,255,0.09);
-    --text: #f0f0e8;
-    --muted: #7a9a7a;
-    --red: #e24b4a;
-    --success: #4caf50;
-    --info: #378add;
-    --warn: #e8a020;
+    --green: #1f8f47;
+    --green-mid: #28bb5e;
+    --gold: #ffc830;
+    --gold-light: #ffd860;
+    --dark: #0a140a;
+    --card: #15291a;
+    --border: rgba(255,255,255,0.11);
+    --text: #ffffff;
+    --muted: #9fe89f;
+    --red: #ff5a59;
+    --success: #3ddc84;
+    --info: #4a9eff;
+    --warn: #ffb030;
   }
 
   body { font-family: -apple-system, 'Segoe UI', sans-serif; background: var(--dark); color: var(--text); min-height: 100vh; font-size: 14px; }
@@ -57,7 +57,7 @@
   button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:500; align-items:center; justify-content:center; padding:16px; }
   .modal-overlay.open { display:flex; }
-  .modal-box { background:#162616; border:1px solid rgba(255,255,255,.12); border-radius:16px; width:100%; max-width:480px; max-height:82vh; overflow-y:auto; padding:20px; }
+  .modal-box { background:#15291a; border:1px solid rgba(255,255,255,.12); border-radius:16px; width:100%; max-width:480px; max-height:82vh; overflow-y:auto; padding:20px; }
   .sheet-handle { width:36px; height:4px; background:rgba(255,255,255,.18); border-radius:2px; margin:0 auto 16px; }
   .modal-header { margin-bottom:12px; }
   .modal-title { font-size:16px; font-weight:700; color:var(--gold); }
@@ -107,7 +107,7 @@
 
   /* ── CARDS ── */
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 13px 15px; margin-bottom: 10px; }
-  .sec { font-size: 16px; font-weight: 700; color: var(--gold); letter-spacing: .3px; text-transform: none; margin: 20px 0 12px; border-bottom: 2px solid rgba(212,160,23,.35); padding-bottom: 8px; }
+  .sec { font-size: 16px; font-weight: 700; color: var(--gold); letter-spacing: .3px; text-transform: none; margin: 20px 0 12px; border-bottom: 2px solid rgba(255,200,48,.35); padding-bottom: 8px; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
   .stat { background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
   .stat-label { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
@@ -115,18 +115,18 @@
 
   /* ── BADGES ── */
   .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; }
-  .b-green { background: rgba(76,175,80,.15); color: var(--success); border: 1px solid rgba(76,175,80,.25); }
-  .b-amber { background: rgba(232,160,32,.15); color: var(--warn); border: 1px solid rgba(232,160,32,.25); }
+  .b-green { background: rgba(61,220,132,.15); color: var(--success); border: 1px solid rgba(61,220,132,.25); }
+  .b-amber { background: rgba(255,176,48,.15); color: var(--warn); border: 1px solid rgba(255,176,48,.25); }
   .b-gray { background: rgba(255,255,255,.07); color: var(--muted); }
-  .b-inprogress { background: rgba(232,160,32,.15); color: var(--warn); border: 1px solid rgba(232,160,32,.35); animation: pulse-warn 2s infinite; }
+  .b-inprogress { background: rgba(255,176,48,.15); color: var(--warn); border: 1px solid rgba(255,176,48,.35); animation: pulse-warn 2s infinite; }
   .b-future { background: rgba(255,255,255,.05); color: var(--muted); border: 1px solid rgba(255,255,255,.1); }
   @keyframes pulse-warn { 0%,100%{opacity:1} 50%{opacity:.6} }
-  .halo { box-shadow: 0 0 0 2px rgba(212,160,23,.5), 0 0 16px rgba(212,160,23,.2); border-color: rgba(212,160,23,.6) !important; }
-  .b-red { background: rgba(226,75,74,.15); color: var(--red); border: 1px solid rgba(226,75,74,.25); }
+  .halo { box-shadow: 0 0 0 2px rgba(255,200,48,.5), 0 0 16px rgba(255,200,48,.2); border-color: rgba(255,200,48,.6) !important; }
+  .b-red { background: rgba(255,90,89,.15); color: var(--red); border: 1px solid rgba(255,90,89,.25); }
 
   /* ── MATCH ROW ── */
   .mrow { border: 1px solid var(--border); border-radius: 11px; padding: 11px 13px; margin-bottom: 7px; touch-action: manipulation; }
-  .mrow[data-status="open"] { border-color: rgba(212,160,23,.55); border-left: 3px solid var(--gold); box-shadow: 0 0 0 1px rgba(212,160,23,.12), 0 2px 12px rgba(212,160,23,.08); }
+  .mrow[data-status="open"] { border-color: rgba(255,200,48,.55); border-left: 3px solid var(--gold); box-shadow: 0 0 0 1px rgba(255,200,48,.12), 0 2px 12px rgba(255,200,48,.08); }
   .mhead { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
   .mteams { font-size: 15px; font-weight: 700; }
   .mmeta { font-size: 12px; color: var(--muted); margin-top: 3px; }
@@ -138,9 +138,9 @@
 
   /* ── RESULT TAGS ── */
   .rtag { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; }
-  .rt-exact { background: rgba(76,175,80,.2); color: var(--success); }
-  .rt-outcome { background: rgba(232,160,32,.2); color: var(--warn); }
-  .rt-refund { background: rgba(55,138,221,.2); color: var(--info); }
+  .rt-exact { background: rgba(61,220,132,.2); color: var(--success); }
+  .rt-outcome { background: rgba(255,176,48,.2); color: var(--warn); }
+  .rt-refund { background: rgba(74,158,255,.2); color: var(--info); }
   .rt-wrong { background: rgba(255,255,255,.06); color: var(--muted); }
 
   /* ── LEADERBOARD ── */
@@ -151,10 +151,10 @@
   .lb-sub { font-size: 12px; color: var(--muted); margin-top:2px; }
   .lb-pts { text-align: right; }
   .lb-num { font-size: 18px; font-weight: 700; }
-  .me-row { background: rgba(55,138,221,.08); border-radius: 8px; padding: 0 7px; }
+  .me-row { background: rgba(74,158,255,.08); border-radius: 8px; padding: 0 7px; }
 
   /* ── INVITE CODE ── */
-  .inv-box { background: rgba(255,255,255,.05); border: 1px solid rgba(212,160,23,.3); border-radius: 9px;
+  .inv-box { background: rgba(255,255,255,.05); border: 1px solid rgba(255,200,48,.3); border-radius: 9px;
     padding: 10px; font-size: 18px; font-weight: 700; text-align: center; letter-spacing: 4px; color: var(--gold); margin: 8px 0; }
 
   /* ── FILTER BAR ── */
@@ -162,12 +162,12 @@
   .filter-bar::-webkit-scrollbar { display: none; }
   .fchip { padding: 5px 10px; border: 1px solid var(--border); border-radius: 20px; font-size: 11px;
     cursor: pointer; white-space: nowrap; color: var(--muted); background: transparent; transition: all .15s; }
-  .fchip.on { background: rgba(212,160,23,.15); border-color: rgba(212,160,23,.4); color: var(--gold); font-weight: 600; }
+  .fchip.on { background: rgba(255,200,48,.15); border-color: rgba(255,200,48,.4); color: var(--gold); font-weight: 600; }
 
   /* ── BANNER ── */
   .banner { border-radius: 9px; padding: 9px 12px; margin-bottom: 8px; font-size: 12px; }
-  .bn-win { background: rgba(76,175,80,.12); border: 1px solid rgba(76,175,80,.25); color: #81c784; }
-  .bn-ref { background: rgba(55,138,221,.1); border: 1px solid rgba(55,138,221,.2); color: #64b5f6; }
+  .bn-win { background: rgba(61,220,132,.12); border: 1px solid rgba(61,220,132,.25); color: #81c784; }
+  .bn-ref { background: rgba(74,158,255,.1); border: 1px solid rgba(74,158,255,.2); color: #64b5f6; }
 
   /* ── LOADING ── */
   .loading { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 13px; }
@@ -226,7 +226,7 @@
 
       <!-- REGISTER FORM -->
       <div id="frm-reg" style="display:none">
-        <div id="invite-banner" style="display:none;background:rgba(76,175,80,.12);border:1px solid rgba(76,175,80,.25);border-radius:8px;padding:9px 12px;font-size:12px;color:#81c784;margin-bottom:12px;text-align:center"></div>
+        <div id="invite-banner" style="display:none;background:rgba(61,220,132,.12);border:1px solid rgba(61,220,132,.25);border-radius:8px;padding:9px 12px;font-size:12px;color:#81c784;margin-bottom:12px;text-align:center"></div>
         <div class="field"><div class="field-label">Username</div><input id="r-u" type="text" placeholder="e.g. golazo_king" autocomplete="username" /></div>
         <div class="field"><div class="field-label">Password</div><input id="r-p" type="password" placeholder="••••••" autocomplete="new-password" /></div>
         <div class="field"><div class="field-label">Email <span style="color:var(--muted);font-size:10px">(needed for password recovery)</span></div><input id="r-e" type="email" placeholder="you@example.com" autocomplete="email" style="width:100%;display:block" /></div>
@@ -242,7 +242,7 @@
         <div class="field"><div class="field-label">Username</div><input id="f-u" type="text" placeholder="your username" autocomplete="username" /></div>
         <div class="field"><div class="field-label">Email address</div><input id="f-e" type="email" placeholder="you@example.com" autocomplete="email" /></div>
         <div class="err" id="f-err"></div>
-        <div id="f-ok" style="display:none;background:rgba(76,175,80,.12);border:1px solid rgba(76,175,80,.3);border-radius:10px;padding:14px;margin-bottom:10px">
+        <div id="f-ok" style="display:none;background:rgba(61,220,132,.12);border:1px solid rgba(61,220,132,.3);border-radius:10px;padding:14px;margin-bottom:10px">
           <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Your new password is:</div>
           <div id="f-newpwd" style="font-size:22px;font-weight:700;color:var(--gold);letter-spacing:3px;text-align:center;padding:8px 0;font-family:monospace"></div>
           <div style="font-size:11px;color:var(--muted);margin-top:8px;text-align:center">Write this down or screenshot it — it won't be shown again</div>
@@ -831,7 +831,7 @@ function renderMatchList(){
             : `<button onclick="event.stopPropagation();settleRandom('${m.id}')" style="background:var(--gold);color:var(--dark);border:none;border-radius:6px;padding:4px 9px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;touch-action:manipulation">Settle</button>`
         : '';
       rightHtml=`<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-        <span class="badge" style="background:rgba(76,175,80,.18);border:1px solid rgba(76,175,80,.35);color:var(--success);font-size:11px;font-weight:700">FT · ${sc}</span>
+        <span class="badge" style="background:rgba(61,220,132,.18);border:1px solid rgba(61,220,132,.35);color:var(--success);font-size:11px;font-weight:700">FT · ${sc}</span>
         ${qsBtn}
       </div>`;
     } else if(status==='live'){
@@ -870,15 +870,15 @@ function renderMatchList(){
 
     const isPast=status==='settled'||status==='inprogress'||status==='live'||status==='finished';
     const rowStyle=myP&&(status==='open'||status==='inprogress'||status==='live')
-      ? 'background:rgba(76,175,80,.06);border:1px solid rgba(76,175,80,.35);'
+      ? 'background:rgba(61,220,132,.06);border:1px solid rgba(61,220,132,.35);'
       : isPast?'background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);'
-      : status==='future'?'background:#162616;border:1px solid rgba(255,255,255,.09);opacity:.78;'
-      : 'background:#162616;border:1px solid rgba(212,160,23,.5);box-shadow:0 0 0 2px rgba(212,160,23,.2);';
+      : status==='future'?'background:#15291a;border:1px solid rgba(255,255,255,.09);opacity:.78;'
+      : 'background:#15291a;border:1px solid rgba(255,200,48,.5);box-shadow:0 0 0 2px rgba(255,200,48,.2);';
 
     // Fix 3: confirmation strip — shows pick prominently below match name
     const confirmStrip=myP&&(status==='open'||status==='inprogress'||status==='live')?
-      `<div style="margin-top:5px;background:rgba(76,175,80,.1);border-radius:6px;padding:4px 8px;display:flex;align-items:center;justify-content:space-between">
-        <div style="font-size:11px;color:rgba(76,175,80,.9);font-weight:600">Your pick: <span style="color:var(--text)">${myP.pred_home} – ${myP.pred_away}</span>${myP.bold?'<span style="color:var(--gold);margin-left:4px;font-size:10px">🔥 BOLD</span>':''}</div>
+      `<div style="margin-top:5px;background:rgba(61,220,132,.1);border-radius:6px;padding:4px 8px;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:11px;color:rgba(61,220,132,.9);font-weight:600">Your pick: <span style="color:var(--text)">${myP.pred_home} – ${myP.pred_away}</span>${myP.bold?'<span style="color:var(--gold);margin-left:4px;font-size:10px">🔥 BOLD</span>':''}</div>
         <div style="font-size:10px;color:rgba(255,255,255,.35)">₹${betFor(m)} staked · tap to change</div>
       </div>`:
       status==='settled'&&myP?``:
@@ -919,7 +919,7 @@ function renderMatchList(){
 
     let out='';
     if(isToday){
-      out+=`<div style="display:flex;align-items:center;justify-content:space-between;margin:0 0 10px;padding:10px 14px;background:rgba(212,160,23,.1);border:1px solid rgba(212,160,23,.35);border-radius:10px">
+      out+=`<div style="display:flex;align-items:center;justify-content:space-between;margin:0 0 10px;padding:10px 14px;background:rgba(255,200,48,.1);border:1px solid rgba(255,200,48,.35);border-radius:10px">
         <div style="display:flex;align-items:center;gap:8px">
           <div style="width:8px;height:8px;border-radius:50%;background:var(--gold)"></div>
           <span style="font-size:16px;font-weight:700;color:var(--gold)">${g.date}</span>
@@ -933,7 +933,7 @@ function renderMatchList(){
         ${dateMeta}
       </div>`;
     } else {
-      out+=`<div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px;padding-bottom:8px;border-bottom:2px solid rgba(212,160,23,.35)">
+      out+=`<div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px;padding-bottom:8px;border-bottom:2px solid rgba(255,200,48,.35)">
         <span style="font-size:16px;font-weight:700;color:var(--gold)">${g.date}</span>
         ${dateMeta}
       </div>`;
@@ -978,8 +978,8 @@ function renderMatchList(){
     const stripMsg=allDone
       ?('All '+openMatches.length+' open match'+(openMatches.length!==1?'es':'')+' predicted ✓')
       :(unpredictedOpen.length+' match'+(unpredictedOpen.length!==1?'es':'')+' open to predict · closes '+closesStr);
-    const stripColor=allDone?'rgba(76,175,80,.12)':'rgba(212,160,23,.1)';
-    const stripBorder=allDone?'rgba(76,175,80,.3)':'rgba(212,160,23,.35)';
+    const stripColor=allDone?'rgba(61,220,132,.12)':'rgba(255,200,48,.1)';
+    const stripBorder=allDone?'rgba(61,220,132,.3)':'rgba(255,200,48,.35)';
     const stripTextColor=allDone?'#6abf6a':'var(--gold)';
     const dotAnim=allDone?'':'animation:pulse 2s infinite;';
     html+='<div id="action-strip" style="display:flex;align-items:center;padding:9px 13px;margin-bottom:10px;background:'+stripColor+';border:1px solid '+stripBorder+';border-radius:10px;gap:7px">'
@@ -1018,7 +1018,7 @@ function toggleMatchSheet(mid){
   }
   activeMatchId=mid;
   const row=document.getElementById('mr_'+mid);
-  if(row) row.style.borderColor='rgba(212,160,23,.5)';
+  if(row) row.style.borderColor='rgba(255,200,48,.5)';
   // Show sheet immediately with spinner — makes tap feel instant on iOS Safari
   document.getElementById('match-sheet').classList.add('open');
   document.getElementById('ms-title').textContent='Loading...';
@@ -1055,7 +1055,7 @@ function openMatchSheet(mid){
 
   // Score or match banner
   if(status==='settled'){
-    html+=`<div style="text-align:center;padding:14px;background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.2);border-radius:10px;margin-bottom:12px">
+    html+=`<div style="text-align:center;padding:14px;background:rgba(255,200,48,.08);border:1px solid rgba(255,200,48,.2);border-radius:10px;margin-bottom:12px">
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${m.home_flag} ${m.home} &nbsp;vs&nbsp; ${m.away} ${m.away_flag}</div>
       <div style="font-size:30px;font-weight:700;color:var(--gold)">${m.result_home} – ${m.result_away}</div>
     </div>`;
@@ -1084,14 +1084,14 @@ function openMatchSheet(mid){
       const won=(m.resolved_winners||[]).includes(ME.username);
       const rc=won&&m.resolved_type==='exact'?'rt-exact':won&&(m.resolved_type==='outcome')?'rt-outcome':m.resolved_type==='refund'&&won?'rt-refund':won&&m.resolved_type==='exact_bold'?'rt-exact':'rt-wrong';
       const rl=won&&m.resolved_type==='exact'?'Exact! +₹'+m.resolved_share:won&&m.resolved_type==='exact_bold'?'🔥 Bold Exact! +₹'+m.resolved_share:won&&m.resolved_type==='outcome'?'Outcome +₹'+m.resolved_share:m.resolved_type==='refund'&&won?'Void ₹'+m.resolved_share:'No win';
-      const boldBadge=myP.bold?'<span style="font-size:10px;color:var(--gold);font-weight:700;margin-left:6px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.4);border-radius:4px;padding:1px 6px;vertical-align:middle">🔥 BOLD</span>':'';
+      const boldBadge=myP.bold?'<span style="font-size:10px;color:var(--gold);font-weight:700;margin-left:6px;background:rgba(255,200,48,.12);border:1px solid rgba(255,200,48,.4);border-radius:4px;padding:1px 6px;vertical-align:middle">🔥 BOLD</span>':'';
       html+=`<div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
         <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">Your prediction</div>
         <div style="font-size:18px;font-weight:700;color:var(--text)">${myP.pred_home} – ${myP.pred_away}${boldBadge}</div></div>
         <span class="rtag ${rc}" style="font-size:12px;padding:4px 10px">${rl}</span>
       </div>`;
     } else {
-      const boldBadge=myP.bold?'<span style="font-size:10px;color:var(--gold);font-weight:700;margin-left:6px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.4);border-radius:4px;padding:1px 6px;vertical-align:middle">🔥 BOLD</span>':'';
+      const boldBadge=myP.bold?'<span style="font-size:10px;color:var(--gold);font-weight:700;margin-left:6px;background:rgba(255,200,48,.12);border:1px solid rgba(255,200,48,.4);border-radius:4px;padding:1px 6px;vertical-align:middle">🔥 BOLD</span>':'';
       html+=`<div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
         <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">Your prediction</div>
         <div style="font-size:18px;font-weight:700;color:var(--text)">${myP.pred_home} – ${myP.pred_away}${boldBadge}</div></div>
@@ -1116,8 +1116,8 @@ function openMatchSheet(mid){
         const isHome=x.home===teamName;
         const my=isHome?x.result_home:x.result_away;
         const opp=isHome?x.result_away:x.result_home;
-        if(my>opp) return '<span style="display:inline-block;width:14px;height:14px;line-height:14px;text-align:center;background:rgba(76,175,80,.25);color:var(--success);border-radius:3px;font-size:9px;font-weight:700;margin-right:2px">W</span>';
-        if(my<opp) return '<span style="display:inline-block;width:14px;height:14px;line-height:14px;text-align:center;background:rgba(226,75,74,.2);color:var(--red);border-radius:3px;font-size:9px;font-weight:700;margin-right:2px">L</span>';
+        if(my>opp) return '<span style="display:inline-block;width:14px;height:14px;line-height:14px;text-align:center;background:rgba(61,220,132,.25);color:var(--success);border-radius:3px;font-size:9px;font-weight:700;margin-right:2px">W</span>';
+        if(my<opp) return '<span style="display:inline-block;width:14px;height:14px;line-height:14px;text-align:center;background:rgba(255,90,89,.2);color:var(--red);border-radius:3px;font-size:9px;font-weight:700;margin-right:2px">L</span>';
         return '<span style="display:inline-block;width:14px;height:14px;line-height:14px;text-align:center;background:rgba(255,255,255,.08);color:var(--muted);border-radius:3px;font-size:9px;font-weight:700;margin-right:2px">D</span>';
       }).join('');
     }
@@ -1158,7 +1158,7 @@ function openMatchSheet(mid){
       const canBold=myBoldsInStage<1; // 1 bold per stage
       const stageLabel=m.grp==='SF'||m.grp==='Final'||m.grp==='3rd'?'SF/Final':m.grp;
       const statusLine=isCurrentBold?'currently your bold for this stage':canBold?'1 bold available this stage':'already used this stage';
-      boldStripHtml=`<div style="background:rgba(212,160,23,.04);border:1px solid rgba(212,160,23,.18);border-radius:8px;padding:10px 12px;margin-bottom:10px">
+      boldStripHtml=`<div style="background:rgba(255,200,48,.04);border:1px solid rgba(255,200,48,.18);border-radius:8px;padding:10px 12px;margin-bottom:10px">
         <label style="display:flex;align-items:flex-start;gap:9px;cursor:${(canBold||isCurrentBold)?'pointer':'not-allowed'};opacity:${(canBold||isCurrentBold)?'1':'.55'}">
           <input type="checkbox" id="sh_bold_${mid}" ${isCurrentBold?'checked':''} ${(canBold||isCurrentBold)?'':'disabled'} style="margin-top:2px;width:16px;height:16px;accent-color:var(--gold)" />
           <div style="flex:1">
@@ -1169,7 +1169,7 @@ function openMatchSheet(mid){
       </div>`;
     }
 
-    html+=`<div style="background:rgba(212,160,23,.06);border:1px solid rgba(212,160,23,.25);border-radius:10px;padding:14px;margin-bottom:10px">
+    html+=`<div style="background:rgba(255,200,48,.06);border:1px solid rgba(255,200,48,.25);border-radius:10px;padding:14px;margin-bottom:10px">
       <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px">
         <div style="font-size:13px;font-weight:600;color:var(--gold)">${isEditing?'Update your pick':'Stake \u20b9'+betFor(m)+' on the score'}</div>
         <div style="font-size:11px;color:var(--success);font-weight:600">win up to \u20b9${(arr.length+1)*betFor(m)}</div>
@@ -1396,8 +1396,8 @@ function buildPlayerInline(username){
 
   const chip=(type,val,col,lbl)=>{
     const active=ppActiveType===type;
-    const bg=active?'rgba(212,160,23,.08)':'rgba(255,255,255,.04)';
-    const bd=active?'rgba(212,160,23,.5)':'rgba(255,255,255,.09)';
+    const bg=active?'rgba(255,200,48,.08)':'rgba(255,255,255,.04)';
+    const bd=active?'rgba(255,200,48,.5)':'rgba(255,255,255,.09)';
     return '<div id="pp-chip-'+type+'" onclick="ppShowType(\'' + type + '\')" style="background:'+bg+';border:1px solid '+bd+';border-radius:9px;padding:8px 4px;text-align:center;cursor:pointer;flex:1">'
       +'<div style="font-size:20px;font-weight:700;color:'+col+'">'+val+'</div>'
       +'<div style="font-size:10px;color:var(--muted)">'+lbl+'</div>'
@@ -1406,7 +1406,7 @@ function buildPlayerInline(username){
 
   const matchListHtml = ppActiveType ? '' : '';
 
-  return '<div id="pp-inline-'+username+'" style="background:rgba(212,160,23,.04);border:1px solid rgba(212,160,23,.2);border-radius:10px;padding:12px;margin-bottom:6px;margin-top:-4px">'
+  return '<div id="pp-inline-'+username+'" style="background:rgba(255,200,48,.04);border:1px solid rgba(255,200,48,.2);border-radius:10px;padding:12px;margin-bottom:6px;margin-top:-4px">'
     +'<div style="display:flex;gap:6px;margin-bottom:10px">'
       +chip('exact',exact,'var(--success)','Exact')
       +chip('outcome',outcome_win,'var(--warn)','Outcome')
@@ -1485,7 +1485,7 @@ function renderLB(){
   if(settledMatches.length===0){
     const openCount=MATCHES.filter(m=>matchStatus(m)==='open').length;
     if(openCount>0){
-      podiumHtml='<div style="background:linear-gradient(135deg,rgba(212,160,23,.15),rgba(212,160,23,.05));border:1px solid rgba(212,160,23,.4);border-radius:14px;padding:18px 16px;margin-bottom:14px;text-align:center">'
+      podiumHtml='<div style="background:linear-gradient(135deg,rgba(255,200,48,.15),rgba(255,200,48,.05));border:1px solid rgba(255,200,48,.4);border-radius:14px;padding:18px 16px;margin-bottom:14px;text-align:center">'
         +'<div style="font-size:24px;margin-bottom:6px">⚽</div>'
         +'<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">Make your first prediction</div>'
         +'<div style="font-size:12px;color:var(--muted);margin-bottom:12px">'+openCount+' match'+(openCount!==1?'es':'')+' open · everyone starts at zero</div>'
@@ -1504,7 +1504,7 @@ function renderLB(){
     if(myStats&&myStats.participated>0){
       const formStrip=myStats.last5.map(r=>{
         const win=r==='W';
-        const bg=win?'rgba(76,175,80,.15)':'rgba(226,75,74,.15)';
+        const bg=win?'rgba(61,220,132,.15)':'rgba(255,90,89,.15)';
         const col=win?'#5DCAA5':'#E24B4A';
         return '<div style="flex:1;height:28px;border-radius:7px;background:'+bg+';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:'+col+'">'+r+'</div>';
       }).join('');
@@ -1512,7 +1512,7 @@ function renderLB(){
       const safePct=myStats.safeTotal>0?Math.round(myStats.safeWin/myStats.safeTotal*100):null;
 
       insightsHtml='<div class="sec" style="margin-bottom:8px">Your insights</div>'
-        +'<div style="background:linear-gradient(135deg,rgba(212,160,23,.08),rgba(212,160,23,.02));border-radius:12px;border:1px solid rgba(212,160,23,.4);box-shadow:0 0 0 1px rgba(212,160,23,.1),0 4px 16px rgba(212,160,23,.12);padding:14px 15px;margin-bottom:14px">'
+        +'<div style="background:linear-gradient(135deg,rgba(255,200,48,.08),rgba(255,200,48,.02));border-radius:12px;border:1px solid rgba(255,200,48,.4);box-shadow:0 0 0 1px rgba(255,200,48,.1),0 4px 16px rgba(255,200,48,.12);padding:14px 15px;margin-bottom:14px">'
         +'<div style="font-size:11px;color:var(--muted);margin-bottom:12px">'+esc(ME.username)+' · '+myStats.participated+' prediction'+(myStats.participated!==1?'s':'')+' made</div>';
 
       if(myStats.last5.length>0){
@@ -1571,7 +1571,7 @@ function renderLB(){
       const barCol=pl>0?'#5DCAA5':pl<0?'#E24B4A':'#888780';
       const plCol=pl>0?'#5DCAA5':pl<0?'#E24B4A':'var(--muted)';
       const rankCol=i===0?'#f0c060':i===1?'#c0c0c0':i===2?'#cd7f32':'#6a8a6a';
-      const meBg=isMe?'background:rgba(55,138,221,.06);border-radius:8px;':'';
+      const meBg=isMe?'background:rgba(74,158,255,.06);border-radius:8px;':'';
       const meName=isMe?'color:#85B7EB;font-weight:600':'color:#c8c8c8';
       const mePctCol=isMe?'#85B7EB':plCol;
       const meAmtCol=isMe?'#85B7EB':'#6a8a6a';
@@ -1604,7 +1604,7 @@ function renderLB(){
     const thS='padding:7px 5px;text-align:center;font-size:10px;font-weight:600;border-bottom:1px solid var(--border);white-space:nowrap';
     const subS='padding:4px 5px;text-align:center;font-size:10px;font-weight:400;border-bottom:1px solid var(--border);white-space:nowrap';
     const blS='border-left:1px solid rgba(255,255,255,.09)';
-    const blGold='border-left:2px solid rgba(212,160,23,.4)';
+    const blGold='border-left:2px solid rgba(255,200,48,.4)';
     let thRow='<th style="'+thS+';text-align:left;padding-left:10px;position:sticky;left:0;background:#1a2a1a;z-index:2;color:var(--muted);font-weight:500;min-width:72px">Player</th>';
     ROUND_DEFS.forEach((r,ri)=>{
       const active=stageActive[r.key];
@@ -1627,9 +1627,9 @@ function renderLB(){
     let rows='';
     tableStats.forEach((ts,i)=>{
       const isMe=ts.u.username===ME.username;
-      const rowBg=isMe?'rgba(55,138,221,.07)':i%2===1?'rgba(255,255,255,.02)':'';
+      const rowBg=isMe?'rgba(74,158,255,.07)':i%2===1?'rgba(255,255,255,.02)':'';
       const nameCol=isMe?'var(--info)':'var(--text)';
-      const nameBg=isMe?'rgba(55,138,221,.12)':'#1a2a1a';
+      const nameBg=isMe?'rgba(74,158,255,.12)':'#1a2a1a';
       let cells='<td style="padding:7px 10px;font-size:12px;font-weight:700;color:'+nameCol+';white-space:nowrap;border-bottom:1px solid rgba(255,255,255,.04);position:sticky;left:0;background:'+nameBg+';z-index:1">'+ts.u.username+(isMe?' ★':'')+'</td>';
       ROUND_DEFS.forEach((r,ri)=>{
         const s=ts.rounds[r.key];
@@ -1646,7 +1646,7 @@ function renderLB(){
       });
       const ov=ts.rounds.overall;
       const plc=plColor(ov.pl);
-      cells+='<td style="padding:7px 4px;text-align:center;font-size:11px;color:var(--text);border-bottom:1px solid rgba(255,255,255,.04);border-left:2px solid rgba(212,160,23,.3)">'+(ov.bet||'—')+'</td>';
+      cells+='<td style="padding:7px 4px;text-align:center;font-size:11px;color:var(--text);border-bottom:1px solid rgba(255,255,255,.04);border-left:2px solid rgba(255,200,48,.3)">'+(ov.bet||'—')+'</td>';
       cells+='<td style="padding:7px 4px;text-align:center;font-size:11px;color:'+(ov.won>0?'var(--success)':'var(--muted)')+';font-weight:'+(ov.won>0?700:400)+';border-bottom:1px solid rgba(255,255,255,.04)">'+(ov.won||'—')+'</td>';
       cells+='<td style="padding:7px 6px;text-align:center;font-size:12px;font-weight:700;color:'+plc+';border-bottom:1px solid rgba(255,255,255,.04)">'+(ov.pl!==0?fmtPL(ov.pl):'—')+'</td>';
       rows+='<tr style="background:'+rowBg+'">'+cells+'</tr>';
@@ -1865,7 +1865,7 @@ function renderHowTo(){
           Your <strong style="color:var(--text)">₹${bet}</strong> goes into that match's shared pot.
           The window closes <strong style="color:var(--text)">5 minutes before kickoff</strong> — you can change your pick any time before that.
         </div>
-        <div style="background:rgba(212,160,23,.06);border:1px solid rgba(212,160,23,.2);border-radius:10px;padding:13px;margin-bottom:10px">
+        <div style="background:rgba(255,200,48,.06);border:1px solid rgba(255,200,48,.2);border-radius:10px;padding:13px;margin-bottom:10px">
           <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:8px">Brazil vs France · Group I · Today</div>
           <div style="display:flex;justify-content:center;align-items:center;gap:18px;margin-bottom:8px">
             <div style="text-align:center">
@@ -1882,7 +1882,7 @@ function renderHowTo(){
             <span>Pot: ₹${bet*4}</span><span>·</span><span>4 players</span><span>·</span><span>₹${bet} each</span>
           </div>
         </div>
-        <div style="background:rgba(55,138,221,.06);border:1px solid rgba(55,138,221,.2);border-radius:8px;padding:10px 13px;font-size:12px;color:var(--muted)">
+        <div style="background:rgba(74,158,255,.06);border:1px solid rgba(74,158,255,.2);border-radius:8px;padding:10px 13px;font-size:12px;color:var(--muted)">
           💡 <strong style="color:var(--text)">Predictions are hidden</strong> until the match settles — you can see your own pick but not others'. No peeking for advantage.
         </div>`
     },
@@ -1900,20 +1900,20 @@ function renderHowTo(){
             <div style="padding:8px 10px;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);background:rgba(255,255,255,.03);text-align:center">Result</div>
             <div style="padding:8px 12px;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);background:rgba(255,255,255,.03);text-align:right">Payout</div>
 
-            <div style="padding:9px 12px;font-size:12px;border-bottom:1px solid var(--border);background:rgba(76,175,80,.04)">You · <strong style="color:var(--success)">2–1 ✓</strong></div>
-            <div style="padding:9px 10px;text-align:center;border-bottom:1px solid var(--border);background:rgba(76,175,80,.04)"><span style="background:rgba(76,175,80,.2);color:var(--success);border-radius:20px;padding:2px 8px;font-size:10px;font-weight:600">Exact</span></div>
-            <div style="padding:9px 12px;text-align:right;color:var(--success);font-weight:700;border-bottom:1px solid var(--border);background:rgba(76,175,80,.04)">+₹${bet*4}</div>
+            <div style="padding:9px 12px;font-size:12px;border-bottom:1px solid var(--border);background:rgba(61,220,132,.04)">You · <strong style="color:var(--success)">2–1 ✓</strong></div>
+            <div style="padding:9px 10px;text-align:center;border-bottom:1px solid var(--border);background:rgba(61,220,132,.04)"><span style="background:rgba(61,220,132,.2);color:var(--success);border-radius:20px;padding:2px 8px;font-size:10px;font-weight:600">Exact</span></div>
+            <div style="padding:9px 12px;text-align:right;color:var(--success);font-weight:700;border-bottom:1px solid var(--border);background:rgba(61,220,132,.04)">+₹${bet*4}</div>
 
             <div style="padding:9px 12px;font-size:12px;border-bottom:1px solid var(--border)">Rahul · <span style="color:var(--warn)">3–0 ✓</span></div>
-            <div style="padding:9px 10px;text-align:center;border-bottom:1px solid var(--border)"><span style="background:rgba(232,160,32,.15);color:var(--warn);border-radius:20px;padding:2px 8px;font-size:10px">Outcome</span></div>
+            <div style="padding:9px 10px;text-align:center;border-bottom:1px solid var(--border)"><span style="background:rgba(255,176,48,.15);color:var(--warn);border-radius:20px;padding:2px 8px;font-size:10px">Outcome</span></div>
             <div style="padding:9px 12px;text-align:right;color:var(--muted);border-bottom:1px solid var(--border)">—</div>
 
             <div style="padding:9px 12px;font-size:12px;border-bottom:1px solid var(--border)">Ankit · <span style="color:var(--red)">1–2 ✗</span></div>
-            <div style="padding:9px 10px;text-align:center;border-bottom:1px solid var(--border)"><span style="background:rgba(226,75,74,.15);color:var(--red);border-radius:20px;padding:2px 8px;font-size:10px">Wrong</span></div>
+            <div style="padding:9px 10px;text-align:center;border-bottom:1px solid var(--border)"><span style="background:rgba(255,90,89,.15);color:var(--red);border-radius:20px;padding:2px 8px;font-size:10px">Wrong</span></div>
             <div style="padding:9px 12px;text-align:right;color:var(--red);font-weight:600;border-bottom:1px solid var(--border)">-₹${bet}</div>
 
             <div style="padding:9px 12px;font-size:12px">Vikram · <span style="color:var(--red)">0–0 ✗</span></div>
-            <div style="padding:9px 10px;text-align:center"><span style="background:rgba(226,75,74,.15);color:var(--red);border-radius:20px;padding:2px 8px;font-size:10px">Wrong</span></div>
+            <div style="padding:9px 10px;text-align:center"><span style="background:rgba(255,90,89,.15);color:var(--red);border-radius:20px;padding:2px 8px;font-size:10px">Wrong</span></div>
             <div style="padding:9px 12px;text-align:right;color:var(--red);font-weight:600">-₹${bet}</div>
           </div>
         </div>
@@ -1930,9 +1930,9 @@ function renderHowTo(){
         </div>
         <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px">
           ${[
-            ['background:rgba(212,160,23,.15);color:var(--gold);border:1px solid rgba(212,160,23,.4)','Predict','Today\'s match, window open. Tap to place your pick.'],
-            ['background:rgba(76,175,80,.15);color:var(--success);border:1px solid rgba(76,175,80,.3)','Predicted','You\'ve locked in a pick. Tap to view or change it.'],
-            ['background:rgba(232,160,32,.15);color:var(--warn);border:1px solid rgba(232,160,32,.35)','In progress','Window closed. Match being played — result soon.'],
+            ['background:rgba(255,200,48,.15);color:var(--gold);border:1px solid rgba(255,200,48,.4)','Predict','Today\'s match, window open. Tap to place your pick.'],
+            ['background:rgba(61,220,132,.15);color:var(--success);border:1px solid rgba(61,220,132,.3)','Predicted','You\'ve locked in a pick. Tap to view or change it.'],
+            ['background:rgba(255,176,48,.15);color:var(--warn);border:1px solid rgba(255,176,48,.35)','In progress','Window closed. Match being played — result soon.'],
             ['background:rgba(255,255,255,.06);color:var(--muted);border:1px solid var(--border)','20:30 IST','Future match. Opens for prediction on match day only.'],
             ['background:var(--gold);color:var(--dark);border:none','2–1','Settled. Tap to see result and everyone\'s predictions.'],
           ].map(([style,label,desc])=>`
@@ -1944,7 +1944,7 @@ function renderHowTo(){
             </div>`).join('')}
           <div style="display:grid;grid-template-columns:100px 1fr;align-items:center">
             <div style="padding:11px 12px;display:flex;align-items:center;justify-content:center">
-              <span style="background:rgba(55,138,221,.15);color:var(--info);border:1px solid rgba(55,138,221,.3);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600">Change</span>
+              <span style="background:rgba(74,158,255,.15);color:var(--info);border:1px solid rgba(74,158,255,.3);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600">Change</span>
             </div>
             <div style="padding:11px 12px;font-size:12px;color:var(--muted);border-left:1px solid var(--border)">Tap this inside a match sheet to update your prediction before cutoff.</div>
           </div>
@@ -1958,7 +1958,7 @@ function renderHowTo(){
           The leaderboard ranks everyone by <strong style="color:var(--text)">P/L%</strong> — profit or loss as a percentage of what you staked. Fairer than raw profit since everyone plays different numbers of matches.
         </div>
         <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px">
-          <div style="display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid var(--border);background:rgba(212,160,23,.04)">
+          <div style="display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid var(--border);background:rgba(255,200,48,.04)">
             <div style="font-size:22px;width:26px;text-align:center">🥇</div>
             <div style="width:34px;height:34px;border-radius:50%;background:#378ADD;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff">PR</div>
             <div style="flex:1">
@@ -1987,7 +1987,7 @@ function renderHowTo(){
             <div style="font-size:11px;color:var(--muted);margin-top:3px">Your prediction accuracy</div>
           </div>
         </div>
-        <div style="background:rgba(55,138,221,.06);border:1px solid rgba(55,138,221,.2);border-radius:8px;padding:10px 13px;font-size:12px;color:var(--muted)">
+        <div style="background:rgba(74,158,255,.06);border:1px solid rgba(74,158,255,.2);border-radius:8px;padding:10px 13px;font-size:12px;color:var(--muted)">
           💡 <strong style="color:var(--text)">Invite friends</strong> via the League tab → Invite others → WhatsApp message opens with your league link ready to send.
         </div>`
     }
@@ -2053,7 +2053,7 @@ function renderHowTo(){
       if(step!==0) return '';
       const openMatches=MATCHES.filter(m=>matchStatus(m)==='open');
       if(!openMatches.length) return '';
-      return `<div onclick="goTab('matches')" style="cursor:pointer;margin-top:8px;text-align:center;padding:10px 14px;background:rgba(212,160,23,.06);border:1px dashed rgba(212,160,23,.35);border-radius:9px">
+      return `<div onclick="goTab('matches')" style="cursor:pointer;margin-top:8px;text-align:center;padding:10px 14px;background:rgba(255,200,48,.06);border:1px dashed rgba(255,200,48,.35);border-radius:9px">
         <div style="font-size:11px;color:var(--muted);margin-bottom:3px">${openMatches.length} match${openMatches.length!==1?'es':''} open to predict right now</div>
         <div style="font-size:13px;font-weight:700;color:var(--gold)">Predict now → go to today's matches</div>
       </div>`;
@@ -2120,7 +2120,7 @@ function showLeagueWelcome(){
       <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:6px;letter-spacing:.3px">CURRENT STANDINGS</div>
       ${standingRows}
     </div>
-    <div style="background:rgba(212,160,23,.06);border:1px solid rgba(212,160,23,.2);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--muted);text-align:center">
+    <div style="background:rgba(255,200,48,.06);border:1px solid rgba(255,200,48,.2);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--muted);text-align:center">
       You're joining <strong style="color:var(--text)">${memberCount}</strong> player${memberCount!==1?'s':''}.
       Predict scores on the <strong style="color:var(--text)">Matches</strong> tab to climb the table.
     </div>
@@ -2203,7 +2203,7 @@ function maybeShowBoldAnnouncement(){
 
 function _boldAnnouncementHtml(){
   return `
-  <div style="background:linear-gradient(135deg,rgba(212,160,23,.12),rgba(212,160,23,.03));border:1px solid rgba(212,160,23,.4);border-radius:12px;padding:18px;margin-bottom:14px;text-align:center">
+  <div style="background:linear-gradient(135deg,rgba(255,200,48,.12),rgba(255,200,48,.03));border:1px solid rgba(255,200,48,.4);border-radius:12px;padding:18px;margin-bottom:14px;text-align:center">
     <div style="font-size:42px;margin-bottom:6px">🔥</div>
     <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:4px">Bold Pick has unlocked</div>
     <div style="font-size:12px;color:var(--muted)">Knockout stages only · One per stage</div>
@@ -2232,7 +2232,7 @@ function _boldAnnouncementHtml(){
     <li>Pick the match where you're most confident in the <em>exact score</em>, not just the winner</li>
   </ul>
 
-  <div style="background:rgba(55,138,221,.06);border:1px solid rgba(55,138,221,.2);border-radius:8px;padding:11px 13px;font-size:12px;color:var(--muted)">
+  <div style="background:rgba(74,158,255,.06);border:1px solid rgba(74,158,255,.2);border-radius:8px;padding:11px 13px;font-size:12px;color:var(--muted)">
     💡 <strong style="color:var(--text)">Strategy tip</strong> — save your bold for the match where you have a strong gut feeling on a specific score that others might miss. A 3-2 or 2-1 in a tight QF is more likely to be uniquely yours than an obvious 1-0.
   </div>
   `;
@@ -2259,22 +2259,22 @@ function renderHowToClassic(){
   <div class="sec">How predictions work</div>
   <div class="card" style="padding:0;overflow:hidden">
     <div style="display:grid;grid-template-columns:44px 1fr">
-      <div style="padding:14px;background:rgba(212,160,23,.1);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px">🗓️</div>
+      <div style="padding:14px;background:rgba(255,200,48,.1);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px">🗓️</div>
       <div style="padding:12px 14px;border-bottom:1px solid var(--border)">
         <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:3px">Predict on match day only</div>
         <div style="font-size:12px;color:var(--muted)">You can only predict a match on the day it is played. The prediction window closes 5 minutes before kickoff. Missed the window? That match is closed for you.</div>
       </div>
-      <div style="padding:14px;background:rgba(76,175,80,.08);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px">🎯</div>
+      <div style="padding:14px;background:rgba(61,220,132,.08);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px">🎯</div>
       <div style="padding:12px 14px;border-bottom:1px solid var(--border)">
         <div style="font-size:13px;font-weight:600;color:var(--success);margin-bottom:3px">Pick the exact scoreline</div>
         <div style="font-size:12px;color:var(--muted)">Enter the final score you think will happen — e.g. Brazil 2, France 1. Each prediction costs ₹\${bet} which goes into the shared pot for that match.</div>
       </div>
-      <div style="padding:14px;background:rgba(55,138,221,.08);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px">🔒</div>
+      <div style="padding:14px;background:rgba(74,158,255,.08);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px">🔒</div>
       <div style="padding:12px 14px;border-bottom:1px solid var(--border)">
         <div style="font-size:13px;font-weight:600;color:var(--info);margin-bottom:3px">Predictions are hidden until settled</div>
         <div style="font-size:12px;color:var(--muted)">You can see your own prediction anytime, but others' predictions are revealed only after the match is settled. No peeking for advantage.</div>
       </div>
-      <div style="padding:14px;background:rgba(232,160,32,.08);display:flex;align-items:center;justify-content:center;font-size:20px">✏️</div>
+      <div style="padding:14px;background:rgba(255,176,48,.08);display:flex;align-items:center;justify-content:center;font-size:20px">✏️</div>
       <div style="padding:12px 14px">
         <div style="font-size:13px;font-weight:600;color:var(--warn);margin-bottom:3px">Change your mind?</div>
         <div style="font-size:12px;color:var(--muted)">You can update your prediction any time before the 5-minute cutoff. Once the window closes, your pick is locked.</div>
@@ -2285,22 +2285,22 @@ function renderHowToClassic(){
   <div class="sec">Scoring & payouts</div>
   <div class="card" style="padding:0;overflow:hidden">
     <div style="display:grid;grid-template-columns:44px 1fr">
-      <div style="padding:14px;background:rgba(76,175,80,.1);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px">🏆</div>
+      <div style="padding:14px;background:rgba(61,220,132,.1);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px">🏆</div>
       <div style="padding:12px 14px;border-bottom:1px solid var(--border)">
         <div style="font-size:13px;font-weight:600;color:var(--success);margin-bottom:3px">Exact score → win the pot</div>
         <div style="font-size:12px;color:var(--muted)">You nailed the exact scoreline. You take the entire pot. If multiple players got it exact, the pot splits equally between them.</div>
       </div>
-      <div style="padding:14px;background:rgba(232,160,32,.08);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px">✅</div>
+      <div style="padding:14px;background:rgba(255,176,48,.08);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px">✅</div>
       <div style="padding:12px 14px;border-bottom:1px solid var(--border)">
         <div style="font-size:13px;font-weight:600;color:var(--warn);margin-bottom:3px">Correct outcome → split with others</div>
         <div style="font-size:12px;color:var(--muted)">Nobody got the exact score, but you predicted the right result (win / draw / loss). You split the pot with everyone else who got the outcome right.</div>
       </div>
-      <div style="padding:14px;background:rgba(55,138,221,.08);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px">🔄</div>
+      <div style="padding:14px;background:rgba(74,158,255,.08);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px">🔄</div>
       <div style="padding:12px 14px;border-bottom:1px solid var(--border)">
         <div style="font-size:13px;font-weight:600;color:var(--info);margin-bottom:3px">All same outcome → void</div>
         <div style="font-size:12px;color:var(--muted)">Everyone predicted the same outcome and it happened. No winner, no loser — everyone gets their ₹\${bet} back.</div>
       </div>
-      <div style="padding:14px;background:rgba(226,75,74,.08);display:flex;align-items:center;justify-content:center;font-size:20px">❌</div>
+      <div style="padding:14px;background:rgba(255,90,89,.08);display:flex;align-items:center;justify-content:center;font-size:20px">❌</div>
       <div style="padding:12px 14px">
         <div style="font-size:13px;font-weight:600;color:var(--red);margin-bottom:3px">Wrong prediction → lose your stake</div>
         <div style="font-size:12px;color:var(--muted)">You got the outcome wrong. Your ₹\${bet} goes into the pot for the winners to collect.</div>
@@ -2324,9 +2324,53 @@ function renderHowToClassic(){
 //  GROUPS — live standings computed from Supabase match results
 // ════════════════════════════════════════════════════════════════
 let groupsLastFetched = 0;
-// Live group standings from worldcup26.ir — cached to avoid refetching on every render
+// Live group standings from worldcup26.ir — persisted to localStorage so it
+// survives across logins/sessions. Only re-fetched when a match has actually
+// kicked off + finished since the last cache (pure date math, no API polling).
 let LIVE_GROUP_STANDINGS = null; // {A:[{name,mp,w,d,l,gf,ga,pts},...], B:[...], ...}
 let liveGroupsFetchedAt = 0;
+
+const GROUP_CACHE_KEY = 'wc2026_group_standings_cache';
+
+function loadGroupStandingsCache(){
+  try{
+    const raw = localStorage.getItem(GROUP_CACHE_KEY);
+    if(!raw) return false;
+    const parsed = JSON.parse(raw);
+    if(!parsed || !parsed.data || !parsed.fetchedAt) return false;
+    LIVE_GROUP_STANDINGS = parsed.data;
+    liveGroupsFetchedAt = parsed.fetchedAt;
+    return true;
+  }catch(e){ return false; }
+}
+
+function saveGroupStandingsCache(){
+  try{
+    localStorage.setItem(GROUP_CACHE_KEY, JSON.stringify({data:LIVE_GROUP_STANDINGS, fetchedAt:liveGroupsFetchedAt}));
+  }catch(e){ /* localStorage full or unavailable — cache just won't persist */ }
+}
+
+// Returns true if any match kicked off AND finished its expected duration
+// strictly after the given cache timestamp — meaning standings could have changed.
+function hasMatchSettledSince(sinceMs){
+  const MONTH_MAP2={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+  for(const m of MATCHES){
+    if(!m.kickoff_ist||!m.match_date) continue;
+    const p=m.match_date.trim().split(' ');
+    const mon=MONTH_MAP2[p[0]]; const day=parseInt(p[1]);
+    if(mon==null||!day) continue;
+    const [hh,mm]=m.kickoff_ist.split(':').map(Number);
+    const kickoffIST=new Date(Date.UTC(2026,mon,day,hh,mm));
+    const kickoffUTC=new Date(kickoffIST.getTime()-IST_OFFSET_MS);
+    const dur=isKnockout(m)?KNOCKOUT_DURATION_MS:MATCH_DURATION_MS;
+    const expectedEndUTC=new Date(kickoffUTC.getTime()+dur);
+    // Match expected to have finished, and that finish happened after our cache was taken
+    if(expectedEndUTC.getTime() > sinceMs && expectedEndUTC.getTime() <= Date.now()){
+      return true;
+    }
+  }
+  return false;
+}
 
 // Fetch live group standings from worldcup26.ir (free, no key).
 // Falls back silently to null on any failure — caller uses DB calc instead.
@@ -2388,10 +2432,21 @@ async function renderGroups(){
     groupsLastFetched = now;
   }
 
-  // Fetch live standings from worldcup26.ir if cache is empty or >5 min old
-  if(!LIVE_GROUP_STANDINGS || (now-liveGroupsFetchedAt)>5*60*1000){
+  // Load standings from localStorage cache if not already in memory this session
+  if(LIVE_GROUP_STANDINGS===null){
+    loadGroupStandingsCache();
+  }
+
+  // Only re-fetch if: no cache at all, OR a match has settled since the cache was taken.
+  // No timers, no polling — pure comparison of match kickoff+duration vs cache timestamp.
+  const needsRefresh = !LIVE_GROUP_STANDINGS || hasMatchSettledSince(liveGroupsFetchedAt);
+  if(needsRefresh){
     const live=await fetchLiveGroupStandings();
-    if(live){ LIVE_GROUP_STANDINGS=live; liveGroupsFetchedAt=now; }
+    if(live){
+      LIVE_GROUP_STANDINGS=live;
+      liveGroupsFetchedAt=now;
+      saveGroupStandingsCache();
+    }
   }
 
   const GROUP_TEAMS = {
@@ -2533,16 +2588,16 @@ async function renderGroups(){
     }
 
     function matchCard(home,away,gold){
-      const bg=gold?'rgba(212,160,23,.08)':'var(--card)';
-      const bd=gold?'rgba(212,160,23,.35)':'var(--border)';
+      const bg=gold?'rgba(255,200,48,.08)':'var(--card)';
+      const bd=gold?'rgba(255,200,48,.35)':'var(--border)';
       return `<div style="background:${bg};border:1px solid ${bd};border-radius:7px;padding:5px 6px">
         <div style="border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:2px;margin-bottom:2px">${slotHTML(home)}</div>
         ${slotHTML(away)}
       </div>`;
     }
     function tbdCard(gold){
-      const bg=gold?'rgba(212,160,23,.08)':'var(--card)';
-      const bd=gold?'rgba(212,160,23,.35)':'var(--border)';
+      const bg=gold?'rgba(255,200,48,.08)':'var(--card)';
+      const bd=gold?'rgba(255,200,48,.35)':'var(--border)';
       return `<div style="background:${bg};border:1px solid ${bd};border-radius:7px;padding:5px 6px">
         <div style="border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:2px;margin-bottom:2px">${slotHTML('TBD')}</div>
         ${slotHTML('TBD')}
@@ -2550,7 +2605,7 @@ async function renderGroups(){
     }
 
     function colHeader(label,gold){
-      return `<div style="font-size:9px;font-weight:600;color:${gold?'var(--gold)':'var(--muted)'};letter-spacing:.5px;text-transform:uppercase;text-align:center;padding:5px 2px;margin-bottom:5px;border-bottom:1px solid ${gold?'rgba(212,160,23,.35)':'var(--border)'}">${label}</div>`;
+      return `<div style="font-size:9px;font-weight:600;color:${gold?'var(--gold)':'var(--muted)'};letter-spacing:.5px;text-transform:uppercase;text-align:center;padding:5px 2px;margin-bottom:5px;border-bottom:1px solid ${gold?'rgba(255,200,48,.35)':'var(--border)'}">${label}</div>`;
     }
 
     html+=`<div class="sec">Knockout bracket</div>
@@ -2636,7 +2691,7 @@ async function renderGroups(){
       standings.forEach((t,i)=>{
         const qualify=i<2, third=i===2;
         const gd=t.gf-t.ga;
-        const rowBg=qualify?'background:rgba(76,175,80,.06)':third?'background:rgba(55,138,221,.04)':i%2===1?'background:rgba(255,255,255,.015)':'';
+        const rowBg=qualify?'background:rgba(61,220,132,.06)':third?'background:rgba(74,158,255,.04)':i%2===1?'background:rgba(255,255,255,.015)':'';
         html+=`<tr style="${rowBg}">
           <td style="padding:10px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px">${i+1}</td>
           <td style="padding:10px 8px;border-bottom:1px solid var(--border);font-weight:${qualify?700:500}">
@@ -3719,7 +3774,7 @@ function randomFillPred(mid){
         +esc(m.home)+' <b style="color:var(--text)">'+odds.hPct+'%</b>'
         +' \u00b7 Draw <b style="color:var(--text)">'+odds.dPct+'%</b>'
         +' \u00b7 '+esc(m.away)+' <b style="color:var(--text)">'+odds.aPct+'%</b></span>'
-        +'<span style="font-size:10px;color:rgba(212,160,23,.8)">'+esc(stronger)+' favoured</span>';
+        +'<span style="font-size:10px;color:rgba(255,200,48,.8)">'+esc(stronger)+' favoured</span>';
       hint.style.cssText='display:flex;justify-content:space-between;align-items:center;'
         +'padding:5px 8px;background:rgba(255,255,255,.03);border-radius:6px;margin-bottom:8px';
     }
@@ -3730,7 +3785,7 @@ function randomFillPred(mid){
   if(aEl) aEl.value=a;
   [hEl,aEl].forEach(el=>{
     if(!el) return;
-    el.style.borderColor='rgba(212,160,23,.7)';
+    el.style.borderColor='rgba(255,200,48,.7)';
     setTimeout(()=>el.style.borderColor='',600);
   });
 }
