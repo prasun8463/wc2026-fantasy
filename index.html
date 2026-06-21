@@ -1522,7 +1522,7 @@ function renderLB(){
       insightsHtml+='<div style="display:flex;gap:8px;margin-bottom:10px">'
         +'<div style="flex:1;background:rgba(255,255,255,.03);border-radius:8px;padding:8px;text-align:center">'
           +'<div style="font-size:17px;font-weight:700;color:var(--text)">'+myStats.acc+'%</div>'
-          +'<div style="font-size:9px;color:var(--muted);margin-top:2px">Hit rate</div>'
+          +'<div style="font-size:9px;color:var(--muted);margin-top:2px">Hit rate ('+(myStats.exact+myStats.outcome_win)+' of '+myStats.participated+')</div>'
         +'</div>'
         +'<div style="flex:1;background:rgba(255,255,255,.03);border-radius:8px;padding:8px;text-align:center">'
           +'<div style="font-size:17px;font-weight:700;color:var(--text)">'+myStats.exact+'</div>'
@@ -1530,19 +1530,18 @@ function renderLB(){
         +'</div>'
       +'</div>';
 
-      if(boldPct!==null||safePct!==null){
+      // Bold vs non-bold breakdown — only shown once Bold picks exist (knockouts onward)
+      if(boldPct!==null){
         insightsHtml+='<div style="border-top:1px solid rgba(255,255,255,.06);padding-top:10px">';
-        if(boldPct!==null){
-          insightsHtml+='<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">'
-            +'<span style="font-size:13px;flex-shrink:0">🎯</span>'
-            +'<span style="font-size:12px;flex:1;color:var(--text)">Bold correct picks <span style="color:var(--muted)">('+myStats.boldWin+' of '+myStats.boldTotal+')</span></span>'
-            +'<span style="font-size:12px;font-weight:700;color:var(--text)">'+boldPct+'%</span>'
-          +'</div>';
-        }
+        insightsHtml+='<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">'
+          +'<span style="font-size:13px;flex-shrink:0">🎯</span>'
+          +'<span style="font-size:12px;flex:1;color:var(--text)">Bold correct picks <span style="color:var(--muted)">('+myStats.boldWin+' of '+myStats.boldTotal+')</span></span>'
+          +'<span style="font-size:12px;font-weight:700;color:var(--text)">'+boldPct+'%</span>'
+        +'</div>';
         if(safePct!==null){
           insightsHtml+='<div style="display:flex;align-items:center;gap:7px">'
             +'<span style="font-size:13px;flex-shrink:0">🛡️</span>'
-            +'<span style="font-size:12px;flex:1;color:var(--text)">'+(boldPct!==null?'Non-bold correct picks':'Correct picks')+' <span style="color:var(--muted)">('+myStats.safeWin+' of '+myStats.safeTotal+')</span></span>'
+            +'<span style="font-size:12px;flex:1;color:var(--text)">Non-bold correct picks <span style="color:var(--muted)">('+myStats.safeWin+' of '+myStats.safeTotal+')</span></span>'
             +'<span style="font-size:12px;font-weight:700;color:var(--text)">'+safePct+'%</span>'
           +'</div>';
         }
