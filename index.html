@@ -1511,8 +1511,11 @@ function renderLB(){
       const mePctCol=isMe?'#85B7EB':plCol;
       const meAmtCol=isMe?'#85B7EB':'#6a8a6a';
 
+      const rankDisplay=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);
+      const rankSize=i<3?'16px':'13px';
+
       standingsHtml+='<div onclick="showPlayerPopup(\''+esc(u.username)+'\')" style="cursor:pointer;'+meBg+'display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.05)">'
-        +'<div style="font-size:13px;font-weight:600;color:'+rankCol+';width:20px;text-align:center;flex-shrink:0">'+(i+1)+'</div>'
+        +'<div style="font-size:'+rankSize+';font-weight:600;color:'+rankCol+';width:20px;text-align:center;flex-shrink:0">'+rankDisplay+'</div>'
         +'<div style="font-size:13px;'+meName+';flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(u.username)+'</div>'
         +'<div style="width:60px;height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;flex-shrink:0"><div style="height:100%;width:'+barW+'%;background:'+barCol+';border-radius:3px"></div></div>'
         +'<div style="font-size:13px;font-weight:700;color:'+mePctCol+';width:48px;text-align:right;flex-shrink:0">'+(pct>0?'+':'')+pct+'%</div>'
