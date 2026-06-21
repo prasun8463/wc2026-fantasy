@@ -2014,7 +2014,11 @@ function htpClassic(){
 // ════════════════════════════════════════════════════════════════
 function showLeagueWelcome(){
   if(!LEAGUE||!MEMBERS) return;
-  const sorted=[...MEMBERS].sort((a,b)=>plPct(b.spent||0,b.earned||0)-plPct(a.spent||0,a.earned||0));
+  // Sort by live-calculated P/L% (calcRoundStats), not stale MEMBERS.spent/earned
+  const sorted=[...MEMBERS].sort((a,b)=>{
+    const sa=calcRoundStats(a.username).overall, sb=calcRoundStats(b.username).overall;
+    return plPct(sb.bet,sb.won)-plPct(sa.bet,sa.won);
+  });
   const memberCount=MEMBERS.length;
 
   const avatarRow=sorted.slice(0,6).map(u=>{
@@ -2804,7 +2808,13 @@ function getClosingTime(kickoff_ist){
 
 function generateLeaderboardMessage(){
   if(!LEAGUE||!MEMBERS||!MEMBERS.length) return '';
-  const sortedMembers=[...MEMBERS].sort((a,b)=>plPct(b.spent||0,b.earned||0)-plPct(a.spent||0,a.earned||0));
+  // Use calcRoundStats (live recalculation from MATCHES+PREDS) — same source as the
+  // Leaderboard tab — instead of reading MEMBERS.spent/earned directly, which can be
+  // stale if a match settled since the last loadAll().
+  const sortedMembers=[...MEMBERS].sort((a,b)=>{
+    const sa=calcRoundStats(a.username).overall, sb=calcRoundStats(b.username).overall;
+    return plPct(sb.bet,sb.won)-plPct(sa.bet,sa.won);
+  });
   const settledCount=MATCHES.filter(m=>m.resolved).length;
   const totalCount=MATCHES.length;
   const dt=new Date(Date.now()+IST_OFFSET_MS);
@@ -2817,9 +2827,10 @@ function generateLeaderboardMessage(){
 
   const medals=['🥇','🥈','🥉'];
   sortedMembers.forEach((u,i)=>{
-    const bet=u.spent||0;
-    const won=u.earned||0;
-    const pl=won-bet;
+    const s=calcRoundStats(u.username).overall;
+    const bet=s.bet;
+    const won=s.won;
+    const pl=s.pl;
     const pct=plPct(bet,won);
     const showMedal=i<3&&pl>0;
     const rank=showMedal?medals[i]:((i+1)+'.');
