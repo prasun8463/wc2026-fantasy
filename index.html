@@ -352,6 +352,9 @@ let LEAGUE = null;   // current league object
 let MEMBERS = [];    // league member usernames
 let MATCHES = [];    // all matches
 let PREDS = {};      // { match_id: [ {username, pred_home, pred_away} ] }
+// In-memory settle lock — prevents double-settle when catchUpSettle and livePoller
+// fire concurrently on the same match before resolved=true is written to DB.
+const SETTLING = new Set();
 let matchFilter = 'All';
 let matchSubTab = 'upcoming'; // 'upcoming' or 'completed'
 
@@ -3312,9 +3315,14 @@ async function debugCatchUpSettle(){
 }
 
 // ── Admin: ledger reconciliation audit (runs entirely client-side) ──
-function runReconciliationAudit(){
+async function runReconciliationAudit(){
   const el=document.getElementById('audit-result');
   if(!el) return;
+  el.textContent='Refreshing data from DB...\n';
+  // Always reload fresh data before auditing — stale in-memory MATCHES/MEMBERS/PREDS
+  // cause calcEarned to undercount if matches settled since last page load
+  await loadAll();
+  el.textContent='Running audit...\n';
 
   const resolvedMatches=MATCHES.filter(m=>m.resolved);
   let totalIn=0, totalOut=0;
@@ -3837,6 +3845,11 @@ function openAdminSettle(mid){
 async function settleWithScore(mid, h, a){
   if(!LEAGUE||!ME) return;
   const m=MATCHES.find(x=>x.id===mid); if(!m||m.resolved) return;
+  // Acquire in-memory lock — prevents double-settle when catchUpSettle and livePoller
+  // both see resolved=false before either writes resolved=true to the DB
+  if(SETTLING.has(mid)){ console.warn('settleWithScore: already settling '+mid+' — skipped'); return; }
+  SETTLING.add(mid);
+  try{
   const act=outcome(h,a);
   const arr=PREDS[mid]||[];
   const memberNames=MEMBERS.map(u=>u.username);
@@ -3869,6 +3882,9 @@ async function settleWithScore(mid, h, a){
     const betAmt=betFor(m);
     const earnAdd=winnerNames.includes(p.username)?share:0;
     await sb.from('users').update({spent:curSpent+betAmt,earned:curEarned+earnAdd}).eq('username',p.username);
+  }
+  }finally{
+    SETTLING.delete(mid); // always release lock, even if an error occurred
   }
 }
 
