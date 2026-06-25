@@ -416,7 +416,26 @@ function dateKey(d){ // returns numeric MMDD key for sorting/comparison
 
 function plColor(v){ return v>0?'var(--success)':v<0?'var(--red)':'var(--muted)'; }
 // Treat exact_bold as exact for win categorisation/stats purposes
-function isExactType(t){ return t==='exact'||t==='exact_bold'; }
+function isExactType(t){ return t==='exact'||t==='exact_bold'||t==='outcome_bold'; }
+// ── Bold pick limits — 50% of matches per stage, 16 total per player ──
+// R32=8 (of 16), R16=4 (of 8), QF=2 (of 4), SF+Final+3rd share 2 bolds across 3 matches
+function boldLimitForStage(grp){
+  if(grp==='R32') return 8;
+  if(grp==='R16') return 4;
+  if(grp==='QF') return 2;
+  if(grp==='SF'||grp==='Final'||grp==='3rd') return 2; // 2 shared across all three
+  return 1;
+}
+// Returns matches that count toward the same bold pool as the given stage
+function boldPoolMatches(grp){
+  if(grp==='SF'||grp==='Final'||grp==='3rd')
+    return MATCHES.filter(m=>m.grp==='SF'||m.grp==='Final'||m.grp==='3rd');
+  return MATCHES.filter(m=>m.grp===grp);
+}
+function boldStageLabel(grp){
+  if(grp==='SF'||grp==='Final'||grp==='3rd') return 'SF / Final / 3rd';
+  return grp;
+}
 function fmtPL(v){ return (v>0?'+':'')+v; }
 // P/L % = (won - bet) / bet * 100 — fairer ranking metric
 function plPct(bet,won){ if(!bet) return 0; return Math.round((won-bet)/bet*100); }
@@ -810,7 +829,13 @@ function renderMatchList(){
     if(myP&&status==='settled'){
       const won=(m.resolved_winners||[]).includes(ME.username);
       const rc=won&&isExactType(m.resolved_type)?'rt-exact':won&&m.resolved_type==='outcome'?'rt-outcome':m.resolved_type==='refund'&&won?'rt-refund':'rt-wrong';
-      const rl=won&&m.resolved_type==='exact_bold'?'🔥 Bold +₹'+m.resolved_share:won&&m.resolved_type==='exact'?'Exact +₹'+m.resolved_share:won&&m.resolved_type==='outcome'?'Outcome +₹'+m.resolved_share:m.resolved_type==='refund'&&won?'Void ₹'+m.resolved_share:'No win';
+      const boldW2=(won&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold'));
+      const share2=boldW2?(m.resolved_share||0)*2:(m.resolved_share||0);
+      const rl=won&&m.resolved_type==='exact_bold'?'🔥 Bold Exact +₹'+share2
+              :won&&m.resolved_type==='outcome_bold'?'🔥 Bold Outcome +₹'+share2
+              :won&&m.resolved_type==='exact'?'Exact +₹'+share2
+              :won&&m.resolved_type==='outcome'?'Outcome +₹'+share2
+              :m.resolved_type==='refund'&&won?'Void ₹'+(m.resolved_share||0):'No win';
       pickBadge=`<span class="rtag ${rc}" style="font-size:9px;margin-left:4px">${rl}</span>`;
     } else if(myP){
       pickBadge=`<span class="badge b-green" style="font-size:9px;padding:1px 6px;margin-left:4px">Predicted</span>`;
@@ -1086,7 +1111,13 @@ function openMatchSheet(mid){
     if(status==='settled'){
       const won=(m.resolved_winners||[]).includes(ME.username);
       const rc=won&&m.resolved_type==='exact'?'rt-exact':won&&(m.resolved_type==='outcome')?'rt-outcome':m.resolved_type==='refund'&&won?'rt-refund':won&&m.resolved_type==='exact_bold'?'rt-exact':'rt-wrong';
-      const rl=won&&m.resolved_type==='exact'?'Exact! +₹'+m.resolved_share:won&&m.resolved_type==='exact_bold'?'🔥 Bold Exact! +₹'+m.resolved_share:won&&m.resolved_type==='outcome'?'Outcome +₹'+m.resolved_share:m.resolved_type==='refund'&&won?'Void ₹'+m.resolved_share:'No win';
+      const boldW3=(won&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold'));
+      const share3=boldW3?(m.resolved_share||0)*2:(m.resolved_share||0);
+      const rl=won&&m.resolved_type==='exact'?'Exact! +₹'+share3
+              :won&&m.resolved_type==='exact_bold'?'🔥 Bold Exact! +₹'+share3
+              :won&&m.resolved_type==='outcome_bold'?'🔥 Bold Outcome! +₹'+share3
+              :won&&m.resolved_type==='outcome'?'Outcome +₹'+share3
+              :m.resolved_type==='refund'&&won?'Void ₹'+(m.resolved_share||0):'No win';
       const boldBadge=myP.bold?'<span style="font-size:10px;color:var(--gold);font-weight:700;margin-left:6px;background:rgba(255,200,48,.12);border:1px solid rgba(255,200,48,.4);border-radius:4px;padding:1px 6px;vertical-align:middle">🔥 BOLD</span>':'';
       html+=`<div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
         <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">Your prediction</div>
@@ -1151,25 +1182,28 @@ function openMatchSheet(mid){
     // ── Bold Pick (knockouts only) ──
     let boldStripHtml='';
     if(isKnockout(m)){
-      const stageGrps=m.grp==='SF'||m.grp==='Final'||m.grp==='3rd'?['SF','Final','3rd']:[m.grp];
-      const myBoldsInStage=stageGrps.flatMap(g=>MATCHES.filter(x=>x.grp===g)).reduce((cnt,mm)=>{
-        if(mm.id===mid) return cnt; // exclude current match (we may be editing it)
+      const boldLimit=boldLimitForStage(m.grp);
+      const stageLabel=boldStageLabel(m.grp);
+      const myBoldsInStage=boldPoolMatches(m.grp).reduce((cnt,mm)=>{
+        if(mm.id===mid) return cnt; // exclude current match
         const myPick=(PREDS[mm.id]||[]).find(p=>p.username===ME.username&&p.bold===true);
         return myPick?cnt+1:cnt;
       },0);
       const isCurrentBold=isEditing&&myP&&myP.bold===true;
-      const canBold=myBoldsInStage<1; // 1 bold per stage
-      const stageLabel=m.grp==='SF'||m.grp==='Final'||m.grp==='3rd'?'SF/Final':m.grp;
-      const statusLine=isCurrentBold?'currently your bold for this stage':canBold?'1 bold available this stage':'already used this stage';
-      boldStripHtml=`<div style="background:rgba(255,200,48,.04);border:1px solid rgba(255,200,48,.18);border-radius:8px;padding:10px 12px;margin-bottom:10px">
-        <label style="display:flex;align-items:flex-start;gap:9px;cursor:${(canBold||isCurrentBold)?'pointer':'not-allowed'};opacity:${(canBold||isCurrentBold)?'1':'.55'}">
-          <input type="checkbox" id="sh_bold_${mid}" ${isCurrentBold?'checked':''} ${(canBold||isCurrentBold)?'':'disabled'} style="margin-top:2px;width:16px;height:16px;accent-color:var(--gold)" />
-          <div style="flex:1">
-            <div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:2px">🔥 Bold Pick · ${stageLabel} <span style="font-weight:400;color:var(--muted);font-size:11px">(${statusLine})</span></div>
-            <div style="font-size:11px;color:var(--muted);line-height:1.5">If your exact score wins, you take the whole pot — no splitting with other exact pickers. Loss is unchanged. One bold per stage.</div>
-          </div>
-        </label>
-      </div>`;
+      const canBold=myBoldsInStage<boldLimit;
+      const boldsRemaining=boldLimit-myBoldsInStage+(isCurrentBold?1:0);
+      const statusLine=isCurrentBold
+        ?'🔥 this is your bold · '+boldsRemaining+' of '+boldLimit+' remaining'
+        :canBold
+          ?boldsRemaining+' of '+boldLimit+' bold'+(boldLimit>1?'s':'')+' remaining for '+stageLabel
+          :'all '+boldLimit+' bolds used for '+stageLabel;
+      boldStripHtml='<div style="background:rgba(255,200,48,.04);border:1px solid rgba(255,200,48,.18);border-radius:8px;padding:10px 12px;margin-bottom:10px">'
+        +'<label style="display:flex;align-items:flex-start;gap:9px;cursor:'+(canBold||isCurrentBold?'pointer':'not-allowed')+';opacity:'+(canBold||isCurrentBold?'1':'.55')+'">'
+        +'<input type="checkbox" id="sh_bold_'+mid+'" '+(isCurrentBold?'checked ':'')+((canBold||isCurrentBold)?'':'disabled ')+' style="margin-top:2px;width:16px;height:16px;accent-color:var(--gold)" />'
+        +'<div style="flex:1">'
+        +'<div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:2px">🔥 Bold Pick · '+stageLabel+' <span style="font-weight:400;color:var(--muted);font-size:11px">('+statusLine+')</span></div>'
+        +'<div style="font-size:11px;color:var(--muted);line-height:1.5">Bold picks earn 2× payout — exact score bolds first, then outcome bolds if no exact winners. '+boldLimit+' bold'+(boldLimit>1?'s':'')+' available for '+stageLabel+'.</div>'
+        +'</div></label></div>';
     }
 
     html+=`<div style="background:rgba(255,200,48,.06);border:1px solid rgba(255,200,48,.25);border-radius:10px;padding:14px;margin-bottom:10px">
@@ -1243,13 +1277,16 @@ async function submitPredFromSheet(mid){
   const isBold=!!(boldEl&&boldEl.checked);
   // Defense in depth: re-validate stage limit before insert
   if(isBold&&m){
-    const stageGrps=m.grp==='SF'||m.grp==='Final'||m.grp==='3rd'?['SF','Final','3rd']:[m.grp];
-    const existingBoldsInStage=stageGrps.flatMap(g=>MATCHES.filter(x=>x.grp===g)).reduce((cnt,mm)=>{
+    const boldLimitSV=boldLimitForStage(m.grp);
+    const existingBoldsInStage=boldPoolMatches(m.grp).reduce((cnt,mm)=>{
       if(mm.id===mid) return cnt;
       const myPick=(PREDS[mm.id]||[]).find(p=>p.username===ME.username&&p.bold===true);
       return myPick?cnt+1:cnt;
     },0);
-    if(existingBoldsInStage>=1){toast('You\u2019ve already used your Bold Pick this stage');return;}
+    if(existingBoldsInStage>=boldLimitSV){
+      toast('You\u2019ve used all '+boldLimitSV+' bolds for '+boldStageLabel(m.grp));
+      return;
+    }
   }
   // delete existing prediction first (if any), then insert fresh
   // this avoids upsert RLS issues — delete+insert works with standard policies
@@ -2209,34 +2246,35 @@ function _boldAnnouncementHtml(){
   <div style="background:linear-gradient(135deg,rgba(255,200,48,.12),rgba(255,200,48,.03));border:1px solid rgba(255,200,48,.4);border-radius:12px;padding:18px;margin-bottom:14px;text-align:center">
     <div style="font-size:42px;margin-bottom:6px">🔥</div>
     <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:4px">Bold Pick has unlocked</div>
-    <div style="font-size:12px;color:var(--muted)">Knockout stages only · One per stage</div>
+    <div style="font-size:12px;color:var(--muted)">Knockout stages only · 8→4→2→1 bolds per stage</div>
   </div>
 
   <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px">How it works</div>
   <div style="font-size:13px;line-height:1.7;color:var(--muted);margin-bottom:14px">
-    On any knockout match, you can mark your prediction as a <strong style="color:var(--gold)">Bold Pick</strong>. If your <strong style="color:var(--text)">exact score</strong> wins, you take the <strong style="color:var(--text)">whole pot</strong> — no splitting with other exact pickers. If you miss, your loss is unchanged.
+    On any knockout match, mark your prediction as a <strong style="color:var(--gold)">Bold Pick</strong> to earn <strong style="color:var(--text)">2× the payout</strong>. Bold picks earn double shares of the pot — exact score bolds first, then outcome bolds. Everyone who's right still earns something. Loss is unchanged.
   </div>
 
   <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px">
     <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px">Example</div>
     <div style="font-size:11px;line-height:1.7;color:var(--muted)">
       Brazil vs France · 4 players × ₹500 = ₹2,000 pot.<br>
-      You go <strong style="color:var(--gold)">🔥 Bold</strong> on 2-1. test1 also picks 2-1 (no bold).<br>
-      Result: <strong style="color:var(--text)">2-1</strong> → <strong style="color:var(--success)">You take the full ₹2,000</strong>. test1 gets ₹0.<br>
-      <span style="opacity:.7">Without bold, you'd have split: ₹1,000 each.</span>
+      You go <strong style="color:var(--gold)">🔥 Bold</strong> on 2-1. Player B picks 2-1 (no bold).<br>
+      Total shares: you=2, Player B=1 → share value=₹667. <strong style="color:var(--success)">You get ₹1,334 (2×)</strong>, Player B gets ₹666.<br>
+      <span style="opacity:.7">Without bold: you'd both get ₹1,000 each.</span>
     </div>
   </div>
 
-  <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px">The catch</div>
+  <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px">The rules</div>
   <ul style="font-size:13px;line-height:1.8;color:var(--muted);padding-left:20px;margin-bottom:14px">
-    <li><strong style="color:var(--text)">One bold per stage</strong> — R32, R16, QF, SF/Final</li>
-    <li>If multiple players bold the same exact score, they split — bolds compete first</li>
-    <li>Outcome wins (right team, wrong score) ignore the bold flag entirely</li>
-    <li>Pick the match where you're most confident in the <em>exact score</em>, not just the winner</li>
+    <li><strong style="color:var(--text)">Bold limits</strong> — R32: 8 · R16: 4 · QF: 2 · SF+Final+3rd: 2 shared · Total: 16</li>
+    <li><strong style="color:var(--text)">2× payout</strong> — bold winners earn double the per-share payout. Everyone who's right still gets something</li>
+    <li><strong style="color:var(--text)">Outcome bolds count too</strong> — if nobody gets exact score, bold outcome pickers earn 2× vs non-bold outcome pickers</li>
+    <li>If multiple players bold the same match, bolds compete among themselves first</li>
+    <li>Loss is unchanged whether you bold or not — bold only affects upside</li>
   </ul>
 
   <div style="background:rgba(74,158,255,.06);border:1px solid rgba(74,158,255,.2);border-radius:8px;padding:11px 13px;font-size:12px;color:var(--muted)">
-    💡 <strong style="color:var(--text)">Strategy tip</strong> — save your bold for the match where you have a strong gut feeling on a specific score that others might miss. A 3-2 or 2-1 in a tight QF is more likely to be uniquely yours than an obvious 1-0.
+    💡 <strong style="color:var(--text)">Strategy tip</strong> — bold when you feel strongly about an exact score AND think others might miss it. A unique 2-1 in a QF earns you double vs splitting. If others bold the same score, bolds split among themselves at 2× — still better than non-bold.
   </div>
   `;
 }
@@ -3858,29 +3896,57 @@ async function settleWithScore(mid, h, a){
   const exact=parts.filter(p=>p.pred_home===h&&p.pred_away===a);
   const outW=parts.filter(p=>outcome(p.pred_home,p.pred_away)===act);
   const allSame=parts.length>0&&parts.every(p=>outcome(p.pred_home,p.pred_away)===act);
-  let winners,winType;
-  if(exact.length){
-    // Bold Option C: if any exact picker went bold, only bolds split the pot
-    const exactBold=exact.filter(p=>p.bold===true);
-    winners=exactBold.length?exactBold:exact;
-    winType=exactBold.length?'exact_bold':'exact';
+
+  // ── 2× Multiplier payout model ──────────────────────────────────────
+  // Priority: exact winners first, then outcome winners (if not all-same), else refund.
+  // Within winning tier: bold pickers earn 2 shares, non-bold earn 1 share.
+  // shareVal = floor(pot / totalShares); bold gets 2×shareVal, non-bold gets 1×shareVal.
+  // Rounding remainder credited to first bold winner (or first winner if no bolds).
+  function applyMultiplier(pool){
+    const boldW=pool.filter(p=>p.bold===true);
+    const nonBoldW=pool.filter(p=>!p.bold);
+    const totalShares=boldW.length*2+nonBoldW.length;
+    const sv=totalShares>0?Math.floor(pot/totalShares):0;
+    const rem=totalShares>0?pot-(sv*totalShares):0;
+    const remTo=(boldW[0]||pool[0])?.username||null;
+    return {boldW,nonBoldW,sv,rem,remTo};
   }
-  else if(!allSame&&outW.length){winners=outW;winType='outcome';}
-  else{winners=parts;winType='refund';}
-  const share=parts.length?Math.round(pot/winners.length):0;
-  const winnerNames=winners.map(p=>p.username);
+
+  let winType,winPool,sv,rem,remTo,boldW,nonBoldW;
+  if(exact.length){
+    const r=applyMultiplier(exact);
+    winType=r.boldW.length?'exact_bold':'exact';
+    winPool=exact; sv=r.sv; rem=r.rem; remTo=r.remTo; boldW=r.boldW; nonBoldW=r.nonBoldW;
+  } else if(!allSame&&outW.length){
+    const r=applyMultiplier(outW);
+    winType=r.boldW.length?'outcome_bold':'outcome';
+    winPool=outW; sv=r.sv; rem=r.rem; remTo=r.remTo; boldW=r.boldW; nonBoldW=r.nonBoldW;
+  } else {
+    // Refund — everyone gets their bet back
+    winType='refund'; winPool=parts; sv=betFor(m); rem=0; remTo=null; boldW=[]; nonBoldW=parts;
+  }
+
+  const winnerNames=winPool.map(p=>p.username);
+  // resolved_share stores the 1-share base value; bold winners earn 2× on payout
+  const share=winType==='refund'?sv:sv;
   await sb.from('matches').update({
     result_home:h,result_away:a,resolved:true,
     resolved_pot:pot,resolved_share:share,resolved_type:winType,
     resolved_winners:winnerNames
   }).eq('id',mid);
   for(const p of parts){
-    // Fetch FRESH values from DB — not stale MEMBERS (prevents race condition when settling multiple matches)
     const {data:freshUser}=await sb.from('users').select('earned,spent').eq('username',p.username).single();
     const curEarned=freshUser?.earned||0;
     const curSpent=freshUser?.spent||0;
     const betAmt=betFor(m);
-    const earnAdd=winnerNames.includes(p.username)?share:0;
+    let earnAdd=0;
+    if(winType==='refund'){
+      earnAdd=sv; // everyone gets bet back
+    } else if(winnerNames.includes(p.username)){
+      const isBoldW=boldW.some(b=>b.username===p.username);
+      earnAdd=isBoldW?sv*2:sv;
+      if(p.username===remTo) earnAdd+=rem; // rounding remainder to first bold winner
+    }
     await sb.from('users').update({spent:curSpent+betAmt,earned:curEarned+earnAdd}).eq('username',p.username);
   }
   }finally{
@@ -3905,19 +3971,40 @@ async function settle(mid){
   const exact=parts.filter(p=>p.pred_home===h&&p.pred_away===a);
   const outW=parts.filter(p=>outcome(p.pred_home,p.pred_away)===act);
   const allSame=parts.length>0&&parts.every(p=>outcome(p.pred_home,p.pred_away)===act);
-  let winners,winType;
-  if(exact.length){
-    // Bold Option C: if any exact picker went bold, only bolds split
-    const exactBold=exact.filter(p=>p.bold===true);
-    winners=exactBold.length?exactBold:exact;
-    winType=exactBold.length?'exact_bold':'exact';
-  }
-  else if(!allSame&&outW.length){winners=outW;winType='outcome';}
-  else{winners=parts;winType='refund';}
-  const share=parts.length?Math.round(pot/winners.length):0;
 
+  // ── 2× Multiplier payout model ──────────────────────────────────────
+  // Priority: exact winners first, then outcome winners (if not all-same), else refund.
+  // Within winning tier: bold pickers earn 2 shares, non-bold earn 1 share.
+  // shareVal = floor(pot / totalShares); bold gets 2×shareVal, non-bold gets 1×shareVal.
+  // Rounding remainder credited to first bold winner (or first winner if no bolds).
+  function applyMultiplier(pool){
+    const boldW=pool.filter(p=>p.bold===true);
+    const nonBoldW=pool.filter(p=>!p.bold);
+    const totalShares=boldW.length*2+nonBoldW.length;
+    const sv=totalShares>0?Math.floor(pot/totalShares):0;
+    const rem=totalShares>0?pot-(sv*totalShares):0;
+    const remTo=(boldW[0]||pool[0])?.username||null;
+    return {boldW,nonBoldW,sv,rem,remTo};
+  }
+
+  let winType,winPool,sv,rem,remTo,boldW,nonBoldW;
+  if(exact.length){
+    const r=applyMultiplier(exact);
+    winType=r.boldW.length?'exact_bold':'exact';
+    winPool=exact; sv=r.sv; rem=r.rem; remTo=r.remTo; boldW=r.boldW; nonBoldW=r.nonBoldW;
+  } else if(!allSame&&outW.length){
+    const r=applyMultiplier(outW);
+    winType=r.boldW.length?'outcome_bold':'outcome';
+    winPool=outW; sv=r.sv; rem=r.rem; remTo=r.remTo; boldW=r.boldW; nonBoldW=r.nonBoldW;
+  } else {
+    // Refund — everyone gets their bet back
+    winType='refund'; winPool=parts; sv=betFor(m); rem=0; remTo=null; boldW=[]; nonBoldW=parts;
+  }
+
+  const winnerNames=winPool.map(p=>p.username);
+  // resolved_share stores the 1-share base value; bold winners earn 2× on payout
+  const share=winType==='refund'?sv:sv;
   // Update match in DB
-  const winnerNames=winners.map(p=>p.username);
   await sb.from('matches').update({
     result_home:h, result_away:a, resolved:true,
     resolved_pot:pot, resolved_share:share, resolved_type:winType,
@@ -3929,7 +4016,14 @@ async function settle(mid){
     const {data:freshUser}=await sb.from('users').select('earned,spent').eq('username',p.username).single();
     const curEarned=freshUser?.earned||0;
     const curSpent=freshUser?.spent||0;
-    const earnAdd=winnerNames.includes(p.username)?share:0;
+    let earnAdd=0;
+    if(winType==='refund'){
+      earnAdd=sv;
+    } else if(winnerNames.includes(p.username)){
+      const isBoldW=boldW.some(b=>b.username===p.username);
+      earnAdd=isBoldW?sv*2:sv;
+      if(p.username===remTo) earnAdd+=rem;
+    }
     const betAmt=betFor(m);
     await sb.from('users').update({spent:curSpent+betAmt, earned:curEarned+earnAdd}).eq('username',p.username);
   }
