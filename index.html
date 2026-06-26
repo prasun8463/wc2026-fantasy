@@ -2616,19 +2616,6 @@ async function renderGroups(){
       return {name:t.name, flag:FLAGS[t.name]||'🏳️'};
     }
 
-    // Get the best 4 third-place teams across all groups (provisional until Jun 27)
-    function getBest3rdTeams(){
-      const thirds=[];
-      Object.keys(GROUP_TEAMS).forEach(grp=>{
-        const st=getGroupStandings(grp, GROUP_TEAMS[grp]);
-        const t=st[2]; // 3rd place in group
-        if(t&&t.mp>0) thirds.push({...t,grp});
-      });
-      // FIFA tiebreaker for best 3rd: pts → gd → gf → alphabetical
-      thirds.sort((a,b)=>b.pts-a.pts||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf||a.name.localeCompare(b.name));
-      return thirds.slice(0,4); // top 4 go through
-    }
-
     function slotHTML(label){
       const parts = label.split(' ');
       const pos = parts[0]==='1st'?1:parts[0]==='2nd'?2:parts[0]==='3rd'?3:null;
@@ -2738,31 +2725,46 @@ async function renderGroups(){
 
     </div></div>`;
 
+  } // end if(activeFilter==='All')
+
     // ── Best 3rd place teams (provisional until all groups finish) ──
-    const best3rds=getBest3rdTeams();
+    const all3rds=[];
+    Object.keys(GROUP_TEAMS).forEach(grp=>{
+      const st=getGroupStandings(grp, GROUP_TEAMS[grp]);
+      const t=st[2];
+      if(t&&t.mp>0) all3rds.push({...t,grp});
+    });
+    all3rds.sort((a,b)=>b.pts-a.pts||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf||a.name.localeCompare(b.name));
+    const best3rds=all3rds;
+
     if(best3rds.length>0){
       const allGroupsDone=Object.keys(GROUP_TEAMS).every(g=>{
         const st=getGroupStandings(g,GROUP_TEAMS[g]);
         return st[0]&&st[0].mp>=3;
       });
-      html+=`<div class="sec" style="margin-top:16px">Best 3rd place teams ${allGroupsDone?'(confirmed)':'(provisional — updates after Jun 27)'}</div>
+      html+=`<div class="sec" style="margin-top:16px">Best 3rd place teams ${allGroupsDone?'(confirmed)':'(provisional — finalised Jun 27)'}</div>
       <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:16px">
-        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Top 4 of 12 third-placed teams qualify for R32. Ranked by pts → goal diff → goals scored.</div>`;
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Top 4 of ${best3rds.length} third-placed teams qualify for R32. Ranked by pts → goal diff → goals scored.</div>`;
       best3rds.forEach((t,i)=>{
         const flag=FLAGS[t.name]||'🏳️';
         const gd=t.gf-t.ga;
-        html+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:${i<best3rds.length-1?'1px solid rgba(255,255,255,.05)':'none'}">
-          <span style="font-size:12px;color:var(--muted);width:16px;text-align:center">${i+1}</span>
-          <span style="font-size:14px">${flag}</span>
-          <span style="font-size:13px;font-weight:600;color:var(--text);flex:1">${t.name}</span>
+        const qualifies=i<4;
+        const isOnBubble=i===3;
+        // Divider line after position 4
+        const afterFour=i===4?`<div style="border-top:1px dashed rgba(255,200,48,.3);margin:6px 0;font-size:9px;color:var(--muted);text-align:center;padding-top:4px">— eliminated below this line —</div>`:'';
+        html+=afterFour+`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:${i<best3rds.length-1?'1px solid rgba(255,255,255,.04)':'none'};opacity:${qualifies?'1':'.55'}">
+          <span style="font-size:11px;color:${qualifies?'var(--success)':'var(--muted)'};width:16px;text-align:center;font-weight:${qualifies?700:400}">${i+1}</span>
+          <span style="font-size:13px">${flag}</span>
+          <span style="font-size:12px;font-weight:${qualifies?600:400};color:${qualifies?'var(--text)':'var(--muted)'};flex:1">${t.name}</span>
           <span style="font-size:11px;color:var(--muted)">Grp ${t.grp}</span>
-          <span style="font-size:12px;color:var(--success);font-weight:600;width:28px;text-align:right">${t.pts}pts</span>
-          <span style="font-size:11px;color:var(--muted);width:36px;text-align:right">${gd>=0?'+':''}${gd} GD</span>
+          <span style="font-size:12px;color:${qualifies?'var(--success)':'var(--muted)'};font-weight:600;width:28px;text-align:right">${t.pts}pts</span>
+          <span style="font-size:11px;color:var(--muted);width:36px;text-align:right">${gd>=0?'+':''}${gd}</span>
         </div>`;
       });
       html+=`</div>`;
     }
     // ── GROUP TABLE VIEW ──
+    if(activeFilter!=='All'){
     const teams = GROUP_TEAMS[activeFilter];
     if(!teams){ html+=`<div class="empty">Unknown group.</div>`; }
     else {
@@ -2804,7 +2806,7 @@ async function renderGroups(){
       if(!hasGames) html+=`<div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:10px">No matches played yet</div>`;
       else html+=`<div style="font-size:10px;color:var(--muted);margin-bottom:10px"><span style="color:var(--success)">■</span> Qualified &nbsp; <span style="color:var(--info)">■</span> 3rd (may advance)</div>`;
     }
-  }
+    } // end if(activeFilter!=='All')
 
   el.innerHTML = html;
 }
