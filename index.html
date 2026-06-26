@@ -1066,15 +1066,16 @@ function openMatchSheet(mid){
   const arr=PREDS[mid]||[];
   const myP=arr.find(p=>p.username===ME.username);
   const pot=arr.length*betFor(m);
-  const status=matchStatus(m); // 'open'|'inprogress'|'settled'|'future'
+  const status=matchStatus(m); // 'open'|'inprogress'|'live'|'finished'|'settled'|'future'
+  const isLiveOrProgress=status==='inprogress'||status==='live'||status==='finished';
   const canPredict=status==='open'&&!myP;
-  const showOtherPreds=status==='settled'||status==='inprogress'||status==='finished'; // reveal during live play
+  const showOtherPreds=status==='settled'||isLiveOrProgress; // reveal during live play
 
   document.getElementById('ms-title').textContent=m.home+' vs '+m.away;
 
   let statusBadge='';
   if(status==='open') statusBadge=`<span class="badge b-green" style="margin-left:8px;font-size:11px">Open to predict</span>`;
-  else if(status==='inprogress') statusBadge=`<span class="badge b-inprogress" style="margin-left:8px;font-size:11px">In progress</span>`;
+  else if(isLiveOrProgress) statusBadge=`<span class="badge b-inprogress" style="margin-left:8px;font-size:11px">${status==='finished'?'FT · Settling':'In progress'}</span>`;
   else if(status==='future') statusBadge=`<span class="badge b-future" style="margin-left:8px;font-size:11px">${m.kickoff_ist||'TBD'} IST</span>`;
 
   let html=`<div style="font-size:12px;color:var(--muted);margin-bottom:12px;display:flex;align-items:center">
@@ -1087,10 +1088,13 @@ function openMatchSheet(mid){
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${m.home_flag} ${m.home} &nbsp;vs&nbsp; ${m.away} ${m.away_flag}</div>
       <div style="font-size:30px;font-weight:700;color:var(--gold)">${m.result_home} – ${m.result_away}</div>
     </div>`;
-  } else if(status==='inprogress'){
+  } else if(isLiveOrProgress){
+    const live=liveDataFor(m);
+    const liveScore=live&&live.home!=null?live.home+' – '+live.away:null;
     html+=`<div style="text-align:center;padding:12px;background:rgba(232,160,23,.08);border:1px solid rgba(232,160,23,.25);border-radius:10px;margin-bottom:12px">
       <div style="font-size:13px;color:var(--warn);font-weight:600">${m.home_flag} ${m.home} vs ${m.away} ${m.away_flag}</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:4px">Match in progress — result will be updated soon</div>
+      ${liveScore?`<div style="font-size:26px;font-weight:700;color:var(--gold);margin:4px 0">${liveScore}</div>`:''}
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">${status==='finished'?'Full time — settling soon':'Match in progress'}</div>
     </div>`;
   } else {
     html+=`<div style="text-align:center;padding:12px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;margin-bottom:12px">
@@ -2612,16 +2616,42 @@ async function renderGroups(){
       return {name:t.name, flag:FLAGS[t.name]||'🏳️'};
     }
 
+    // Get the best 4 third-place teams across all groups (provisional until Jun 27)
+    function getBest3rdTeams(){
+      const thirds=[];
+      Object.keys(GROUP_TEAMS).forEach(grp=>{
+        const st=getGroupStandings(grp, GROUP_TEAMS[grp]);
+        const t=st[2]; // 3rd place in group
+        if(t&&t.mp>0) thirds.push({...t,grp});
+      });
+      // FIFA tiebreaker for best 3rd: pts → gd → gf → alphabetical
+      thirds.sort((a,b)=>b.pts-a.pts||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf||a.name.localeCompare(b.name));
+      return thirds.slice(0,4); // top 4 go through
+    }
+
     function slotHTML(label){
       const parts = label.split(' ');
-      const pos = parts[0]==='1st'?1:parts[0]==='2nd'?2:null;
+      const pos = parts[0]==='1st'?1:parts[0]==='2nd'?2:parts[0]==='3rd'?3:null;
       const grpLetter = parts[1]==='Group'?parts[2]:null;
       let team = null;
       if(pos && grpLetter) team = getTop(grpLetter, pos);
+
       const isBest3rd = label==='Best 3rd place';
+      if(isBest3rd){
+        // Show provisionally — label as "Best 3rd (TBC)" until all groups finish
+        const groupsDone=Object.keys(GROUP_TEAMS).every(g=>{
+          const st=getGroupStandings(g,GROUP_TEAMS[g]);
+          return st[0]&&st[0].mp>=3;
+        });
+        return `<div style="display:flex;align-items:center;gap:4px;padding:2px 0">
+          <span style="font-size:11px;width:15px;flex-shrink:0"></span>
+          <span style="font-size:10px;color:#4a6a4a;font-style:italic">${groupsDone?'Best 3rd (confirmed)':'Best 3rd (TBC Jun 27)'}</span>
+        </div>`;
+      }
+
       const flag = team?(FLAGS[team.name]||'🏳️'):'';
       const name = team?team.name:label;
-      const nameColor = team?'var(--text)':isBest3rd?'#4a6a4a':'var(--muted)';
+      const nameColor = team?'var(--text)':'var(--muted)';
       return `<div style="display:flex;align-items:center;gap:4px;padding:2px 0">
         <span style="font-size:11px;width:15px;flex-shrink:0">${flag}</span>
         <span style="font-size:10px;font-weight:${team?600:400};color:${nameColor};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
@@ -2708,7 +2738,30 @@ async function renderGroups(){
 
     </div></div>`;
 
-  } else {
+    // ── Best 3rd place teams (provisional until all groups finish) ──
+    const best3rds=getBest3rdTeams();
+    if(best3rds.length>0){
+      const allGroupsDone=Object.keys(GROUP_TEAMS).every(g=>{
+        const st=getGroupStandings(g,GROUP_TEAMS[g]);
+        return st[0]&&st[0].mp>=3;
+      });
+      html+=`<div class="sec" style="margin-top:16px">Best 3rd place teams ${allGroupsDone?'(confirmed)':'(provisional — updates after Jun 27)'}</div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:16px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Top 4 of 12 third-placed teams qualify for R32. Ranked by pts → goal diff → goals scored.</div>`;
+      best3rds.forEach((t,i)=>{
+        const flag=FLAGS[t.name]||'🏳️';
+        const gd=t.gf-t.ga;
+        html+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:${i<best3rds.length-1?'1px solid rgba(255,255,255,.05)':'none'}">
+          <span style="font-size:12px;color:var(--muted);width:16px;text-align:center">${i+1}</span>
+          <span style="font-size:14px">${flag}</span>
+          <span style="font-size:13px;font-weight:600;color:var(--text);flex:1">${t.name}</span>
+          <span style="font-size:11px;color:var(--muted)">Grp ${t.grp}</span>
+          <span style="font-size:12px;color:var(--success);font-weight:600;width:28px;text-align:right">${t.pts}pts</span>
+          <span style="font-size:11px;color:var(--muted);width:36px;text-align:right">${gd>=0?'+':''}${gd} GD</span>
+        </div>`;
+      });
+      html+=`</div>`;
+    }
     // ── GROUP TABLE VIEW ──
     const teams = GROUP_TEAMS[activeFilter];
     if(!teams){ html+=`<div class="empty">Unknown group.</div>`; }
