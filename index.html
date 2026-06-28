@@ -3230,65 +3230,69 @@ function generateLeaderboardMessage(){
 
 function generateStageBreakdownMessage(){
   if(!LEAGUE||!MEMBERS||!MEMBERS.length) return '';
-  // Sort by P/L% to match leaderboard ranking
   const sortedMembers=[...MEMBERS].sort((a,b)=>{
     const sa=calcRoundStats(a.username).overall, sb=calcRoundStats(b.username).overall;
     return plPct(sb.bet,sb.won)-plPct(sa.bet,sa.won);
   });
   const settledCount=MATCHES.filter(m=>m.resolved).length;
+  const totalCount=MATCHES.length;
   const dt=new Date(Date.now()+IST_OFFSET_MS);
   const dStr=MONTH_NAMES[dt.getUTCMonth()]+' '+dt.getUTCDate();
 
-  // Find which stages have activity
+  // Only show stages that have at least one settled match
   const activeStages=ROUND_DEFS.filter(r=>MATCHES.some(m=>r.grps.includes(m.grp)&&m.resolved));
 
-  let msg='📊 *Stage P/L Breakdown*\n';
-  msg+='_'+LEAGUE.name+' · '+dStr+'_\n';
-  msg+='_'+settledCount+' matches settled_\n\n';
+  let msg='🏆 *'+LEAGUE.name+'*\n';
+  msg+=dStr+' · _'+settledCount+' of '+totalCount+' matches settled_\n\n';
 
   // Use monospace block for alignment
   msg+='```\n';
 
-  // Column widths
-  const nameW=13;
-  const stgW=8;
+  // Column widths — name col wider, stage cols compact
+  const nameW=12;
+  const stgW=6;
+  const totW=8;
+  const pctW=7;
 
-  // Header
+  // Header row
   let hdr='Player'.padEnd(nameW);
   activeStages.forEach(r=>{
-    const lbl=r.key==='group'?'Grp':r.key==='sf'?'SF/F':r.key.toUpperCase();
+    const lbl=r.key==='group'?'Grp':r.key==='sf'?'SF':r.key.toUpperCase();
     hdr+=lbl.padStart(stgW);
   });
-  hdr+='P/L%'.padStart(stgW);
+  hdr+='Total'.padStart(totW);
+  hdr+='P/L%'.padStart(pctW);
   msg+=hdr+'\n';
   msg+='─'.repeat(hdr.length)+'\n';
 
-  // Rows with medals for top 3 in profit
+  // Player rows — sorted by P/L%
   const medals=['🥇','🥈','🥉'];
   let rank=0;
   sortedMembers.forEach((u,i)=>{
     const s=calcRoundStats(u.username);
-    const hasAny=s.overall.bet>0;
-    if(!hasAny) return;
-
+    if(s.overall.bet===0) return;
     rank++;
     const pct=plPct(s.overall.bet,s.overall.won);
-    const medal=rank<=3&&s.overall.pl>0?medals[rank-1]:(rank+'.');
-    // Medal takes 2 chars, name gets remaining space
+    const pl=s.overall.pl;
+    const medal=rank<=3&&pl>0?medals[rank-1]:(rank+'.');
+    // Truncate name to fit
     let name=u.username;
     const prefix=medal+' ';
-    const available=nameW-prefix.length;
-    if(name.length>available) name=name.slice(0,available-1)+'…';
+    const avail=nameW-prefix.length;
+    if(name.length>avail) name=name.slice(0,avail-1)+'…';
     let row=(prefix+name).padEnd(nameW);
-
+    // Stage P/L columns
     activeStages.forEach(r=>{
-      const pl=s[r.key]?.pl||0;
-      const plStr=pl>0?'+'+pl:pl===0?'—':''+pl;
-      row+=plStr.padStart(stgW);
+      const stagePl=s[r.key]?.pl||0;
+      const stgStr=stagePl>0?'+'+stagePl:stagePl===0?'—':''+stagePl;
+      row+=stgStr.padStart(stgW);
     });
-
+    // Total absolute P/L
+    const totStr=pl>0?'+₹'+pl:pl<0?'-₹'+Math.abs(pl):'₹0';
+    row+=totStr.padStart(totW);
+    // P/L%
     const pctStr=pct>0?'+'+pct+'%':pct===0?'0%':pct+'%';
-    row+=pctStr.padStart(stgW);
+    row+=pctStr.padStart(pctW);
     msg+=row+'\n';
   });
 
@@ -3710,28 +3714,14 @@ function renderAdmin(){
   const anyUnlocked=!groupLocked||!r32Locked||!r16Locked||!qfLocked||!sfLocked;
 
   // ── Leaderboard share section ──
-  const lbPreviewMsg=generateLeaderboardMessage();
-  const lbShareHtml=`
-    <div class="sec">Share leaderboard</div>
-    <div class="card" style="margin-bottom:4px">
-      <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Post current standings to your WhatsApp group</div>
-      <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:13px;line-height:1.7;color:var(--text);font-family:monospace;white-space:pre-wrap;margin-bottom:12px;max-height:280px;overflow-y:auto">${esc(lbPreviewMsg).replace(/\*([^*]+)\*/g,'<strong>$1</strong>').replace(/_([^_]+)_/g,'<em style="opacity:.75">$1</em>')}</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-gold" onclick="shareLeaderboardWhatsApp()" style="width:auto;padding:10px 20px;font-size:14px;touch-action:manipulation">
-          📲 Open in WhatsApp
-        </button>
-        <button onclick="copyLeaderboard()" style="background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;padding:10px 18px;cursor:pointer;font-weight:600;touch-action:manipulation">
-          📋 Copy
-        </button>
-      </div>
-    </div>`;
+  const lbShareHtml=''; // Superseded by Share standings below
 
-  // Stage breakdown share
+  // Stage breakdown share — now includes full standings + stage P/L columns
   const stgMsg=generateStageBreakdownMessage();
   const stgShareHtml=stgMsg?`
-    <div class="sec">Share stage breakdown</div>
+    <div class="sec">Share standings</div>
     <div class="card" style="margin-bottom:4px">
-      <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Post stage P/L table to your WhatsApp group</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Post full standings + stage breakdown to your WhatsApp group</div>
       <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:13px;line-height:1.7;color:var(--text);font-family:monospace;white-space:pre-wrap;margin-bottom:12px;max-height:280px;overflow-y:auto">${esc(stgMsg).replace(/\*([^*]+)\*/g,'<strong>$1</strong>').replace(/_([^_]+)_/g,'<em style="opacity:.75">$1</em>')}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-gold" onclick="shareStageBreakdownWhatsApp()" style="width:auto;padding:10px 20px;font-size:14px;touch-action:manipulation">
