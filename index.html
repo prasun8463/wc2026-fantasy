@@ -2669,21 +2669,20 @@ async function renderGroups(){
     // ── Dynamic bracket slot resolution ──
     // Reads from settled MATCHES in DB — auto-fills as rounds progress
     function winnerOf(matchNum){
-      // Match numbers: R32=73-88, R16=89-96, QF=97-100, SF=101-102, 3rd=103, Final=104
-      const grp=matchNum>=89&&matchNum<=96?'R16'
-               :matchNum>=97&&matchNum<=100?'QF'
-               :matchNum>=101&&matchNum<=102?'SF'
-               :matchNum===103?'3rd'
-               :matchNum===104?'Final':'R32';
-      const m=MATCHES.find(x=>x.grp===grp&&x.id==='g'+matchNum)||
-              MATCHES.find(x=>{
-                // Match by ID pattern — R32 are g73-g88, R16 are g89-g96 etc.
-                return x.id==='g'+matchNum;
-              });
-      if(!m||!m.resolved||!m.result_home===undefined) return null;
+      // Lookup map: bracket match number → DB match ID
+      const ID_MAP={
+        73:'r01',74:'r03',75:'r04',76:'r02',
+        77:'r06',78:'r05',79:'r07',80:'r08',
+        81:'r10',82:'r09',83:'r11',84:'r12',
+        85:'r13',86:'r15',87:'r16',88:'r14'
+      };
+      // R16+ use sequential IDs — adjust as your DB is populated
+      const dbId=ID_MAP[matchNum]||('r'+String(matchNum).padStart(2,'0'));
+      const m=MATCHES.find(x=>x.id===dbId);
+      if(!m||!m.resolved||m.result_home==null) return null;
       const h=parseInt(m.result_home), a=parseInt(m.result_away);
       if(isNaN(h)||isNaN(a)) return null;
-      const winnerName=h>a?m.home:a>h?m.away:null; // null = draw (shouldn't happen in KO)
+      const winnerName=h>a?m.home:a>h?m.away:null;
       if(!winnerName) return null;
       return {name:winnerName, flag:FLAGS[winnerName]||'🏳️'};
     }
@@ -2767,7 +2766,7 @@ async function renderGroups(){
           ${knockoutCard(w101,w102,104,true)}
         </div>
         <div style="font-size:9px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;text-align:center;padding:5px 2px;margin:14px 0 5px;border-bottom:1px solid var(--border)">3rd place · Jul 18</div>
-        <div>${knockoutCard(winnerOf(101)===w101?w98:w97, winnerOf(102)===w102?w100:w99, 103,false)}</div>
+        <div>${knockoutCard(w97||w98?(!w101||w101.name===w97?.name?w98:w97):null, w99||w100?(!w102||w102.name===w99?.name?w100:w99):null, 103,false)}</div>
       </div>
 
       <!-- QF RIGHT -->
