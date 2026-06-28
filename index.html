@@ -842,9 +842,10 @@ function renderMatchList(){
     const potDisplay=pot>0?'₹'+pot+' pot':'₹'+betFor(m)+' to enter';
     const status=matchStatus(m);
     const canPredict=status==='open'&&!myP;
-    // Use DB flag if available, fall back to global FLAGS lookup for R32+ matches
-    const hFlag=m.home_flag||FLAGS[normaliseTeamName(m.home)]||FLAGS[m.home]||'';
-    const aFlag=m.away_flag||FLAGS[normaliseTeamName(m.away)]||FLAGS[m.away]||'';
+    // Use global FLAGS map first (most reliable), fall back to DB flag if team not in map
+    // Exclude white flag 🏳️ as it means "not set" in the DB
+    const hFlag=FLAGS[normaliseTeamName(m.home)]||FLAGS[m.home]||(m.home_flag&&m.home_flag!=='🏳️'?m.home_flag:'');
+    const aFlag=FLAGS[normaliseTeamName(m.away)]||FLAGS[m.away]||(m.away_flag&&m.away_flag!=='🏳️'?m.away_flag:'');
     // Patch onto m so all template references to m.home_flag/m.away_flag work
     m.home_flag=hFlag; m.away_flag=aFlag;
 
@@ -4227,6 +4228,14 @@ function applyInviteParam(){
 
 // ── Auto-restore session on page load ─────────────────────────
 (async function restoreSession(){
+  // Force relogin when app version changes — clears stale cached data
+  const APP_VERSION = 'v20260628b'; // bump this string to force everyone to relogin
+  if(localStorage.getItem('wc2026_app_version')!==APP_VERSION){
+    localStorage.clear(); // clear all cached data including stale flags, group cache etc.
+    localStorage.setItem('wc2026_app_version', APP_VERSION);
+    applyInviteParam();
+    return; // user will see login screen fresh
+  }
   const saved = localStorage.getItem('wc2026_user');
   if(!saved){ applyInviteParam(); return; }
   setAuthLoading(true);
