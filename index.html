@@ -439,23 +439,26 @@ function dateKey(d){ // returns numeric MMDD key for sorting/comparison
 function plColor(v){ return v>0?'var(--success)':v<0?'var(--red)':'var(--muted)'; }
 // Treat exact_bold as exact for win categorisation/stats purposes
 function isExactType(t){ return t==='exact'||t==='exact_bold'||t==='outcome_bold'; }
-// ── Bold pick limits — 50% of matches per stage, 16 total per player ──
-// R32=8 (of 16), R16=4 (of 8), QF=2 (of 4), SF+Final+3rd share 2 bolds across 3 matches
+// ── Bold pick limits — 13 total per player across the tournament ──
+// R32=5 (of 16), R16=3 (of 8), QF=2 (of 4), SF=2 (of 2), Final+3rd share 1
 function boldLimitForStage(grp){
-  if(grp==='R32') return 8;
-  if(grp==='R16') return 4;
-  if(grp==='QF') return 2;
-  if(grp==='SF'||grp==='Final'||grp==='3rd') return 2; // 2 shared across all three
+  if(grp==='R32') return 5;
+  if(grp==='R16') return 3;
+  if(grp==='QF'||grp==='SF') return 2; // 2 shared across QF+SF (6 matches)
+  if(grp==='Final'||grp==='3rd') return 1; // 1 shared across Final+3rd (2 matches)
   return 1;
 }
 // Returns matches that count toward the same bold pool as the given stage
 function boldPoolMatches(grp){
-  if(grp==='SF'||grp==='Final'||grp==='3rd')
-    return MATCHES.filter(m=>m.grp==='SF'||m.grp==='Final'||m.grp==='3rd');
+  if(grp==='QF'||grp==='SF')
+    return MATCHES.filter(m=>m.grp==='QF'||m.grp==='SF');
+  if(grp==='Final'||grp==='3rd')
+    return MATCHES.filter(m=>m.grp==='Final'||m.grp==='3rd');
   return MATCHES.filter(m=>m.grp===grp);
 }
 function boldStageLabel(grp){
-  if(grp==='SF'||grp==='Final'||grp==='3rd') return 'SF / Final / 3rd';
+  if(grp==='QF'||grp==='SF') return 'QF / SF';
+  if(grp==='Final'||grp==='3rd') return 'Final / 3rd place';
   return grp;
 }
 function fmtPL(v){ return (v>0?'+':'')+v; }
@@ -2282,7 +2285,7 @@ function _boldAnnouncementHtml(){
   <div style="background:linear-gradient(135deg,rgba(255,200,48,.12),rgba(255,200,48,.03));border:1px solid rgba(255,200,48,.4);border-radius:12px;padding:18px;margin-bottom:14px;text-align:center">
     <div style="font-size:42px;margin-bottom:6px">🔥</div>
     <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:4px">Bold Pick has unlocked</div>
-    <div style="font-size:12px;color:var(--muted)">Knockout stages only · 8→4→2→1 bolds per stage</div>
+    <div style="font-size:12px;color:var(--muted)">Knockout stages only · 5→3→2→1 bolds per stage</div>
   </div>
 
   <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px">How it works</div>
@@ -2302,7 +2305,7 @@ function _boldAnnouncementHtml(){
 
   <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px">The rules</div>
   <ul style="font-size:13px;line-height:1.8;color:var(--muted);padding-left:20px;margin-bottom:14px">
-    <li><strong style="color:var(--text)">Bold limits</strong> — R32: 8 · R16: 4 · QF: 2 · SF+Final+3rd: 2 shared · Total: 16</li>
+    <li><strong style="color:var(--text)">Bold limits</strong> — R32: 5 · R16: 3 · QF+SF: 2 shared (6 matches) · Final+3rd: 1 shared · Total: 11</li>
     <li><strong style="color:var(--text)">2× payout</strong> — bold winners earn double the per-share payout. Everyone who's right still gets something</li>
     <li><strong style="color:var(--text)">Outcome bolds count too</strong> — if nobody gets exact score, bold outcome pickers earn 2× vs non-bold outcome pickers</li>
     <li>If multiple players bold the same match, bolds compete among themselves first</li>
