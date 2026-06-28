@@ -400,7 +400,11 @@ function calcRoundStats(username){
       const myP=(PREDS[m.id]||[]).find(p=>p.username===username);
       if(!myP)return;
       spent+=betFor(m);
-      if((m.resolved_winners||[]).includes(username))earned+=m.resolved_share||0;
+      if((m.resolved_winners||[]).includes(username)){
+        const myPred=(PREDS[m.id]||[]).find(p=>p.username===username);
+        const isBoldWin=myPred&&myPred.bold&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold');
+        earned+=(m.resolved_share||0)*(isBoldWin?2:1);
+      }
     });
     stats[r.key]={bet:spent, won:earned, pl:earned-spent};
   });
@@ -1430,7 +1434,9 @@ function ppShowType(type){
     matches.forEach(m=>{
       const myP=(PREDS[m.id]||[]).find(p=>p.username===username);
       const won=(m.resolved_winners||[]).includes(username);
-      const wonAmt=won?m.resolved_share:0;
+      const myPDrawer=(PREDS[m.id]||[]).find(p=>p.username===username);
+      const isBoldWinDrawer=won&&myPDrawer&&myPDrawer.bold&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold');
+      const wonAmt=won?(m.resolved_share||0)*(isBoldWinDrawer?2:1):0;
       const wonColor=wonAmt>0?'var(--success)':'var(--red)';
       const wonStr=wonAmt>0?'+₹'+wonAmt:'-₹'+betFor(m);
       html+='<div onclick="toggleMatchSheet(\''+m.id+'\')" style="cursor:pointer;display:contents">'
@@ -1862,7 +1868,11 @@ function showScorecardModal(type){
 
   const _sba=parseBetAmount(LEAGUE?.bet_amount); const _sbet=typeof _sba==='object'?parseInt(_sba.group)||100:parseInt(_sba)||100;
   const totalSpent=matches.length*_sbet;
-  const totalWon=matches.filter(m=>(m.resolved_winners||[]).includes(ME.username)).reduce((s,m)=>s+(m.resolved_share||0),0);
+  const totalWon=matches.filter(m=>(m.resolved_winners||[]).includes(ME.username)).reduce((s,m)=>{
+    const myPModal=(PREDS[m.id]||[]).find(p=>p.username===ME.username);
+    const isBoldWinModal=myPModal&&myPModal.bold&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold');
+    return s+(m.resolved_share||0)*(isBoldWinModal?2:1);
+  },0);
   let topHtml=`<div class="pot-strip">
     <div class="pot-cell"><div class="pot-lbl">Matches</div><div class="pot-val">${matches.length}</div></div>
     <div class="pot-cell"><div class="pot-lbl">Total bet</div><div class="pot-val">₹${totalSpent}</div></div>
@@ -3517,7 +3527,11 @@ async function runReconciliationAudit(){
     resolvedMatches.forEach(m=>{
       const myP=(PREDS[m.id]||[]).find(p=>p.username===u.username);
       if(myP) calcSpent+=betFor(m);
-      if((m.resolved_winners||[]).includes(u.username)) calcEarned+=(m.resolved_share||0);
+      if((m.resolved_winners||[]).includes(u.username)){
+        const myPAudit=(PREDS[m.id]||[]).find(p=>p.username===u.username);
+        const isBoldWinAudit=myPAudit&&myPAudit.bold&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold');
+        calcEarned+=(m.resolved_share||0)*(isBoldWinAudit?2:1);
+      }
     });
     totalOut+=(u.earned||0);
     const spentDiff=(u.spent||0)-calcSpent;
