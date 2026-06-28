@@ -2234,7 +2234,8 @@ function maybeShowBoldAnnouncement(){
   const knockoutStarted=MATCHES.some(m=>{
     if(!isKnockout(m)) return false;
     if(m.home==='TBD'||m.away==='TBD') return false;
-    return dateKey(m.match_date)<=todayKey;
+    // Fire as soon as R32 teams are confirmed (predictions are open today)
+    return true;
   });
   if(!knockoutStarted) return;
   // Skip for total newcomers — only show to engaged players
@@ -2461,6 +2462,7 @@ async function fetchLiveGroupStandings(){
 async function renderGroups(){
   const el = document.getElementById('pane-groups');
   el.innerHTML = ''; // clear immediately so no stale spinner shows
+  try{
   const now = Date.now();
   // Only re-fetch if explicitly refreshed — MATCHES already loaded at login
   if(groupsLastFetched === 0){
@@ -2733,64 +2735,52 @@ async function renderGroups(){
     const w97=winnerOf(97),w98=winnerOf(98),w99=winnerOf(99),w100=winnerOf(100);
     const w101=winnerOf(101),w102=winnerOf(102);
 
-    html+=`<div class="sec">Knockout bracket</div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Auto-updates as matches settle · Scroll to see both sides</div>
-    <div style="overflow-x:auto;margin-bottom:16px">
-    <div style="min-width:920px;display:grid;grid-template-columns:88px 88px 88px 90px 88px 88px 88px;gap:6px;align-items:start">
+    // Build bracket using string concatenation — no nested template literals (Rule 2)
+    html+='<div class="sec">Knockout bracket</div>';
+    html+='<div style="font-size:11px;color:var(--muted);margin-bottom:12px">Auto-updates as matches settle · Scroll to see both sides</div>';
+    html+='<div style="overflow-x:auto;margin-bottom:16px">';
+    html+='<div style="min-width:920px;display:grid;grid-template-columns:88px 88px 88px 90px 88px 88px 88px;gap:6px;align-items:start">';
 
-      <!-- R32 LEFT -->
-      <div>
-        ${colHeader('R32')}
-        <div style="display:flex;flex-direction:column;gap:4px">`;
-    R32_LEFT.forEach(m=>{ html+=matchCard(m.home,m.away,false); });
-    html+=`</div></div>
+    // R32 LEFT
+    html+='<div>'+colHeader('R32')+'<div style="display:flex;flex-direction:column;gap:4px">';
+    R32_LEFT.forEach(function(m){ html+=matchCard(m.home,m.away,false); });
+    html+='</div></div>';
 
-      <!-- R16 LEFT -->
-      <div>
-        ${colHeader('R16')}
-        <div style="display:flex;flex-direction:column;gap:4px;padding-top:14px">`;
-    r16L.forEach(s=>{ html+=`<div style="margin-bottom:9px">${knockoutCard(s.a,s.b,s.m,false)}</div>`; });
-    html+=`</div></div>
+    // R16 LEFT
+    html+='<div>'+colHeader('R16')+'<div style="display:flex;flex-direction:column;gap:4px;padding-top:14px">';
+    r16L.forEach(function(s){ html+='<div style="margin-bottom:9px">'+knockoutCard(s.a,s.b,s.m,false)+'</div>'; });
+    html+='</div></div>';
 
-      <!-- QF LEFT -->
-      <div>
-        ${colHeader('QF')}
-        <div style="display:flex;flex-direction:column;gap:4px;padding-top:46px">`;
-    qfL.forEach(s=>{ html+=`<div style="margin-bottom:44px">${knockoutCard(s.a,s.b,s.m,false)}</div>`; });
-    html+=`</div></div>
+    // QF LEFT
+    html+='<div>'+colHeader('QF')+'<div style="display:flex;flex-direction:column;gap:4px;padding-top:46px">';
+    qfL.forEach(function(s){ html+='<div style="margin-bottom:44px">'+knockoutCard(s.a,s.b,s.m,false)+'</div>'; });
+    html+='</div></div>';
 
-      <!-- FINAL (center) -->
-      <div>
-        ${colHeader('Final · Jul 19',true)}
-        <div style="display:flex;flex-direction:column;padding-top:110px">
-          ${knockoutCard(w101,w102,104,true)}
-        </div>
-        <div style="font-size:9px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;text-align:center;padding:5px 2px;margin:14px 0 5px;border-bottom:1px solid var(--border)">3rd place · Jul 18</div>
-        <div>${knockoutCard(w97||w98?(!w101||w101.name===w97?.name?w98:w97):null, w99||w100?(!w102||w102.name===w99?.name?w100:w99):null, 103,false)}</div>
-      </div>
+    // FINAL (center)
+    const sf1loser=w101?(w101.name===w97?.name?w98:w97):null;
+    const sf2loser=w102?(w102.name===w99?.name?w100:w99):null;
+    html+='<div>'+colHeader('Final · Jul 19',true);
+    html+='<div style="display:flex;flex-direction:column;padding-top:110px">'+knockoutCard(w101,w102,104,true)+'</div>';
+    html+='<div style="font-size:9px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;text-align:center;padding:5px 2px;margin:14px 0 5px;border-bottom:1px solid var(--border)">3rd place · Jul 18</div>';
+    html+='<div>'+knockoutCard(sf1loser,sf2loser,103,false)+'</div>';
+    html+='</div>';
 
-      <!-- QF RIGHT -->
-      <div>
-        ${colHeader('QF')}
-        <div style="display:flex;flex-direction:column;gap:4px;padding-top:46px">`;
-    qfR.forEach(s=>{ html+=`<div style="margin-bottom:44px">${knockoutCard(s.a,s.b,s.m,false)}</div>`; });
-    html+=`</div></div>
+    // QF RIGHT
+    html+='<div>'+colHeader('QF')+'<div style="display:flex;flex-direction:column;gap:4px;padding-top:46px">';
+    qfR.forEach(function(s){ html+='<div style="margin-bottom:44px">'+knockoutCard(s.a,s.b,s.m,false)+'</div>'; });
+    html+='</div></div>';
 
-      <!-- R16 RIGHT -->
-      <div>
-        ${colHeader('R16')}
-        <div style="display:flex;flex-direction:column;gap:4px;padding-top:14px">`;
-    r16R.forEach(s=>{ html+=`<div style="margin-bottom:9px">${knockoutCard(s.a,s.b,s.m,false)}</div>`; });
-    html+=`</div></div>
+    // R16 RIGHT
+    html+='<div>'+colHeader('R16')+'<div style="display:flex;flex-direction:column;gap:4px;padding-top:14px">';
+    r16R.forEach(function(s){ html+='<div style="margin-bottom:9px">'+knockoutCard(s.a,s.b,s.m,false)+'</div>'; });
+    html+='</div></div>';
 
-      <!-- R32 RIGHT -->
-      <div>
-        ${colHeader('R32')}
-        <div style="display:flex;flex-direction:column;gap:4px">`;
-    R32_RIGHT.forEach(m=>{ html+=matchCard(m.home,m.away,false); });
-    html+=`</div></div>
+    // R32 RIGHT
+    html+='<div>'+colHeader('R32')+'<div style="display:flex;flex-direction:column;gap:4px">';
+    R32_RIGHT.forEach(function(m){ html+=matchCard(m.home,m.away,false); });
+    html+='</div></div>';
 
-    </div></div>`;
+    html+='</div></div>';
 
   } // end if(activeFilter==='All')
 
@@ -2876,6 +2866,10 @@ async function renderGroups(){
     } // end if(activeFilter!=='All')
 
   el.innerHTML = html;
+  }catch(err){
+    console.error('renderGroups error:', err);
+    el.innerHTML = '<div style="padding:20px;color:var(--red);font-size:13px">⚠️ Tournament tab error: '+err.message+'<br><pre style="font-size:10px;margin-top:8px;color:var(--muted)">'+err.stack+'</pre></div>';
+  }
 }
 
 async function refreshGroups(){
