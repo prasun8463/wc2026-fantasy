@@ -2581,24 +2581,24 @@ async function renderGroups(){
     // LEFT HALF feeds SF 101 (top of final): matches 73,74,75,77,81,82,83,84
     // RIGHT HALF feeds SF 102 (bottom of final): matches 76,78,79,80,85,86,87,88
     const R32_LEFT = [
-      {num:74,home:'1st Group E',away:'Best 3rd place'},
-      {num:77,home:'1st Group I',away:'Best 3rd place'},
-      {num:73,home:'2nd Group A',away:'2nd Group B'},
-      {num:75,home:'1st Group F',away:'2nd Group C'},
-      {num:83,home:'2nd Group K',away:'2nd Group L'},
-      {num:84,home:'1st Group H',away:'2nd Group J'},
-      {num:81,home:'1st Group D',away:'Best 3rd place'},
-      {num:82,home:'1st Group G',away:'Best 3rd place'},
+      {num:74,home:'Germany',away:'Paraguay'},
+      {num:77,home:'France',away:'Sweden'},
+      {num:73,home:'South Africa',away:'Canada'},
+      {num:75,home:'Netherlands',away:'Morocco'},
+      {num:83,home:'Portugal',away:'Croatia'},
+      {num:84,home:'Spain',away:'Austria'},
+      {num:81,home:'USA',away:'Bosnia and Herzegovina'},
+      {num:82,home:'Belgium',away:'Senegal'},
     ];
     const R32_RIGHT = [
-      {num:76,home:'1st Group C',away:'2nd Group F'},
-      {num:78,home:'2nd Group E',away:'2nd Group I'},
-      {num:79,home:'1st Group A',away:'Best 3rd place'},
-      {num:80,home:'1st Group L',away:'Best 3rd place'},
-      {num:86,home:'1st Group J',away:'2nd Group H'},
-      {num:88,home:'2nd Group D',away:'2nd Group G'},
-      {num:85,home:'1st Group B',away:'Best 3rd place'},
-      {num:87,home:'1st Group K',away:'Best 3rd place'},
+      {num:76,home:'Brazil',away:'Japan'},
+      {num:78,home:'Ivory Coast',away:'Norway'},
+      {num:79,home:'Mexico',away:'Ecuador'},
+      {num:80,home:'England',away:'DR Congo'},
+      {num:86,home:'Argentina',away:'Cape Verde'},
+      {num:88,home:'Australia',away:'Egypt'},
+      {num:85,home:'Switzerland',away:'Algeria'},
+      {num:87,home:'Colombia',away:'Ghana'},
     ];
     // R16 pairings (each pair = 2 R32 winners). Order matches R32_LEFT/RIGHT grouping above.
     const R16_LEFT_LABELS  = ['R16 — W74 v W77','R16 — W73 v W75','R16 — W83 v W84','R16 — W81 v W82'];
@@ -2623,16 +2623,20 @@ async function renderGroups(){
       let team = null;
       if(pos && grpLetter) team = getTop(grpLetter, pos);
 
+      // Check if label is a real team name in our FLAGS map
+      const directFlag = FLAGS[label];
+      if(directFlag){
+        return `<div style="display:flex;align-items:center;gap:4px;padding:2px 0">
+          <span style="font-size:11px;width:15px;flex-shrink:0">${directFlag}</span>
+          <span style="font-size:10px;font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}</span>
+        </div>`;
+      }
+
       const isBest3rd = label==='Best 3rd place';
       if(isBest3rd){
-        // Show provisionally — label as "Best 3rd (TBC)" until all groups finish
-        const groupsDone=Object.keys(GROUP_TEAMS).every(g=>{
-          const st=getGroupStandings(g,GROUP_TEAMS[g]);
-          return st[0]&&st[0].mp>=3;
-        });
         return `<div style="display:flex;align-items:center;gap:4px;padding:2px 0">
           <span style="font-size:11px;width:15px;flex-shrink:0"></span>
-          <span style="font-size:10px;color:#4a6a4a;font-style:italic">${groupsDone?'Best 3rd (confirmed)':'Best 3rd (TBC Jun 27)'}</span>
+          <span style="font-size:10px;color:#4a6a4a;font-style:italic">Best 3rd (TBC)</span>
         </div>`;
       }
 
@@ -2662,12 +2666,76 @@ async function renderGroups(){
       </div>`;
     }
 
-    function colHeader(label,gold){
-      return `<div style="font-size:9px;font-weight:600;color:${gold?'var(--gold)':'var(--muted)'};letter-spacing:.5px;text-transform:uppercase;text-align:center;padding:5px 2px;margin-bottom:5px;border-bottom:1px solid ${gold?'rgba(255,200,48,.35)':'var(--border)'}">${label}</div>`;
+    // ── Dynamic bracket slot resolution ──
+    // Reads from settled MATCHES in DB — auto-fills as rounds progress
+    function winnerOf(matchNum){
+      // Match numbers: R32=73-88, R16=89-96, QF=97-100, SF=101-102, 3rd=103, Final=104
+      const grp=matchNum>=89&&matchNum<=96?'R16'
+               :matchNum>=97&&matchNum<=100?'QF'
+               :matchNum>=101&&matchNum<=102?'SF'
+               :matchNum===103?'3rd'
+               :matchNum===104?'Final':'R32';
+      const m=MATCHES.find(x=>x.grp===grp&&x.id==='g'+matchNum)||
+              MATCHES.find(x=>{
+                // Match by ID pattern — R32 are g73-g88, R16 are g89-g96 etc.
+                return x.id==='g'+matchNum;
+              });
+      if(!m||!m.resolved||!m.result_home===undefined) return null;
+      const h=parseInt(m.result_home), a=parseInt(m.result_away);
+      if(isNaN(h)||isNaN(a)) return null;
+      const winnerName=h>a?m.home:a>h?m.away:null; // null = draw (shouldn't happen in KO)
+      if(!winnerName) return null;
+      return {name:winnerName, flag:FLAGS[winnerName]||'🏳️'};
     }
 
+    function knockoutCard(teamA, teamB, matchNum, gold){
+      const bg=gold?'rgba(255,200,48,.08)':'var(--card)';
+      const bd=gold?'rgba(255,200,48,.35)':'var(--border)';
+      const nameA=teamA?teamA.name:'TBD';
+      const flagA=teamA?teamA.flag:'';
+      const nameB=teamB?teamB.name:'TBD';
+      const flagB=teamB?teamB.flag:'';
+      const colorA=teamA?'var(--text)':'var(--muted)';
+      const colorB=teamB?'var(--text)':'var(--muted)';
+      const wt=winnerOf(matchNum);
+      const settled=!!wt;
+      const mkRow=(name,flag,color)=>'<div style="display:flex;align-items:center;gap:4px;padding:2px 0'+(settled&&name===wt?.name?';background:rgba(61,220,132,.08);border-radius:3px':'')+'">'+
+        '<span style="font-size:11px;width:15px;flex-shrink:0">'+flag+'</span>'+
+        '<span style="font-size:10px;font-weight:'+(name!=='TBD'?600:400)+';color:'+color+';opacity:'+(settled&&name!==wt?.name?'.4':'1')+'">'+name+'</span>'+
+        '</div>';
+      return '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:7px;padding:5px 6px">'+
+        '<div style="border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:2px;margin-bottom:2px">'+mkRow(nameA,flagA,colorA)+'</div>'+
+        mkRow(nameB,flagB,colorB)+
+      '</div>';
+    }
+
+    // Resolve R16 slots from R32 winners
+    // Left half R16: 89=W74,W77  90=W73,W75  93=W83,W84  94=W81,W82
+    // Right half R16: 91=W76,W78  92=W79,W80  95=W86,W88  96=W85,W87
+    const w={};
+    [73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88].forEach(n=>{ w[n]=winnerOf(n); });
+
+    const r16L=[
+      {a:w[74],b:w[77],m:89},{a:w[73],b:w[75],m:90},
+      {a:w[83],b:w[84],m:93},{a:w[81],b:w[82],m:94}
+    ];
+    const r16R=[
+      {a:w[76],b:w[78],m:91},{a:w[79],b:w[80],m:92},
+      {a:w[86],b:w[88],m:95},{a:w[85],b:w[87],m:96}
+    ];
+
+    // Resolve QF slots from R16 winners
+    const w16={};
+    [89,90,91,92,93,94,95,96].forEach(n=>{ w16[n]=winnerOf(n); });
+    const qfL=[{a:w16[89],b:w16[90],m:97},{a:w16[93],b:w16[94],m:98}];
+    const qfR=[{a:w16[91],b:w16[92],m:99},{a:w16[95],b:w16[96],m:100}];
+
+    // Resolve SF + Final from QF winners
+    const w97=winnerOf(97),w98=winnerOf(98),w99=winnerOf(99),w100=winnerOf(100);
+    const w101=winnerOf(101),w102=winnerOf(102);
+
     html+=`<div class="sec">Knockout bracket</div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Teams populate as group stage settles · Scroll to see both sides</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Auto-updates as matches settle · Scroll to see both sides</div>
     <div style="overflow-x:auto;margin-bottom:16px">
     <div style="min-width:920px;display:grid;grid-template-columns:88px 88px 88px 90px 88px 88px 88px;gap:6px;align-items:start">
 
@@ -2682,38 +2750,38 @@ async function renderGroups(){
       <div>
         ${colHeader('R16')}
         <div style="display:flex;flex-direction:column;gap:4px;padding-top:14px">`;
-    for(let i=0;i<4;i++){ html+=`<div style="margin-bottom:9px">${tbdCard(false)}</div>`; }
+    r16L.forEach(s=>{ html+=`<div style="margin-bottom:9px">${knockoutCard(s.a,s.b,s.m,false)}</div>`; });
     html+=`</div></div>
 
       <!-- QF LEFT -->
       <div>
         ${colHeader('QF')}
         <div style="display:flex;flex-direction:column;gap:4px;padding-top:46px">`;
-    for(let i=0;i<2;i++){ html+=`<div style="margin-bottom:44px">${tbdCard(false)}</div>`; }
+    qfL.forEach(s=>{ html+=`<div style="margin-bottom:44px">${knockoutCard(s.a,s.b,s.m,false)}</div>`; });
     html+=`</div></div>
 
       <!-- FINAL (center) -->
       <div>
         ${colHeader('Final · Jul 19',true)}
         <div style="display:flex;flex-direction:column;padding-top:110px">
-          ${tbdCard(true)}
+          ${knockoutCard(w101,w102,104,true)}
         </div>
-        <div style="font-size:9px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;text-align:center;padding:5px 2px;margin:14px 0 5px;border-bottom:1px solid var(--border)">3rd place</div>
-        <div>${tbdCard(false)}</div>
+        <div style="font-size:9px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;text-align:center;padding:5px 2px;margin:14px 0 5px;border-bottom:1px solid var(--border)">3rd place · Jul 18</div>
+        <div>${knockoutCard(winnerOf(101)===w101?w98:w97, winnerOf(102)===w102?w100:w99, 103,false)}</div>
       </div>
 
       <!-- QF RIGHT -->
       <div>
         ${colHeader('QF')}
         <div style="display:flex;flex-direction:column;gap:4px;padding-top:46px">`;
-    for(let i=0;i<2;i++){ html+=`<div style="margin-bottom:44px">${tbdCard(false)}</div>`; }
+    qfR.forEach(s=>{ html+=`<div style="margin-bottom:44px">${knockoutCard(s.a,s.b,s.m,false)}</div>`; });
     html+=`</div></div>
 
       <!-- R16 RIGHT -->
       <div>
         ${colHeader('R16')}
         <div style="display:flex;flex-direction:column;gap:4px;padding-top:14px">`;
-    for(let i=0;i<4;i++){ html+=`<div style="margin-bottom:9px">${tbdCard(false)}</div>`; }
+    r16R.forEach(s=>{ html+=`<div style="margin-bottom:9px">${knockoutCard(s.a,s.b,s.m,false)}</div>`; });
     html+=`</div></div>
 
       <!-- R32 RIGHT -->
@@ -3152,9 +3220,10 @@ function generateLeaderboardMessage(){
 
 function generateStageBreakdownMessage(){
   if(!LEAGUE||!MEMBERS||!MEMBERS.length) return '';
+  // Sort by P/L% to match leaderboard ranking
   const sortedMembers=[...MEMBERS].sort((a,b)=>{
-    const sa=calcRoundStats(a.username), sb_=calcRoundStats(b.username);
-    return sb_.overall.pl-sa.overall.pl;
+    const sa=calcRoundStats(a.username).overall, sb=calcRoundStats(b.username).overall;
+    return plPct(sb.bet,sb.won)-plPct(sa.bet,sa.won);
   });
   const settledCount=MATCHES.filter(m=>m.resolved).length;
   const dt=new Date(Date.now()+IST_OFFSET_MS);
@@ -3167,13 +3236,11 @@ function generateStageBreakdownMessage(){
   msg+='_'+LEAGUE.name+' · '+dStr+'_\n';
   msg+='_'+settledCount+' matches settled_\n\n';
 
-  // Build header row
-  const stageLabels=activeStages.map(r=>r.label.replace(' Stage','').replace('SF / ',''));
   // Use monospace block for alignment
   msg+='```\n';
 
   // Column widths
-  const nameW=12;
+  const nameW=13;
   const stgW=8;
 
   // Header
@@ -3182,20 +3249,27 @@ function generateStageBreakdownMessage(){
     const lbl=r.key==='group'?'Grp':r.key==='sf'?'SF/F':r.key.toUpperCase();
     hdr+=lbl.padStart(stgW);
   });
-  hdr+='P/L'.padStart(stgW);
+  hdr+='P/L%'.padStart(stgW);
   msg+=hdr+'\n';
   msg+='─'.repeat(hdr.length)+'\n';
 
-  // Rows
+  // Rows with medals for top 3 in profit
   const medals=['🥇','🥈','🥉'];
+  let rank=0;
   sortedMembers.forEach((u,i)=>{
     const s=calcRoundStats(u.username);
     const hasAny=s.overall.bet>0;
     if(!hasAny) return;
 
+    rank++;
+    const pct=plPct(s.overall.bet,s.overall.won);
+    const medal=rank<=3&&s.overall.pl>0?medals[rank-1]:(rank+'.');
+    // Medal takes 2 chars, name gets remaining space
     let name=u.username;
-    if(name.length>nameW-1) name=name.slice(0,nameW-2)+'…';
-    let row=name.padEnd(nameW);
+    const prefix=medal+' ';
+    const available=nameW-prefix.length;
+    if(name.length>available) name=name.slice(0,available-1)+'…';
+    let row=(prefix+name).padEnd(nameW);
 
     activeStages.forEach(r=>{
       const pl=s[r.key]?.pl||0;
@@ -3203,9 +3277,8 @@ function generateStageBreakdownMessage(){
       row+=plStr.padStart(stgW);
     });
 
-    const opl=s.overall.pl;
-    const oplStr=opl>0?'+'+opl:opl===0?'0':''+opl;
-    row+=oplStr.padStart(stgW);
+    const pctStr=pct>0?'+'+pct+'%':pct===0?'0%':pct+'%';
+    row+=pctStr.padStart(stgW);
     msg+=row+'\n';
   });
 
@@ -3644,7 +3717,8 @@ function renderAdmin(){
   const stgShareHtml=stgMsg?`
     <div class="sec">Share stage breakdown</div>
     <div class="card" style="margin-bottom:4px">
-      <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:12px;line-height:1.6;color:var(--text);font-family:monospace;white-space:pre-wrap;margin-bottom:12px;max-height:280px;overflow-y:auto">${esc(stgMsg).replace(/\*([^*]+)\*/g,'<strong>$1</strong>').replace(/_([^_]+)_/g,'<em style="opacity:.75">$1</em>')}</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Post stage P/L table to your WhatsApp group</div>
+      <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:13px;line-height:1.7;color:var(--text);font-family:monospace;white-space:pre-wrap;margin-bottom:12px;max-height:280px;overflow-y:auto">${esc(stgMsg).replace(/\*([^*]+)\*/g,'<strong>$1</strong>').replace(/_([^_]+)_/g,'<em style="opacity:.75">$1</em>')}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-gold" onclick="shareStageBreakdownWhatsApp()" style="width:auto;padding:10px 20px;font-size:14px;touch-action:manipulation">
           📲 Open in WhatsApp
