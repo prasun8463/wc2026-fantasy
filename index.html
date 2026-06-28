@@ -342,6 +342,24 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // PROD_MODE: read from leagues.prod_mode in DB (set via SQL before June go-live)
 // Controls: hides random settle buttons, enables auto-settle via API
 let PROD_MODE = false; // overwritten after loadAll() reads league
+
+// ── Team flag emoji map (global — used in Matches tab + Tournament bracket) ──
+const FLAGS = {
+  'Mexico':'🇲🇽','South Africa':'🇿🇦','South Korea':'🇰🇷','Czechia':'🇨🇿',
+  'Canada':'🇨🇦','Bosnia and Herzegovina':'🇧🇦','Qatar':'🇶🇦','Switzerland':'🇨🇭',
+  'Brazil':'🇧🇷','Morocco':'🇲🇦','Haiti':'🇭🇹','Scotland':'🏴󠁧󠁢󠁳󠁣󠁴󠁿',
+  'USA':'🇺🇸','Paraguay':'🇵🇾','Australia':'🇦🇺','Türkiye':'🇹🇷',
+  'Germany':'🇩🇪','Curaçao':'🇨🇼','Ivory Coast':'🇨🇮','Ecuador':'🇪🇨',
+  'Netherlands':'🇳🇱','Japan':'🇯🇵','Tunisia':'🇹🇳','Sweden':'🇸🇪',
+  'Belgium':'🇧🇪','Egypt':'🇪🇬','Iran':'🇮🇷','New Zealand':'🇳🇿',
+  'Spain':'🇪🇸','Cape Verde':'🇨🇻','Saudi Arabia':'🇸🇦','Uruguay':'🇺🇾',
+  'France':'🇫🇷','Senegal':'🇸🇳','Norway':'🇳🇴','Iraq':'🇮🇶',
+  'Argentina':'🇦🇷','Algeria':'🇩🇿','Austria':'🇦🇹','Jordan':'🇯🇴',
+  'Portugal':'🇵🇹','Uzbekistan':'🇺🇿','Colombia':'🇨🇴','DR Congo':'🇨🇩',
+  'England':'🏴󠁧󠁢󠁥󠁮󠁧󠁿','Croatia':'🇭🇷','Ghana':'🇬🇭','Panama':'🇵🇦',
+  'Norway':'🇳🇴','Sweden':'🇸🇪','Algeria':'🇩🇿','Austria':'🇦🇹',
+  'Croatia':'🇭🇷','Ghana':'🇬🇭','Cape Verde':'🇨🇻','Senegal':'🇸🇳',
+};
 // ════════════════════════════════════════════════════════════════
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -824,6 +842,11 @@ function renderMatchList(){
     const potDisplay=pot>0?'₹'+pot+' pot':'₹'+betFor(m)+' to enter';
     const status=matchStatus(m);
     const canPredict=status==='open'&&!myP;
+    // Use DB flag if available, fall back to global FLAGS lookup for R32+ matches
+    const hFlag=m.home_flag||FLAGS[normaliseTeamName(m.home)]||FLAGS[m.home]||'';
+    const aFlag=m.away_flag||FLAGS[normaliseTeamName(m.away)]||FLAGS[m.away]||'';
+    // Patch onto m so all template references to m.home_flag/m.away_flag work
+    m.home_flag=hFlag; m.away_flag=aFlag;
 
     let pickBadge='';
     if(myP&&status==='settled'){
@@ -2225,24 +2248,21 @@ function _aboutContentHtml(){
 //  BOLD PICK ANNOUNCEMENT — shown once when knockouts begin
 // ════════════════════════════════════════════════════════════════
 function maybeShowBoldAnnouncement(){
-  // Show ONCE when knockouts have started (any non-TBD knockout match dated today/past).
-  // Gates: not seen yet, MATCHES loaded, user is in a league, has placed >=1 prediction overall.
-  if(localStorage.getItem('wc2026_bold_seen')) return;
   if(!MATCHES||!MATCHES.length||!ME) return;
   const istNow=new Date(Date.now()+IST_OFFSET_MS);
-  const todayKey=(istNow.getUTCMonth()+1)*100+istNow.getUTCDate();
-  const knockoutStarted=MATCHES.some(m=>{
-    if(!isKnockout(m)) return false;
-    if(m.home==='TBD'||m.away==='TBD') return false;
-    // Fire as soon as R32 teams are confirmed (predictions are open today)
-    return true;
-  });
+  const todayKey=(istNow.getUTCMonth()+1)*100+istNow.getUTCDate(); // e.g. 628 for Jun 28
+  // Jun 28 2026 = launch day — show on EVERY login so all players see it
+  // From Jun 29 onwards — show once per day per device
+  const isLaunchDay=(istNow.getUTCFullYear()===2026&&istNow.getUTCMonth()===5&&istNow.getUTCDate()===28);
+  if(!isLaunchDay){
+    const seenKey='wc2026_bold_seen_'+todayKey;
+    if(localStorage.getItem(seenKey)) return;
+    localStorage.setItem(seenKey,'1');
+  }
+  const knockoutStarted=MATCHES.some(m=>isKnockout(m)&&m.home!=='TBD'&&m.away!=='TBD');
   if(!knockoutStarted) return;
-  // Skip for total newcomers — only show to engaged players
   const myPredCount=Object.values(PREDS||{}).reduce((n,arr)=>n+(arr||[]).filter(p=>p.username===ME.username).length,0);
   if(myPredCount<1) return;
-
-  localStorage.setItem('wc2026_bold_seen','1');
   showInfoModal('🔥 New: Bold Pick — knockouts only', _boldAnnouncementHtml());
 }
 
@@ -2511,20 +2531,7 @@ async function renderGroups(){
     L:['England','Croatia','Ghana','Panama'],
   };
 
-  const FLAGS = {
-    'Mexico':'🇲🇽','South Africa':'🇿🇦','South Korea':'🇰🇷','Czechia':'🇨🇿',
-    'Canada':'🇨🇦','Bosnia and Herzegovina':'🇧🇦','Qatar':'🇶🇦','Switzerland':'🇨🇭',
-    'Brazil':'🇧🇷','Morocco':'🇲🇦','Haiti':'🇭🇹','Scotland':'🏴󠁧󠁢󠁳󠁣󠁴󠁿',
-    'USA':'🇺🇸','Paraguay':'🇵🇾','Australia':'🇦🇺','Türkiye':'🇹🇷',
-    'Germany':'🇩🇪','Curaçao':'🇨🇼','Ivory Coast':'🇨🇮','Ecuador':'🇪🇨',
-    'Netherlands':'🇳🇱','Japan':'🇯🇵','Tunisia':'🇹🇳','Sweden':'🇸🇪',
-    'Belgium':'🇧🇪','Egypt':'🇪🇬','Iran':'🇮🇷','New Zealand':'🇳🇿',
-    'Spain':'🇪🇸','Cape Verde':'🇨🇻','Saudi Arabia':'🇸🇦','Uruguay':'🇺🇾',
-    'France':'🇫🇷','Senegal':'🇸🇳','Norway':'🇳🇴','Iraq':'🇮🇶',
-    'Argentina':'🇦🇷','Algeria':'🇩🇿','Austria':'🇦🇹','Jordan':'🇯🇴',
-    'Portugal':'🇵🇹','Uzbekistan':'🇺🇿','Colombia':'🇨🇴','DR Congo':'🇨🇩',
-    'England':'🏴󠁧󠁢󠁥󠁮󠁧󠁿','Croatia':'🇭🇷','Ghana':'🇬🇭','Panama':'🇵🇦',
-  };
+  // FLAGS is now a global constant (defined at top of script)
 
   function getGroupStandings(grpLetter, teams){
     // Prefer live worldcup26.ir data — immune to bugs in our own settle pipeline
@@ -2578,6 +2585,17 @@ async function renderGroups(){
 
   // ── BRACKET VIEW (All) — Butterfly layout per official FIFA bracket tree ──
   if(activeFilter==='All'){
+    function colHeader(label,gold){
+      return '<div style="font-size:9px;font-weight:600;color:'+(gold?'var(--gold)':'var(--muted)')+';letter-spacing:.5px;text-transform:uppercase;text-align:center;padding:5px 2px;margin-bottom:5px;border-bottom:1px solid '+(gold?'rgba(255,200,48,.35)':'var(--border)')+'">'+label+'</div>';
+    }
+    function matchCard(home,away,gold){
+      const bg=gold?'rgba(255,200,48,.08)':'var(--card)';
+      const bd=gold?'rgba(255,200,48,.35)':'var(--border)';
+      return '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:7px;padding:5px 6px">'
+        +'<div style="border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:2px;margin-bottom:2px">'+slotHTML(home)+'</div>'
+        +slotHTML(away)
+      +'</div>';
+    }
     // R32 matches in official FIFA numbering (73-88), ordered left-half then right-half
     // so the visual layout matches the actual bracket tree below.
     // LEFT HALF feeds SF 101 (top of final): matches 73,74,75,77,81,82,83,84
@@ -2651,22 +2669,7 @@ async function renderGroups(){
       </div>`;
     }
 
-    function matchCard(home,away,gold){
-      const bg=gold?'rgba(255,200,48,.08)':'var(--card)';
-      const bd=gold?'rgba(255,200,48,.35)':'var(--border)';
-      return `<div style="background:${bg};border:1px solid ${bd};border-radius:7px;padding:5px 6px">
-        <div style="border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:2px;margin-bottom:2px">${slotHTML(home)}</div>
-        ${slotHTML(away)}
-      </div>`;
-    }
-    function tbdCard(gold){
-      const bg=gold?'rgba(255,200,48,.08)':'var(--card)';
-      const bd=gold?'rgba(255,200,48,.35)':'var(--border)';
-      return `<div style="background:${bg};border:1px solid ${bd};border-radius:7px;padding:5px 6px">
-        <div style="border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:2px;margin-bottom:2px">${slotHTML('TBD')}</div>
-        ${slotHTML('TBD')}
-      </div>`;
-    }
+
 
     // ── Dynamic bracket slot resolution ──
     // Reads from settled MATCHES in DB — auto-fills as rounds progress
@@ -2948,11 +2951,11 @@ function normaliseTeamName(name){
     'Republic of Korea':'South Korea',
     'USA':'USA','United States':'USA',
     'Bosnia':'Bosnia and Herzegovina',
-    'Bosnia and Herzegovina':'Bosnia and Herzegovina',
+'Bosnia and Herzegovina':'Bosnia and Herzegovina','Bosnia & Herzegovina':'Bosnia and Herzegovina','Bosnia-Herzegovina':'Bosnia and Herzegovina','Bosnia Herzegovina':'Bosnia and Herzegovina','Bosnia':'Bosnia and Herzegovina',
     'Turkiye':'Türkiye','Turkey':'Türkiye',
     'Czech Republic':'Czechia',
-    'DR Congo':'DR Congo','Congo DR':'DR Congo',
-    'Ivory Coast':'Ivory Coast',"Côte d'Ivoire":'Ivory Coast',
+    'DR Congo':'DR Congo','Congo DR':'DR Congo','Democratic Republic of the Congo':'DR Congo','DR. Congo':'DR Congo','Congo, DR':'DR Congo','Congo-Kinshasa':'DR Congo',
+    'Ivory Coast':'Ivory Coast',"Côte d'Ivoire":'Ivory Coast',"Cote d'Ivoire":'Ivory Coast','Cote dIvoire':'Ivory Coast',
     'Cabo Verde':'Cape Verde','Cape Verde':'Cape Verde','Czech Republic':'Czechia','Czechia':'Czechia',
     'Curacao':'Curaçao',
     'New Zealand':'New Zealand',
