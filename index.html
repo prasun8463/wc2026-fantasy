@@ -3265,16 +3265,29 @@ function generateStageBreakdownMessage(){
   const dt=new Date(Date.now()+IST_OFFSET_MS);
   const dStr=MONTH_NAMES[dt.getUTCMonth()]+' '+dt.getUTCDate();
   const activeStages=ROUND_DEFS.filter(r=>MATCHES.some(m=>r.grps.includes(m.grp)&&m.resolved));
-
   const medals=['🥇','🥈','🥉'];
-  const fmt=(n)=>n>0?'+'+n:n===0?'—':String(n);
-  const fmtRs=(n)=>n>0?'+₹'+n:n<0?'-₹'+Math.abs(n):'₹0';
 
-  let msg='🏆 *'+LEAGUE.name+'*\n';
-  msg+=dStr+' · _'+settledCount+' of '+totalCount+' matches settled_\n';
-  msg+='━━━━━━━━━━━━━━━━\n';
+  // Column widths
+  const nameW=12;
+  const stgW=6;
+  const totW=8;
+  const pctW=6;
 
-  // Single row per player with all stage columns inline
+  function pad(s,w,right){ s=String(s); return right?s.padStart(w):s.padEnd(w); }
+  function fmtStg(n){ return n>0?'+'+n:n===0?'—':String(n); }
+  function fmtTot(n){ return n>0?'+\u20b9'+n:n<0?'-\u20b9'+Math.abs(n):'\u20b9'+0; }
+  function fmtPct(n){ return n>0?'+'+n+'%':n<0?n+'%':'0%'; }
+
+  // Header
+  let hdr=pad('Player',nameW);
+  activeStages.forEach(r=>{ hdr+=pad(r.key==='group'?'Grp':r.key==='sf'?'SF':r.key.toUpperCase(),stgW,true); });
+  hdr+=pad('Total',totW,true)+pad('P/L%',pctW,true);
+
+  // Divider
+  const div='\u2500'.repeat(hdr.length);
+
+  // Rows
+  let rows='';
   let rank=0;
   sortedMembers.forEach(u=>{
     const s=calcRoundStats(u.username);
@@ -3282,21 +3295,20 @@ function generateStageBreakdownMessage(){
     rank++;
     const pct=plPct(s.overall.bet,s.overall.won);
     const pl=s.overall.pl;
-    const pfx=rank<=3&&pl>0?medals[rank-1]:(rank+'.');
-
-    // Stage values inline
-    const stageParts=activeStages.map(r=>{
-      const lbl=r.key==='group'?'Grp':r.key==='sf'?'SF':r.key.toUpperCase();
-      const v=s[r.key]?.pl||0;
-      return lbl+' '+fmt(v);
-    }).join(' · ');
-
-    const totStr=fmtRs(pl);
-    const pctStr=pct>0?'*+'+pct+'%*':pct<0?'*'+pct+'%*':'*0%*';
-    msg+=pfx+' '+u.username+' · '+stageParts+' · '+totStr+' · '+pctStr+'\n';
+    const pfx=(rank<=3&&pl>0?medals[rank-1]:(rank+'.'))+' ';
+    // Name truncated to fit
+    let name=u.username;
+    const avail=nameW-pfx.length;
+    if(name.length>avail) name=name.slice(0,avail-1)+'\u2026';
+    let row=pad(pfx+name,nameW);
+    activeStages.forEach(r=>{ row+=pad(fmtStg(s[r.key]?.pl||0),stgW,true); });
+    row+=pad(fmtTot(pl),totW,true)+pad(fmtPct(pct),pctW,true);
+    rows+=row+'\n';
   });
 
-  msg+='━━━━━━━━━━━━━━━━\n';
+  let msg='🏆 *'+LEAGUE.name+'*\n';
+  msg+=dStr+' · _'+settledCount+' of '+totalCount+' matches settled_\n\n';
+  msg+='```\n'+hdr+'\n'+div+'\n'+rows+'```\n';
   msg+='_'+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})+' IST_';
   return msg;
 }
