@@ -438,7 +438,7 @@ function dateKey(d){ // returns numeric MMDD key for sorting/comparison
 
 function plColor(v){ return v>0?'var(--success)':v<0?'var(--red)':'var(--muted)'; }
 // Treat exact_bold as exact for win categorisation/stats purposes
-function isExactType(t){ return t==='exact'||t==='exact_bold'||t==='outcome_bold'; }
+function isExactType(t){ return t==='exact'||t==='exact_bold'; }
 // ── Bold pick limits — 13 total per player across the tournament ──
 // R32=5 (of 16), R16=3 (of 8), QF=2 (of 4), SF=2 (of 2), Final+3rd share 1
 function boldLimitForStage(grp){
@@ -1148,7 +1148,7 @@ function openMatchSheet(mid){
     if(status==='settled'){
       const won=(m.resolved_winners||[]).includes(ME.username);
       const rc=won&&m.resolved_type==='exact'?'rt-exact':won&&(m.resolved_type==='outcome')?'rt-outcome':m.resolved_type==='refund'&&won?'rt-refund':won&&m.resolved_type==='exact_bold'?'rt-exact':'rt-wrong';
-      const myPDrawer2=(PREDS[m.id]||[]).find(p=>p.username===username);
+      const myPDrawer2=(PREDS[m.id]||[]).find(p=>p.username===ME.username);
       const isThisBold=myPDrawer2&&myPDrawer2.bold===true;
       const boldW3=(won&&isThisBold&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold'));
       const share3=boldW3?(m.resolved_share||0)*2:(m.resolved_share||0);
@@ -1408,8 +1408,22 @@ function ppShowType(type){
 
   const settled=MATCHES.filter(m=>m.resolved&&(PREDS[m.id]||[]).find(p=>p.username===username));
   let matches=[];
-  if(ppActiveType==='exact') matches=settled.filter(m=>(m.resolved_winners||[]).includes(username)&&isExactType(m.resolved_type));
-  else if(ppActiveType==='outcome') matches=settled.filter(m=>(m.resolved_winners||[]).includes(username)&&m.resolved_type==='outcome');
+  if(ppActiveType==='exact') matches=settled.filter(m=>{
+    if(!(m.resolved_winners||[]).includes(username)) return false;
+    if(!isExactType(m.resolved_type)) return false;
+    // Verify this player's prediction actually matched the exact score
+    const myP=(PREDS[m.id]||[]).find(p=>p.username===username);
+    return myP&&parseInt(myP.pred_home)===parseInt(m.result_home)&&parseInt(myP.pred_away)===parseInt(m.result_away);
+  });
+  else if(ppActiveType==='outcome') matches=settled.filter(m=>{
+    if(!(m.resolved_winners||[]).includes(username)) return false;
+    if(m.resolved_type!=='outcome'&&m.resolved_type!=='outcome_bold') return false;
+    // Outcome win = right team, wrong score (or bold outcome)
+    const myP=(PREDS[m.id]||[]).find(p=>p.username===username);
+    if(!myP) return false;
+    const isExact=parseInt(myP.pred_home)===parseInt(m.result_home)&&parseInt(myP.pred_away)===parseInt(m.result_away);
+    return !isExact; // exclude exact scores (they go in exact bucket)
+  });
   else if(ppActiveType==='wrong') matches=settled.filter(m=>{
     const participated=(PREDS[m.id]||[]).find(p=>p.username===username);
     return participated&&!(m.resolved_winners||[]).includes(username)&&m.resolved_type!=='refund';
@@ -1472,7 +1486,11 @@ function buildPlayerInline(username){
   let exact=0,outcome_win=0,wrong=0,refund=0;
   settled.forEach(m=>{
     const won=(m.resolved_winners||[]).includes(username);
-    if(isExactType(m.resolved_type)&&won) exact++;
+    if(won&&isExactType(m.resolved_type)){
+        const myPExact=(PREDS[m.id]||[]).find(p=>p.username===u.username);
+        if(myPExact&&parseInt(myPExact.pred_home)===parseInt(m.result_home)&&parseInt(myPExact.pred_away)===parseInt(m.result_away)) exact++;
+        else outcome_win++; // bold outcome win counted as outcome, not exact
+      }
     else if(m.resolved_type==='outcome'&&won) outcome_win++;
     else if(m.resolved_type==='refund'&&won) refund++;
     else wrong++;
