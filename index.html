@@ -3266,14 +3266,15 @@ function generateStageBreakdownMessage(){
   const dStr=MONTH_NAMES[dt.getUTCMonth()]+' '+dt.getUTCDate();
   const activeStages=ROUND_DEFS.filter(r=>MATCHES.some(m=>r.grps.includes(m.grp)&&m.resolved));
 
-  // ── Header ──
-  let msg='🏆 *'+LEAGUE.name+'*\n';
-  msg+='_'+dStr+' · '+settledCount+'/'+totalCount+' matches_\n';
-  msg+='━━━━━━━━━━━━━━━━\n\n';
-
-  // ── Single line per player: rank · name · P/L% · total ──
   const medals=['🥇','🥈','🥉'];
-  const rankPfx=(r,pl)=>r<=3?(pl>0?medals[r-1]:r+'.'):(r+'.');
+  const fmt=(n)=>n>0?'+'+n:n===0?'—':String(n);
+  const fmtRs=(n)=>n>0?'+₹'+n:n<0?'-₹'+Math.abs(n):'₹0';
+
+  let msg='🏆 *'+LEAGUE.name+'*\n';
+  msg+=dStr+' · _'+settledCount+' of '+totalCount+' matches settled_\n';
+  msg+='━━━━━━━━━━━━━━━━\n';
+
+  // Single row per player with all stage columns inline
   let rank=0;
   sortedMembers.forEach(u=>{
     const s=calcRoundStats(u.username);
@@ -3281,32 +3282,22 @@ function generateStageBreakdownMessage(){
     rank++;
     const pct=plPct(s.overall.bet,s.overall.won);
     const pl=s.overall.pl;
-    const pfx=rankPfx(rank,pl);
-    const pctStr=pct>0?'*+'+pct+'%*':'*'+pct+'%*';
-    const totStr=pl>0?'+₹'+pl:pl<0?'−₹'+Math.abs(pl):'₹0';
-    msg+=pfx+' '+u.username+' · '+pctStr+' ('+totStr+')\n';
+    const pfx=rank<=3&&pl>0?medals[rank-1]:(rank+'.');
+
+    // Stage values inline
+    const stageParts=activeStages.map(r=>{
+      const lbl=r.key==='group'?'Grp':r.key==='sf'?'SF':r.key.toUpperCase();
+      const v=s[r.key]?.pl||0;
+      return lbl+' '+fmt(v);
+    }).join(' · ');
+
+    const totStr=fmtRs(pl);
+    const pctStr=pct>0?'*+'+pct+'%*':pct<0?'*'+pct+'%*':'*0%*';
+    msg+=pfx+' '+u.username+' · '+stageParts+' · '+totStr+' · '+pctStr+'\n';
   });
 
-  // ── Stage breakdown summary (compact, below the table) ──
-  if(activeStages.length>1){
-    msg+='\n━━━━━━━━━━━━━━━━\n';
-    const stageLabels=activeStages.map(r=>r.key==='group'?'Grp':r.key==='sf'?'SF':r.key.toUpperCase());
-    msg+='_By stage ('+stageLabels.join(' · ')+')_\n';
-    rank=0;
-    sortedMembers.forEach(u=>{
-      const s=calcRoundStats(u.username);
-      if(s.overall.bet===0) return;
-      rank++;
-      const pfx=rankPfx(rank,s.overall.pl);
-      const parts=activeStages.map(r=>{
-        const p=s[r.key]?.pl||0;
-        return p>0?'+₹'+p:p===0?'—':'−₹'+Math.abs(p);
-      });
-      msg+=pfx+' '+u.username+': '+parts.join(' · ')+'\n';
-    });
-  }
-
-  msg+='\n_'+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})+' IST_';
+  msg+='━━━━━━━━━━━━━━━━\n';
+  msg+='_'+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})+' IST_';
   return msg;
 }
 
