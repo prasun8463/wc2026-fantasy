@@ -3287,8 +3287,7 @@ function generateStageBreakdownMessage(){
     const pct=plPct(s.overall.bet,s.overall.won);
     const pl=s.overall.pl;
     const pfx=rank<=3&&pl>0?medals[rank-1]:(rank+'.');
-    // Truncate name to 9 chars max to keep lines short
-    const name=u.username.length>9?u.username.slice(0,8)+'…':u.username;
+    const name=u.username;
     const stgVals=activeStages.map(r=>fmtStg(s[r.key]?.pl||0)).join(' · ');
     const pctStr=pct>0?'*+'+pct+'%*':pct<0?'*'+pct+'%*':'*0%*';
     msg+=pfx+' *'+name+'* '+stgVals+' · '+fmtTot(pl)+' · '+pctStr+'\n';
