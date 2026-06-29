@@ -3323,42 +3323,158 @@ function shareStageBreakdownWhatsApp(){
 }
 
 async function screenshotStageBreakdown(){
-  // First switch to LB tab so the element is rendered
-  const alreadyOnLB=activeTab==='lb';
-  if(!alreadyOnLB){ goTab('lb'); await new Promise(r=>setTimeout(r,400)); }
-  const el=document.getElementById('stage-breakdown-capture');
-  if(!el){ toast('Stage breakdown not visible — no settled matches yet'); return; }
-  if(typeof html2canvas==='undefined'){ toast('Screenshot library not loaded yet — try again'); return; }
-  toast('Capturing...', 2000);
-  try{
-    const canvas=await html2canvas(el,{
-      backgroundColor:'#0a140a',
-      scale:2, // retina quality
-      useCORS:true,
-      logging:false
+  if(!LEAGUE||!MEMBERS||!MEMBERS.length){ toast('No data yet'); return; }
+  toast('Generating image...', 2000);
+
+  const activeStages=ROUND_DEFS.filter(r=>MATCHES.some(m=>r.grps.includes(m.grp)&&m.resolved));
+  const sortedMembers=[...MEMBERS].sort((a,b)=>{
+    const sa=calcRoundStats(a.username).overall, sb=calcRoundStats(b.username).overall;
+    return plPct(sb.bet,sb.won)-plPct(sa.bet,sa.won);
+  }).filter(u=>calcRoundStats(u.username).overall.bet>0);
+
+  const medals=['🥇','🥈','🥉'];
+  const stgLabels=activeStages.map(r=>r.key==='group'?'Grp':r.key==='sf'?'SF':r.key.toUpperCase());
+
+  // Layout constants
+  const scale=2;
+  const pad=20;
+  const rowH=36;
+  const nameW=140;
+  const stgW=70;
+  const totW=90;
+  const pctW=70;
+  const cols=[nameW,...activeStages.map(()=>stgW),totW,pctW];
+  const totalW=cols.reduce((a,b)=>a+b,0)+pad*2;
+  const headerRows=3; // league name, date, column headers
+  const totalH=pad+(headerRows*rowH)+(sortedMembers.length*rowH)+pad+30;
+
+  const canvas=document.createElement('canvas');
+  canvas.width=totalW*scale;
+  canvas.height=totalH*scale;
+  const ctx=canvas.getContext('2d');
+  ctx.scale(scale,scale);
+
+  // Background
+  ctx.fillStyle='#0a140a';
+  ctx.fillRect(0,0,totalW,totalH);
+
+  // Helper: get x for column index
+  function colX(i){ let x=pad; for(let j=0;j<i;j++) x+=cols[j]; return x; }
+
+  let y=pad;
+
+  // League name
+  ctx.font='bold 16px -apple-system, sans-serif';
+  ctx.fillStyle='#ffc830';
+  ctx.fillText('🏆 '+LEAGUE.name, pad, y+20);
+  y+=rowH;
+
+  // Date + match count
+  const dt=new Date(Date.now()+IST_OFFSET_MS);
+  const dStr=MONTH_NAMES[dt.getUTCMonth()]+' '+dt.getUTCDate();
+  const settledCount=MATCHES.filter(m=>m.resolved).length;
+  ctx.font='13px -apple-system, sans-serif';
+  ctx.fillStyle='#9fe89f';
+  ctx.fillText(dStr+' · '+settledCount+' of '+MATCHES.length+' matches settled', pad, y+18);
+  y+=rowH;
+
+  // Column headers
+  ctx.fillStyle='rgba(255,255,255,0.06)';
+  ctx.fillRect(0, y, totalW, rowH);
+  ctx.font='bold 12px -apple-system, sans-serif';
+  ctx.fillStyle='#9fe89f';
+  ctx.fillText('Player', colX(0)+6, y+22);
+  stgLabels.forEach((lbl,i)=>{
+    const x=colX(i+1);
+    ctx.fillText(lbl, x+(stgW-ctx.measureText(lbl).width)/2, y+22);
+  });
+  const totLbl='Total';
+  ctx.fillText(totLbl, colX(cols.length-2)+(totW-ctx.measureText(totLbl).width)/2, y+22);
+  const pctLbl='P/L%';
+  ctx.fillText(pctLbl, colX(cols.length-1)+(pctW-ctx.measureText(pctLbl).width)/2, y+22);
+  y+=rowH;
+
+  // Divider
+  ctx.strokeStyle='rgba(255,255,255,0.1)';
+  ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(totalW,y); ctx.stroke();
+
+  // Player rows
+  sortedMembers.forEach((u,i)=>{
+    const s=calcRoundStats(u.username);
+    const pct=plPct(s.overall.bet,s.overall.won);
+    const pl=s.overall.pl;
+    const isMe=u.username===ME.username;
+
+    // Row bg
+    if(isMe){
+      ctx.fillStyle='rgba(74,158,255,0.06)';
+      ctx.fillRect(0,y,totalW,rowH);
+    } else if(i%2===0){
+      ctx.fillStyle='rgba(255,255,255,0.02)';
+      ctx.fillRect(0,y,totalW,rowH);
+    }
+
+    // Rank + name
+    const pfx=i<3&&pl>0?medals[i]:(i+1)+'.';
+    const nameCol=isMe?'#85B7EB':'#ffffff';
+    ctx.font=(isMe?'bold ':'')+'13px -apple-system, sans-serif';
+    ctx.fillStyle=nameCol;
+    ctx.fillText(pfx+' '+u.username, colX(0)+6, y+23);
+
+    // Stage values
+    activeStages.forEach((r,si)=>{
+      const v=s[r.key]?.pl||0;
+      const str=v>0?'+'+v:v===0?'—':String(v);
+      const col=v>0?'#3ddc84':v<0?'#ff5a59':'#9fe89f';
+      ctx.fillStyle=col;
+      ctx.font='13px -apple-system, sans-serif';
+      const x=colX(si+1);
+      ctx.fillText(str, x+(stgW-ctx.measureText(str).width)/2, y+23);
     });
-    canvas.toBlob(async blob=>{
-      // Try Web Share API (works on mobile Safari/Chrome)
-      if(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File([blob],'standings.png',{type:'image/png'})]})){
-        try{
-          await navigator.share({
-            files:[new File([blob],'standings.png',{type:'image/png'})],
-            title:LEAGUE.name+' Standings'
-          });
-          return;
-        }catch(e){ /* fallthrough to download */ }
-      }
-      // Fallback: download the image so user can share manually
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement('a');
-      a.href=url; a.download='standings.png'; a.click();
-      URL.revokeObjectURL(url);
-      toast('Image saved — share from your photos', 3000);
-    },'image/png');
-  }catch(e){
-    console.error('Screenshot failed:',e);
-    toast('Screenshot failed: '+e.message);
-  }
+
+    // Total
+    const totStr=pl>0?'+₹'+pl:pl<0?'-₹'+Math.abs(pl):'₹0';
+    const totCol=pl>0?'#3ddc84':pl<0?'#ff5a59':'#9fe89f';
+    ctx.fillStyle=totCol;
+    ctx.font='bold 13px -apple-system, sans-serif';
+    const tx=colX(cols.length-2);
+    ctx.fillText(totStr, tx+(totW-ctx.measureText(totStr).width)/2, y+23);
+
+    // P/L%
+    const pctStr=(pct>0?'+':'')+pct+'%';
+    const pctCol=pct>0?'#3ddc84':pct<0?'#ff5a59':'#9fe89f';
+    ctx.fillStyle=pctCol;
+    const px=colX(cols.length-1);
+    ctx.fillText(pctStr, px+(pctW-ctx.measureText(pctStr).width)/2, y+23);
+
+    y+=rowH;
+
+    // Row separator
+    ctx.strokeStyle='rgba(255,255,255,0.05)';
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(totalW,y); ctx.stroke();
+  });
+
+  // Footer
+  ctx.font='11px -apple-system, sans-serif';
+  ctx.fillStyle='rgba(255,255,255,0.3)';
+  const ts=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})+' IST';
+  ctx.fillText(ts, totalW-ctx.measureText(ts).width-pad, y+20);
+
+  // Share or download
+  canvas.toBlob(async blob=>{
+    const file=new File([blob],'standings.png',{type:'image/png'});
+    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file],title:LEAGUE.name+' Standings'}); return; }
+      catch(e){ if(e.name==='AbortError') return; }
+    }
+    // Fallback: download
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download='standings.png'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    toast('Image saved — share from your photos 📸', 3000);
+  },'image/png');
 }
 
 async function copyLeaderboard(){  const msg=generateLeaderboardMessage();
