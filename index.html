@@ -859,7 +859,7 @@ function renderMatchList(){
     let pickBadge='';
     if(myP&&status==='settled'){
       const won=(m.resolved_winners||[]).includes(ME.username);
-      const rc=won&&isExactType(m.resolved_type)?'rt-exact':won&&m.resolved_type==='outcome'?'rt-outcome':m.resolved_type==='refund'&&won?'rt-refund':'rt-wrong';
+      const rc=won&&isExactType(m.resolved_type)?'rt-exact':won&&(m.resolved_type==='outcome'||m.resolved_type==='outcome_bold')?'rt-outcome':m.resolved_type==='refund'&&won?'rt-refund':'rt-wrong';
       const myPRow=(PREDS[m.id]||[]).find(p=>p.username===ME?.username);
       const iMyBold=myPRow&&myPRow.bold===true;
       const boldW2=(won&&iMyBold&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold'));
@@ -1147,7 +1147,7 @@ function openMatchSheet(mid){
   if(myP){
     if(status==='settled'){
       const won=(m.resolved_winners||[]).includes(ME.username);
-      const rc=won&&m.resolved_type==='exact'?'rt-exact':won&&(m.resolved_type==='outcome')?'rt-outcome':m.resolved_type==='refund'&&won?'rt-refund':won&&m.resolved_type==='exact_bold'?'rt-exact':'rt-wrong';
+      const rc=won&&(m.resolved_type==='exact'||m.resolved_type==='exact_bold')?'rt-exact':won&&(m.resolved_type==='outcome'||m.resolved_type==='outcome_bold')?'rt-outcome':m.resolved_type==='refund'&&won?'rt-refund':'rt-wrong';
       const myPDrawer2=(PREDS[m.id]||[]).find(p=>p.username===ME.username);
       const isThisBold=myPDrawer2&&myPDrawer2.bold===true;
       const boldW3=(won&&isThisBold&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold'));
@@ -1491,7 +1491,7 @@ function buildPlayerInline(username){
         if(myPExact&&parseInt(myPExact.pred_home)===parseInt(m.result_home)&&parseInt(myPExact.pred_away)===parseInt(m.result_away)) exact++;
         else outcome_win++; // bold outcome win counted as outcome, not exact
       }
-    else if(m.resolved_type==='outcome'&&won) outcome_win++;
+    else if((m.resolved_type==='outcome'||m.resolved_type==='outcome_bold')&&won) outcome_win++;
     else if(m.resolved_type==='refund'&&won) refund++;
     else wrong++;
   });
@@ -1549,12 +1549,12 @@ function renderLB(){
       if(!myP){skipped++;return;}
       participated++;
       const won=(m.resolved_winners||[]).includes(u.username);
-      const isWin=(isExactType(m.resolved_type)||m.resolved_type==='outcome')&&won;
+      const isWin=(isExactType(m.resolved_type)||m.resolved_type==='outcome'||m.resolved_type==='outcome_bold')&&won;
       if(myP.bold){ boldTotal++; if(isWin) boldWin++; }
       else { safeTotal++; if(isWin) safeWin++; }
       if(m.resolved_type!=='refund') form.push(isWin?'W':'L');
       if(isExactType(m.resolved_type)&&won){exact++;if(m.resolved_share>biggestWin)biggestWin=m.resolved_share;}
-      else if(m.resolved_type==='outcome'&&won){outcome_win++;if(m.resolved_share>biggestWin)biggestWin=m.resolved_share;}
+      else if((m.resolved_type==='outcome'||m.resolved_type==='outcome_bold')&&won){outcome_win++;if(m.resolved_share>biggestWin)biggestWin=m.resolved_share;}
       else if(m.resolved_type==='refund'){}  // refund: neutral, don't count
       else{wrong++;}
     });
@@ -1564,7 +1564,7 @@ function renderLB(){
     for(let i=predSettled.length-1;i>=0;i--){
       const m=predSettled[i];
       const won=(m.resolved_winners||[]).includes(u.username);
-      const isWin=(isExactType(m.resolved_type)||m.resolved_type==='outcome')&&won;
+      const isWin=(isExactType(m.resolved_type)||m.resolved_type==='outcome'||m.resolved_type==='outcome_bold')&&won;
       if(isWin) onStreak++;
       else break; // stop at first non-win (including refunds and losses)
     }
@@ -1874,7 +1874,7 @@ function showScorecardModal(type){
   } else if(type==='outcome'){
     matches=settled.filter(m=>{
       const won=(m.resolved_winners||[]).includes(ME.username);
-      return m.resolved_type==='outcome'&&won;
+      return (m.resolved_type==='outcome'||m.resolved_type==='outcome_bold')&&won;
     });
   } else if(type==='wrong'){
     matches=settled.filter(m=>{
@@ -1924,7 +1924,7 @@ function showScorecardModal(type){
       else if(type==='refund') resultLine=`<span style="color:var(--info)">Void ₹${m.resolved_share}</span>`;
       else if(type==='played'){
         if(isExactType(m.resolved_type)&&won2) resultLine=`<span style="color:var(--success);font-weight:600">${m.resolved_type==='exact_bold'?'🔥 Bold ':'Exact '}+₹${m.resolved_share}</span>`;
-        else if(m.resolved_type==='outcome'&&won2) resultLine=`<span style="color:var(--warn);font-weight:600">Outcome +₹${m.resolved_share}</span>`;
+        else if((m.resolved_type==='outcome'||m.resolved_type==='outcome_bold')&&won2) resultLine=`<span style="color:var(--warn);font-weight:600">Outcome +₹${m.resolved_share}</span>`;
         else if(m.resolved_type==='refund'&&won2) resultLine=`<span style="color:var(--info)">Void ₹${m.resolved_share}</span>`;
         else resultLine=`<span style="color:var(--red)">No win</span>`;
       }
