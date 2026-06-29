@@ -199,6 +199,7 @@
   .empty { text-align: center; color: var(--muted); font-size: 13px; padding: 24px; }
   .ok-msg { font-size: 11px; color: var(--success); margin-top: 5px; }
 </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
@@ -1754,14 +1755,17 @@ function renderLB(){
       cells+='<td style="padding:7px 6px;text-align:center;font-size:12px;font-weight:700;color:'+plc+';border-bottom:1px solid rgba(255,255,255,.04)">'+(ov.pl!==0?fmtPL(ov.pl):'—')+'</td>';
       rows+='<tr style="background:'+rowBg+'">'+cells+'</tr>';
     });
-    tableHtml='<div class="sec" style="margin-top:16px">Stage breakdown</div>'
+    tableHtml='<div id="stage-breakdown-capture" style="background:var(--dark);padding:12px;border-radius:12px">'
+      +'<div class="sec" style="margin-top:0">Stage breakdown</div>'
       +'<div style="font-size:10px;color:var(--muted);text-align:right;margin-bottom:3px">← scroll for later stages →</div>'
       +'<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border);margin-bottom:4px">'
       +'<table style="width:100%;border-collapse:collapse;min-width:480px">'
       +'<thead style="background:rgba(255,255,255,.03)"><tr>'+thRow+'</tr><tr>'+subRow+'</tr></thead>'
       +'<tbody>'+rows+'</tbody>'
       +'</table></div>'
-      +'<div style="font-size:10px;color:var(--muted);margin-bottom:14px">Dimmed = not yet started · Tap any player row to see match details</div>';
+      +'<div style="font-size:10px;color:var(--muted);margin-bottom:4px">Dimmed = not yet started · Tap any player row to see match details</div>'
+      +'<div style="font-size:10px;color:var(--muted);text-align:right">'+LEAGUE.name+' · '+new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short'})+'</div>'
+      +'</div>';
   }
 
   const html=headerHtml+podiumHtml+bannerHtml+storyHtml+insightsHtml+standingsHtml+tableHtml;
@@ -3318,6 +3322,45 @@ function shareStageBreakdownWhatsApp(){
   window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
 }
 
+async function screenshotStageBreakdown(){
+  // First switch to LB tab so the element is rendered
+  const alreadyOnLB=activeTab==='lb';
+  if(!alreadyOnLB){ goTab('lb'); await new Promise(r=>setTimeout(r,400)); }
+  const el=document.getElementById('stage-breakdown-capture');
+  if(!el){ toast('Stage breakdown not visible — no settled matches yet'); return; }
+  if(typeof html2canvas==='undefined'){ toast('Screenshot library not loaded yet — try again'); return; }
+  toast('Capturing...', 2000);
+  try{
+    const canvas=await html2canvas(el,{
+      backgroundColor:'#0a140a',
+      scale:2, // retina quality
+      useCORS:true,
+      logging:false
+    });
+    canvas.toBlob(async blob=>{
+      // Try Web Share API (works on mobile Safari/Chrome)
+      if(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File([blob],'standings.png',{type:'image/png'})]})){
+        try{
+          await navigator.share({
+            files:[new File([blob],'standings.png',{type:'image/png'})],
+            title:LEAGUE.name+' Standings'
+          });
+          return;
+        }catch(e){ /* fallthrough to download */ }
+      }
+      // Fallback: download the image so user can share manually
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url; a.download='standings.png'; a.click();
+      URL.revokeObjectURL(url);
+      toast('Image saved — share from your photos', 3000);
+    },'image/png');
+  }catch(e){
+    console.error('Screenshot failed:',e);
+    toast('Screenshot failed: '+e.message);
+  }
+}
+
 async function copyLeaderboard(){  const msg=generateLeaderboardMessage();
   try {
     await navigator.clipboard.writeText(msg);
@@ -3724,8 +3767,11 @@ function renderAdmin(){
         <button class="btn btn-gold" onclick="shareStageBreakdownWhatsApp()" style="width:auto;padding:10px 20px;font-size:14px;touch-action:manipulation">
           📲 Open in WhatsApp
         </button>
+        <button onclick="screenshotStageBreakdown()" style="background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;padding:10px 18px;cursor:pointer;font-weight:600;touch-action:manipulation">
+          📸 Share as image
+        </button>
         <button onclick="copyStageBreakdown()" style="background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;padding:10px 18px;cursor:pointer;font-weight:600;touch-action:manipulation">
-          📋 Copy
+          📋 Copy text
         </button>
       </div>
     </div>`:'';
