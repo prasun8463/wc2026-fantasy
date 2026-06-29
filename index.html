@@ -3271,12 +3271,12 @@ function generateStageBreakdownMessage(){
   const fmtTot=(n)=>n>0?'+₹'+n:n<0?'-₹'+Math.abs(n):'₹0';
   const fmtPct=(n)=>n>0?'+'+n+'%':n<0?n+'%':'0%';
 
-  // Build compact stage header e.g. "Grp · R32"
-  const stgHdr=activeStages.map(r=>r.key==='group'?'Grp':r.key==='sf'?'SF':r.key.toUpperCase()).join(' · ');
+  // Compact stage header e.g. "Grp · R32 · P/L%"
+  const stgHdr=activeStages.map(r=>r.key==='group'?'Grp':r.key==='sf'?'SF':r.key.toUpperCase()).join(' · ')+' · P/L%';
 
   let msg='🏆 *'+LEAGUE.name+'*\n';
   msg+=dStr+' · _'+settledCount+' of '+totalCount+' matches settled_\n';
-  msg+='_'+stgHdr+' · Total · P/L%_\n';
+  msg+='_'+stgHdr+'_\n';
   msg+='━━━━━━━━━━━━━━━━\n';
 
   let rank=0;
@@ -3290,7 +3290,7 @@ function generateStageBreakdownMessage(){
     const name=u.username;
     const stgVals=activeStages.map(r=>fmtStg(s[r.key]?.pl||0)).join(' · ');
     const pctStr=pct>0?'*+'+pct+'%*':pct<0?'*'+pct+'%*':'*0%*';
-    msg+=pfx+' *'+name+'* '+stgVals+' · '+fmtTot(pl)+' · '+pctStr+'\n';
+    msg+=pfx+' *'+name+'* '+stgVals+' · '+pctStr+'\n';
   });
 
   msg+='━━━━━━━━━━━━━━━━\n';
