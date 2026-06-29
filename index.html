@@ -860,12 +860,14 @@ function renderMatchList(){
     if(myP&&status==='settled'){
       const won=(m.resolved_winners||[]).includes(ME.username);
       const rc=won&&isExactType(m.resolved_type)?'rt-exact':won&&m.resolved_type==='outcome'?'rt-outcome':m.resolved_type==='refund'&&won?'rt-refund':'rt-wrong';
-      const boldW2=(won&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold'));
+      const myPRow=(PREDS[m.id]||[]).find(p=>p.username===ME?.username);
+      const iMyBold=myPRow&&myPRow.bold===true;
+      const boldW2=(won&&iMyBold&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold'));
       const share2=boldW2?(m.resolved_share||0)*2:(m.resolved_share||0);
-      const rl=won&&m.resolved_type==='exact_bold'?'🔥 Bold Exact +₹'+share2
-              :won&&m.resolved_type==='outcome_bold'?'🔥 Bold Outcome +₹'+share2
-              :won&&m.resolved_type==='exact'?'Exact +₹'+share2
-              :won&&m.resolved_type==='outcome'?'Outcome +₹'+share2
+      const rl=won&&m.resolved_type==='exact_bold'&&iMyBold?'🔥 Bold Exact +₹'+share2
+              :won&&m.resolved_type==='outcome_bold'&&iMyBold?'🔥 Bold Outcome +₹'+share2
+              :won&&(m.resolved_type==='exact_bold'||m.resolved_type==='exact')?'Exact +₹'+share2
+              :won&&(m.resolved_type==='outcome_bold'||m.resolved_type==='outcome')?'Outcome +₹'+share2
               :m.resolved_type==='refund'&&won?'Void ₹'+(m.resolved_share||0):'No win';
       pickBadge=`<span class="rtag ${rc}" style="font-size:9px;margin-left:4px">${rl}</span>`;
     } else if(myP){
@@ -1146,12 +1148,14 @@ function openMatchSheet(mid){
     if(status==='settled'){
       const won=(m.resolved_winners||[]).includes(ME.username);
       const rc=won&&m.resolved_type==='exact'?'rt-exact':won&&(m.resolved_type==='outcome')?'rt-outcome':m.resolved_type==='refund'&&won?'rt-refund':won&&m.resolved_type==='exact_bold'?'rt-exact':'rt-wrong';
-      const boldW3=(won&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold'));
+      const myPDrawer2=(PREDS[m.id]||[]).find(p=>p.username===username);
+      const isThisBold=myPDrawer2&&myPDrawer2.bold===true;
+      const boldW3=(won&&isThisBold&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold'));
       const share3=boldW3?(m.resolved_share||0)*2:(m.resolved_share||0);
-      const rl=won&&m.resolved_type==='exact'?'Exact! +₹'+share3
-              :won&&m.resolved_type==='exact_bold'?'🔥 Bold Exact! +₹'+share3
-              :won&&m.resolved_type==='outcome_bold'?'🔥 Bold Outcome! +₹'+share3
-              :won&&m.resolved_type==='outcome'?'Outcome +₹'+share3
+      const rl=won&&m.resolved_type==='exact'&&!isThisBold?'Exact! +₹'+share3
+              :won&&(m.resolved_type==='exact_bold'||m.resolved_type==='exact')&&isThisBold?'🔥 Bold Exact! +₹'+share3
+              :won&&m.resolved_type==='outcome_bold'&&isThisBold?'🔥 Bold Outcome! +₹'+share3
+              :won&&(m.resolved_type==='outcome_bold'||m.resolved_type==='outcome')?'Outcome +₹'+share3
               :m.resolved_type==='refund'&&won?'Void ₹'+(m.resolved_share||0):'No win';
       const boldBadge=myP.bold?'<span style="font-size:10px;color:var(--gold);font-weight:700;margin-left:6px;background:rgba(255,200,48,.12);border:1px solid rgba(255,200,48,.4);border-radius:4px;padding:1px 6px;vertical-align:middle">🔥 BOLD</span>':'';
       html+=`<div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
@@ -1274,15 +1278,19 @@ function openMatchSheet(mid){
       const isMe=p.username===ME.username;
       const won=(m.resolved_winners||[]).includes(p.username);
       // Only show outcome tags on fully settled matches — in-progress should be neutral
+      const isBoldPick=p.bold===true;
+      const isBoldWin=won&&isBoldPick&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold');
+      const winShare=(m.resolved_share||0)*(isBoldWin?2:1);
       const tag=!m.resolved
         ? `<span style="font-size:10px;color:var(--muted);padding:2px 6px">–</span>`
-        : won&&m.resolved_type==='exact'?`<span class="rtag rt-exact">Exact</span>`
-        : won&&m.resolved_type==='exact_bold'?`<span class="rtag rt-exact">🔥 Bold</span>`
-        : won&&m.resolved_type==='outcome'?`<span class="rtag rt-outcome">Outcome</span>`
+        : won&&(m.resolved_type==='exact'||m.resolved_type==='exact_bold')&&!isBoldPick?`<span class="rtag rt-exact">Exact</span>`
+        : won&&m.resolved_type==='exact_bold'&&isBoldPick?`<span class="rtag rt-exact">🔥 Bold Exact</span>`
+        : won&&m.resolved_type==='outcome_bold'&&isBoldPick?`<span class="rtag rt-outcome">🔥 Bold Outcome</span>`
+        : won&&(m.resolved_type==='outcome'||m.resolved_type==='outcome_bold')?`<span class="rtag rt-outcome">Outcome</span>`
         : m.resolved_type==='refund'&&won?`<span class="rtag rt-refund">Void</span>`
         : `<span class="rtag rt-wrong">Wrong</span>`;
-      const winAmt=won?`<span style="font-size:11px;color:var(--success);font-weight:600;margin-left:4px">+₹${m.resolved_share}</span>`:'';
-      const boldMark=p.bold?'<span style="font-size:9px;color:var(--gold);margin-left:3px" title="Bold pick">🔥</span>':'';
+      const winAmt=won?`<span style="font-size:11px;color:var(--success);font-weight:600;margin-left:4px">+₹${winShare}</span>`:'';
+      const boldMark=p.bold?'<span style="font-size:9px;color:var(--gold);margin-left:3px">🔥</span>':'';
       html+=`<div class="pred-row">
         <span style="color:${isMe?'var(--info)':'var(--text)'}${isMe?';font-weight:700':''}">${esc(p.username)}${isMe?' <span style="font-size:10px;color:var(--muted)">(you)</span>':''}${boldMark}</span>
         <span style="display:flex;align-items:center;gap:5px"><span style="font-size:13px;color:var(--muted)">${p.pred_home}–${p.pred_away}</span>${tag}${winAmt}</span>
@@ -3238,66 +3246,49 @@ function generateStageBreakdownMessage(){
   const totalCount=MATCHES.length;
   const dt=new Date(Date.now()+IST_OFFSET_MS);
   const dStr=MONTH_NAMES[dt.getUTCMonth()]+' '+dt.getUTCDate();
-
-  // Only show stages that have at least one settled match
   const activeStages=ROUND_DEFS.filter(r=>MATCHES.some(m=>r.grps.includes(m.grp)&&m.resolved));
 
+  // ── Header ──
   let msg='🏆 *'+LEAGUE.name+'*\n';
-  msg+=dStr+' · _'+settledCount+' of '+totalCount+' matches settled_\n\n';
+  msg+='_'+dStr+' · '+settledCount+'/'+totalCount+' matches_\n';
+  msg+='━━━━━━━━━━━━━━━━\n\n';
 
-  // Use monospace block for alignment
-  msg+='```\n';
-
-  // Column widths — name col wider, stage cols compact
-  const nameW=12;
-  const stgW=6;
-  const totW=8;
-  const pctW=7;
-
-  // Header row
-  let hdr='Player'.padEnd(nameW);
-  activeStages.forEach(r=>{
-    const lbl=r.key==='group'?'Grp':r.key==='sf'?'SF':r.key.toUpperCase();
-    hdr+=lbl.padStart(stgW);
-  });
-  hdr+='Total'.padStart(totW);
-  hdr+='P/L%'.padStart(pctW);
-  msg+=hdr+'\n';
-  msg+='─'.repeat(hdr.length)+'\n';
-
-  // Player rows — sorted by P/L%
+  // ── Single line per player: rank · name · P/L% · total ──
   const medals=['🥇','🥈','🥉'];
+  const rankPfx=(r,pl)=>r<=3?(pl>0?medals[r-1]:r+'.'):(r+'.');
   let rank=0;
-  sortedMembers.forEach((u,i)=>{
+  sortedMembers.forEach(u=>{
     const s=calcRoundStats(u.username);
     if(s.overall.bet===0) return;
     rank++;
     const pct=plPct(s.overall.bet,s.overall.won);
     const pl=s.overall.pl;
-    const medal=rank<=3&&pl>0?medals[rank-1]:(rank+'.');
-    // Truncate name to fit
-    let name=u.username;
-    const prefix=medal+' ';
-    const avail=nameW-prefix.length;
-    if(name.length>avail) name=name.slice(0,avail-1)+'…';
-    let row=(prefix+name).padEnd(nameW);
-    // Stage P/L columns
-    activeStages.forEach(r=>{
-      const stagePl=s[r.key]?.pl||0;
-      const stgStr=stagePl>0?'+'+stagePl:stagePl===0?'—':''+stagePl;
-      row+=stgStr.padStart(stgW);
-    });
-    // Total absolute P/L
-    const totStr=pl>0?'+₹'+pl:pl<0?'-₹'+Math.abs(pl):'₹0';
-    row+=totStr.padStart(totW);
-    // P/L%
-    const pctStr=pct>0?'+'+pct+'%':pct===0?'0%':pct+'%';
-    row+=pctStr.padStart(pctW);
-    msg+=row+'\n';
+    const pfx=rankPfx(rank,pl);
+    const pctStr=pct>0?'*+'+pct+'%*':'*'+pct+'%*';
+    const totStr=pl>0?'+₹'+pl:pl<0?'−₹'+Math.abs(pl):'₹0';
+    msg+=pfx+' '+u.username+' · '+pctStr+' ('+totStr+')\n';
   });
 
-  msg+='```\n';
-  msg+='_Updated '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})+' IST_';
+  // ── Stage breakdown summary (compact, below the table) ──
+  if(activeStages.length>1){
+    msg+='\n━━━━━━━━━━━━━━━━\n';
+    const stageLabels=activeStages.map(r=>r.key==='group'?'Grp':r.key==='sf'?'SF':r.key.toUpperCase());
+    msg+='_By stage ('+stageLabels.join(' · ')+')_\n';
+    rank=0;
+    sortedMembers.forEach(u=>{
+      const s=calcRoundStats(u.username);
+      if(s.overall.bet===0) return;
+      rank++;
+      const pfx=rankPfx(rank,s.overall.pl);
+      const parts=activeStages.map(r=>{
+        const p=s[r.key]?.pl||0;
+        return p>0?'+₹'+p:p===0?'—':'−₹'+Math.abs(p);
+      });
+      msg+=pfx+' '+u.username+': '+parts.join(' · ')+'\n';
+    });
+  }
+
+  msg+='\n_'+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})+' IST_';
   return msg;
 }
 
