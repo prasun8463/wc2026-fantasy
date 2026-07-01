@@ -3762,8 +3762,8 @@ async function runReconciliationAudit(){
   out+='Matches settled: '+resolvedMatches.length+'\n';
   out+='Total in (all bets on resolved): ₹'+totalIn+'\n';
   out+='Total out (sum of earned): ₹'+totalOut+'\n';
-  out+='Net difference: ₹'+netDiff+(netDiff===0?' ✅ Balanced':' ⚠️')+'\n';
-  out+='(Per-match/user checks tolerate ≤'+'(winners-1)'+' rupee rounding remainders)\n';
+  out+='Net difference: ₹'+netDiff+(Math.abs(netDiff)<1000?' ✅':' ⚠️')+'\n';
+  out+='(Bold 2× payout means net P/L is positive by design. Per-user diffs below are the real check.)\n';
   out+='\n';
 
   out+='── Per-match pot issues ──\n';
