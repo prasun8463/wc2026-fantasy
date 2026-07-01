@@ -3342,8 +3342,9 @@ async function screenshotStageBreakdown(){
   const nameW=140;
   const stgW=70;
   const totW=90;
+  const betW=75;
   const pctW=70;
-  const cols=[nameW,...activeStages.map(()=>stgW),totW,pctW];
+  const cols=[nameW,...activeStages.map(()=>stgW),totW,betW,pctW];
   const totalW=cols.reduce((a,b)=>a+b,0)+pad*2;
   const headerRows=3; // league name, date, column headers
   const totalH=pad+(headerRows*rowH)+(sortedMembers.length*rowH)+pad+30;
@@ -3388,8 +3389,10 @@ async function screenshotStageBreakdown(){
     const x=colX(i+1);
     ctx.fillText(lbl, x+(stgW-ctx.measureText(lbl).width)/2, y+22);
   });
-  const totLbl='Total';
-  ctx.fillText(totLbl, colX(cols.length-2)+(totW-ctx.measureText(totLbl).width)/2, y+22);
+  const totLbl='Total P/L';
+  ctx.fillText(totLbl, colX(cols.length-3)+(totW-ctx.measureText(totLbl).width)/2, y+22);
+  const betLbl='Total Bet';
+  ctx.fillText(betLbl, colX(cols.length-2)+(betW-ctx.measureText(betLbl).width)/2, y+22);
   const pctLbl='P/L%';
   ctx.fillText(pctLbl, colX(cols.length-1)+(pctW-ctx.measureText(pctLbl).width)/2, y+22);
   y+=rowH;
@@ -3433,13 +3436,20 @@ async function screenshotStageBreakdown(){
       ctx.fillText(str, x+(stgW-ctx.measureText(str).width)/2, y+23);
     });
 
-    // Total
+    // Total P/L
     const totStr=pl>0?'+₹'+pl:pl<0?'-₹'+Math.abs(pl):'₹0';
     const totCol=pl>0?'#3ddc84':pl<0?'#ff5a59':'#9fe89f';
     ctx.fillStyle=totCol;
     ctx.font='bold 13px -apple-system, sans-serif';
-    const tx=colX(cols.length-2);
+    const tx=colX(cols.length-3);
     ctx.fillText(totStr, tx+(totW-ctx.measureText(totStr).width)/2, y+23);
+
+    // Total Bet (context for why total P/L may be high but P/L% low, or vice versa)
+    const betStr='₹'+s.overall.bet;
+    ctx.fillStyle='#9fe89f';
+    ctx.font='13px -apple-system, sans-serif';
+    const bx=colX(cols.length-2);
+    ctx.fillText(betStr, bx+(betW-ctx.measureText(betStr).width)/2, y+23);
 
     // P/L%
     const pctStr=(pct>0?'+':'')+pct+'%';
