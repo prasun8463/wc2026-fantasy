@@ -3681,13 +3681,27 @@ async function runReconciliationAudit(){
     const pot=preds.length*bet;
     const winners=m.resolved_winners||[];
     const share=m.resolved_share||0;
-    const paidOut=winners.length*share;
+    // Account for bold winners earning 2x share (exact_bold / outcome_bold match types)
+    const isBoldType=m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold';
+    const paidOut=winners.reduce((sum,wName)=>{
+      if(isBoldType){
+        const wPred=preds.find(p=>p.username===wName);
+        const isWBold=wPred&&wPred.bold===true;
+        return sum+(isWBold?share*2:share);
+      }
+      return sum+share;
+    },0);
     totalIn+=pot;
     const diff=pot-paidOut;
-    // Tolerate rounding remainders: when pot doesn't divide evenly by winner count,
-    // the remainder (0 to winners-1 rupees) is normal and may be manually allocated
-    // to one winner (captured in their earned, not in the shared resolved_share field).
-    const tolerance=winners.length>0?winners.length-1:0;
+    // Tolerate rounding remainders: when pot doesn't divide evenly by total shares,
+    // the remainder (0 to totalShares-1 rupees) is normal and allocated to first bold winner.
+    const totalShares=isBoldType
+      ? winners.reduce((n,wName)=>{
+          const wPred=preds.find(p=>p.username===wName);
+          return n+((wPred&&wPred.bold===true)?2:1);
+        },0)
+      : winners.length;
+    const tolerance=totalShares>0?totalShares-1:0;
     if(Math.abs(diff)>tolerance){
       matchIssues.push({id:m.id, match:m.home+' vs '+m.away, pot, winners:winners.length, share, paidOut, diff});
     }
@@ -3755,7 +3769,7 @@ async function runReconciliationAudit(){
   out+='── Per-match pot issues ──\n';
   if(matchIssues.length===0) out+='✓ None — all pots fully distributed\n';
   else matchIssues.forEach(i=>{
-    out+='⚠️ '+i.id+' ('+i.match+'): pot=₹'+i.pot+', '+i.winners+' winner(s) × ₹'+i.share+' = ₹'+i.paidOut+', diff=₹'+i.diff+'\n';
+    out+='⚠️ '+i.id+' ('+i.match+'): pot=₹'+i.pot+', paid=₹'+i.paidOut+' (base share ₹'+i.share+' × '+i.winners+' winners, bold winners 2×), diff=₹'+i.diff+'\n';
   });
   out+='\n';
 
