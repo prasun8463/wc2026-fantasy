@@ -2720,10 +2720,21 @@ async function renderGroups(){
     function winnerOf(matchNum){
       // Lookup map: bracket match number → DB match ID
       const ID_MAP={
+        // R32: bracket number → DB ID
         73:'r01',74:'r03',75:'r04',76:'r02',
         77:'r06',78:'r05',79:'r07',80:'r08',
         81:'r10',82:'r09',83:'r11',84:'r12',
-        85:'r13',86:'r15',87:'r16',88:'r14'
+        85:'r13',86:'r15',87:'r16',88:'r14',
+        // R16: bracket number → DB ID (matched by confirmed teams)
+        89:'r16_02',  // Paraguay vs France (W74 vs W77)
+        90:'r16_01',  // Canada vs Morocco (W73 vs W75)
+        91:'r16_03',  // Brazil vs Norway (W76 vs W78)
+        92:'r16_04',  // Mexico vs England (W79 vs W80)
+        93:'r16_05',  // Portugal vs Spain (W83 vs W84)
+        94:'r16_06',  // USA vs Belgium (W81 vs W82)
+        95:'r16_07',  // Argentina vs Egypt (W86 vs W88)
+        96:'r16_08',  // Switzerland vs Colombia (W85 vs W87)
+        // QF/SF/Final: add DB IDs here when created (e.g. 97:'qf_01')
       };
       // R16+ use sequential IDs — adjust as your DB is populated
       const dbId=ID_MAP[matchNum]||('r'+String(matchNum).padStart(2,'0'));
