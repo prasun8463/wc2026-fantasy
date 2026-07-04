@@ -2718,8 +2718,23 @@ async function renderGroups(){
 
 
     // ── Dynamic bracket slot resolution ──
-    // Reads from settled MATCHES in DB — auto-fills as rounds progress
+    // Primary: LIVE_SCORES from worldcup26.ir API (includes penalty scores)
+    // Fallback: DB resolved matches
     function winnerOf(matchNum){
+      const TEAMS={
+        73:['South Africa','Canada'],    74:['Germany','Paraguay'],
+        75:['Netherlands','Morocco'],    76:['Brazil','Japan'],
+        77:['France','Sweden'],          78:['Ivory Coast','Norway'],
+        79:['Mexico','Ecuador'],         80:['England','DR Congo'],
+        81:['USA','Bosnia and Herzegovina'], 82:['Belgium','Senegal'],
+        83:['Portugal','Croatia'],       84:['Spain','Austria'],
+        85:['Switzerland','Algeria'],    86:['Argentina','Cape Verde'],
+        87:['Colombia','Ghana'],         88:['Australia','Egypt'],
+        89:['Paraguay','France'],        90:['Canada','Morocco'],
+        91:['Brazil','Norway'],          92:['Mexico','England'],
+        93:['Portugal','Spain'],         94:['USA','Belgium'],
+        95:['Argentina','Egypt'],        96:['Switzerland','Colombia'],
+      };
       const ID_MAP={
         73:'r01',74:'r03',75:'r04',76:'r02',
         77:'r06',78:'r05',79:'r07',80:'r08',
@@ -2727,18 +2742,40 @@ async function renderGroups(){
         85:'r13',86:'r15',87:'r16',88:'r14',
         89:'r16_02',90:'r16_01',91:'r16_03',92:'r16_04',
         93:'r16_05',94:'r16_06',95:'r16_07',96:'r16_08',
+        // Add QF/SF/Final IDs here as DB matches are created
       };
+
+      const pair=TEAMS[matchNum];
+      const mk=(name)=>({name,flag:FLAGS[normaliseTeamName(name)]||FLAGS[name]||'🏳️'});
+
+      // ── Layer 1: API via LIVE_SCORES (most current, handles penalties) ──
+      if(pair){
+        const [home,away]=pair;
+        const key=normaliseTeamName(home)+'_'+normaliseTeamName(away);
+        const live=LIVE_SCORES[key];
+        if(live&&live.status==='FT'&&live.home!=null&&live.away!=null){
+          if(live.home>live.away) return mk(home);
+          if(live.away>live.home) return mk(away);
+          // Draw — use penalty scores from API (home_penalty_score / away_penalty_score)
+          if(live.homePenalty!=null&&live.awayPenalty!=null){
+            if(live.homePenalty>live.awayPenalty) return mk(home);
+            if(live.awayPenalty>live.homePenalty) return mk(away);
+          }
+        }
+      }
+
+      // ── Layer 2: DB settled matches (when API data has cleared) ──
       const dbId=ID_MAP[matchNum];
-      if(!dbId) return null;
-      const m=MATCHES.find(x=>x.id===dbId);
-      if(!m||!m.resolved||m.result_home==null) return null;
-      const h=parseInt(m.result_home), a=parseInt(m.result_away);
-      if(isNaN(h)||isNaN(a)) return null;
-      // winner_team is set by settleWithScore for all KO matches including penalties
-      if(m.winner_team) return {name:m.winner_team, flag:FLAGS[normaliseTeamName(m.winner_team)]||FLAGS[m.winner_team]||'🏳️'};
-      // Fallback for normal wins (no draw)
-      if(h>a) return {name:m.home, flag:FLAGS[normaliseTeamName(m.home)]||FLAGS[m.home]||'🏳️'};
-      if(a>h) return {name:m.away, flag:FLAGS[normaliseTeamName(m.away)]||FLAGS[m.away]||'🏳️'};
+      if(dbId){
+        const m=MATCHES.find(x=>x.id===dbId);
+        if(m&&m.resolved&&m.result_home!=null){
+          const h=parseInt(m.result_home),a=parseInt(m.result_away);
+          if(h>a) return mk(m.home);
+          if(a>h) return mk(m.away);
+          // Draw — check penalty_winner (can be set via SQL for historical matches)
+          if(m.penalty_winner) return mk(m.penalty_winner);
+        }
+      }
       return null;
     }
 
@@ -2980,7 +3017,9 @@ async function fetchLiveScores(){
         status:status,
         elapsed:g.time_elapsed||'',
         homeScorers:g.home_scorers||null,
-        awayScorers:g.away_scorers||null
+        awayScorers:g.away_scorers||null,
+        homePenalty:parseInt(g.home_penalty_score)||null,
+        awayPenalty:parseInt(g.away_penalty_score)||null,
       };
       updated++;
     }
