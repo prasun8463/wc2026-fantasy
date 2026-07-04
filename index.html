@@ -3402,6 +3402,17 @@ async function screenshotStageBreakdown(){
   const medals=['🥇','🥈','🥉'];
   const stgLabels=activeStages.map(r=>r.key==='group'?'Grp':r.key==='sf'?'SF':r.key.toUpperCase());
 
+  // Compute stage winners (best net P/L per stage)
+  const stageWinners={};
+  activeStages.forEach(r=>{
+    let best=null, bestPl=-Infinity;
+    sortedMembers.forEach(u=>{
+      const v=calcRoundStats(u.username)[r.key]?.pl||0;
+      if(v>bestPl){ bestPl=v; best=u.username; }
+    });
+    if(best&&bestPl>0) stageWinners[r.key]=best;
+  });
+
   // Layout constants
   const scale=2;
   const pad=20;
@@ -3492,14 +3503,24 @@ async function screenshotStageBreakdown(){
     ctx.fillStyle=nameCol;
     ctx.fillText(pfx+' '+u.username, colX(0)+6, y+23);
 
-    // Stage values
+    // Stage values — gold cell background for stage winner
     activeStages.forEach((r,si)=>{
       const v=s[r.key]?.pl||0;
       const str=v>0?'+'+v:v===0?'—':String(v);
-      const col=v>0?'#3ddc84':v<0?'#ff5a59':'#9fe89f';
-      ctx.fillStyle=col;
-      ctx.font='13px -apple-system, sans-serif';
+      const isStageWinner=stageWinners[r.key]===u.username;
       const x=colX(si+1);
+
+      // Gold cell background for stage winner
+      if(isStageWinner){
+        ctx.fillStyle='rgba(255,200,48,0.18)';
+        ctx.beginPath();
+        ctx.roundRect(x+2, y+3, stgW-4, rowH-6, 4);
+        ctx.fill();
+      }
+
+      const col=isStageWinner?'#ffc830':v>0?'#3ddc84':v<0?'#ff5a59':'#9fe89f';
+      ctx.fillStyle=col;
+      ctx.font=(isStageWinner?'bold ':'')+'13px -apple-system, sans-serif';
       ctx.fillText(str, x+(stgW-ctx.measureText(str).width)/2, y+23);
     });
 
@@ -3537,6 +3558,8 @@ async function screenshotStageBreakdown(){
   ctx.fillStyle='rgba(255,255,255,0.3)';
   const ts=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})+' IST';
   ctx.fillText(ts, totalW-ctx.measureText(ts).width-pad, y+20);
+  ctx.fillStyle='rgba(255,200,48,0.6)';
+  ctx.fillText('■ Stage winner', pad, y+20);
 
   // Share or download
   canvas.toBlob(async blob=>{
