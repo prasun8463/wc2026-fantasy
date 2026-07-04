@@ -880,7 +880,21 @@ function renderMatchList(){
     const isAdmin=ME&&LEAGUE&&ME.username===LEAGUE.admin_username;
     let rightHtml='';
     if(status==='settled'){
-      rightHtml=`<div style="font-size:20px;font-weight:700;color:var(--gold);flex-shrink:0">${m.result_home}–${m.result_away}</div>`;
+      // For KO drawn matches — show AET score + penalty winner
+      const isKODraw=isKnockout(m)&&parseInt(m.result_home)===parseInt(m.result_away);
+      const liveKey=normaliseTeamName(m.home)+'_'+normaliseTeamName(m.away);
+      const liveD=LIVE_SCORES[liveKey];
+      let penLine='';
+      if(isKODraw){
+        if(liveD&&liveD.homePenalty!=null&&liveD.awayPenalty!=null){
+          const penWinner=liveD.homePenalty>liveD.awayPenalty?m.home:m.away;
+          penLine='<div style="font-size:10px;color:var(--success);margin-top:1px;text-align:right">🏆 '+penWinner+' '+liveD.homePenalty+'–'+liveD.awayPenalty+' pens</div>';
+        }
+      }
+      rightHtml='<div style="flex-shrink:0;text-align:right">'
+        +'<div style="font-size:20px;font-weight:700;color:var(--gold)">'
+        +m.result_home+'–'+m.result_away+(isKODraw?'<span style="font-size:11px;color:var(--muted);margin-left:3px">AET</span>':'')
+        +'</div>'+penLine+'</div>';
     } else if(status==='finished'){
       // API confirmed FT — show score + quick settle for admin
       const hasLiveScore=live&&live.home!=null;
@@ -1120,7 +1134,15 @@ function openMatchSheet(mid){
   if(status==='settled'){
     html+=`<div style="text-align:center;padding:14px;background:rgba(255,200,48,.08);border:1px solid rgba(255,200,48,.2);border-radius:10px;margin-bottom:12px">
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${m.home_flag} ${m.home} &nbsp;vs&nbsp; ${m.away} ${m.away_flag}</div>
-      <div style="font-size:30px;font-weight:700;color:var(--gold)">${m.result_home} – ${m.result_away}</div>
+      <div style="font-size:30px;font-weight:700;color:var(--gold)">${m.result_home} – ${m.result_away}${isKnockout(m)&&parseInt(m.result_home)===parseInt(m.result_away)?'<span style="font-size:14px;color:var(--muted);margin-left:6px">AET</span>':''}</div>
+      ${(()=>{
+        if(!isKnockout(m)||parseInt(m.result_home)!==parseInt(m.result_away)) return '';
+        const lk=normaliseTeamName(m.home)+'_'+normaliseTeamName(m.away);
+        const ld=LIVE_SCORES[lk];
+        if(!ld||ld.homePenalty==null) return '';
+        const pw=ld.homePenalty>ld.awayPenalty?m.home:m.away;
+        return '<div style="font-size:12px;color:var(--success);margin-top:6px">🏆 '+pw+' advances · '+ld.homePenalty+'–'+ld.awayPenalty+' on penalties</div>';
+      })()}
     </div>`;
   } else if(isLiveOrProgress){
     const live=liveDataFor(m);
