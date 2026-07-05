@@ -3022,12 +3022,20 @@ async function fetchLiveScores(){
       // Map worldcup26.ir statuses to our internal status codes
       // IMPORTANT: time_elapsed is the real-time indicator; finished field can be stale/premature.
       // Priority: time_elapsed first, finished field only as fallback.
+      // For KO matches: if penalty scores present → PEN, else finished → AET (not FT)
+      // because autoSettleFinished requires AET/PEN for KO matches to avoid settling at 90min.
       let status='NS'; // not started
-      if(elapsed==='finished') status='FT';
+      const hasPenalty=!isNaN(parseInt(g.home_penalty_score))&&!isNaN(parseInt(g.away_penalty_score));
+      if(elapsed==='finished'){
+        if(hasPenalty) status='PEN';
+        else status='AET'; // finished KO match without penalties = went to AET or won in 90min
+                           // autoSettleFinished accepts AET for KO, FT for group
+      }
       else if(elapsed==='notstarted'||elapsed===''||elapsed==='null'||!elapsed){
-        // No live activity — check finished field as fallback
-        if(fin) status='FT';
-        else status='NS';
+        if(fin){
+          if(hasPenalty) status='PEN';
+          else status='AET';
+        } else status='NS';
       }
       else status='LIVE'; // any other time_elapsed value (e.g. "45", "HT", "90+3") = in progress
 
