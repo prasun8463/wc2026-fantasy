@@ -4367,6 +4367,12 @@ async function settleWithScore(mid, h, a){
   if(SETTLING.has(mid)){ console.warn('settleWithScore: already settling '+mid+' — skipped'); return; }
   SETTLING.add(mid);
   try{
+  // Re-fetch resolved status from DB — catches concurrent sessions that settled while we were loading
+  const {data:freshMatch}=await sb.from('matches').select('resolved').eq('id',mid).single();
+  if(freshMatch?.resolved){
+    console.warn('settleWithScore: '+mid+' already resolved in DB (concurrent session) — skipped');
+    return;
+  }
   const act=outcome(h,a);
   const arr=PREDS[mid]||[];
   const memberNames=MEMBERS.map(u=>u.username);
@@ -4408,7 +4414,6 @@ async function settleWithScore(mid, h, a){
   // resolved_share stores the 1-share base value; bold winners earn 2× on payout
   const share=winType==='refund'?sv:sv;
   // winner_team = the team that won the match (by score or penalty shootout per API)
-  // For draws: API reports AET score same both sides, winner_team must be set separately
   const winnerTeam=h>a?m.home:a>h?m.away:null;
   const updateObj={
     result_home:h,result_away:a,resolved:true,
@@ -4416,7 +4421,18 @@ async function settleWithScore(mid, h, a){
     resolved_winners:winnerNames
   };
   if(winnerTeam) updateObj.winner_team=winnerTeam;
-  await sb.from('matches').update(updateObj).eq('id',mid);
+
+  // ── DB-level double-settle guard ──────────────────────────────────────
+  // Only update if resolved=false in DB right now. If another session already
+  // settled this match, the update affects 0 rows → we bail out safely.
+  const {data:updatedRows,error:updateErr}=await sb.from('matches')
+    .update(updateObj).eq('id',mid).eq('resolved',false).select('id');
+  if(updateErr){ console.error('Settle update error:',updateErr); return; }
+  if(!updatedRows||updatedRows.length===0){
+    console.warn('settleWithScore: match '+mid+' already resolved in DB — skipping user balance update');
+    return; // Another session beat us to it — do NOT touch user balances
+  }
+
   for(const p of parts){
     const {data:freshUser}=await sb.from('users').select('earned,spent').eq('username',p.username).single();
     const curEarned=freshUser?.earned||0;
