@@ -3657,15 +3657,18 @@ async function copyReminderMessage(){
 
 // ── Admin: test worldcup26.ir /get/groups response shape ──
 async function debugGroupsApi(){
-  const el=document.getElementById('settle-debug');
+  const el=document.getElementById('settle-debug-persist');
   if(!el) return;
-  el.textContent='Fetching worldcup26.ir/get/games for KO match fields...\n';
+  el.textContent='';
+  const log=(s)=>{ el.textContent+=s+'\n'; el.scrollTop=el.scrollHeight; };
+  log('=== '+new Date().toLocaleTimeString('en-IN')+' — Groups API debug ===');
+  log('Fetching worldcup26.ir/get/games for KO match fields...');
   try{
     const res=await fetch('https://worldcup26.ir/get/games');
-    if(!res.ok){ el.textContent+='❌ HTTP '+res.status+'\n'; return; }
+    if(!res.ok){ log('❌ HTTP '+res.status+''); return; }
     const data=await res.json();
     const games=Array.isArray(data)?data:(data.games||data.data||[]);
-    el.textContent+='✓ Got '+games.length+' games\n\n';
+    log('✓ Got '+games.length+' games\n');
     // Find a known penalty match (Germany vs Paraguay or Netherlands vs Morocco)
     const koGames=games.filter(g=>{
       const h=(g.home_team_name_en||'').toLowerCase();
@@ -3674,56 +3677,58 @@ async function debugGroupsApi(){
               a.includes('paraguay')||a.includes('morocco')||a.includes('egypt'));
     });
     if(koGames.length){
-      el.textContent+='KO penalty matches found:\n';
+      log('KO penalty matches found:');
       koGames.forEach(g=>{
-        el.textContent+='\n'+g.home_team_name_en+' vs '+g.away_team_name_en+':\n';
-        Object.keys(g).forEach(k=>{ el.textContent+='  '+k+': '+JSON.stringify(g[k])+'\n'; });
+        log('\n'+g.home_team_name_en+' vs '+g.away_team_name_en+':');
+        Object.keys(g).forEach(k=>{ log('  '+k+': '+JSON.stringify(g[k])+''); });
       });
     } else {
-      el.textContent+='No KO matches found — showing first game fields:\n';
-      Object.keys(games[0]).forEach(k=>{ el.textContent+='  '+k+': '+JSON.stringify(games[0][k])+'\n'; });
+      log('No KO matches found — showing first game fields:');
+      Object.keys(games[0]).forEach(k=>{ log('  '+k+': '+JSON.stringify(games[0][k])+''); });
     }
-  }catch(e){ el.textContent+='❌ Error: '+e.message+'\n'; }
+  }catch(e){ log('❌ Error: '+e.message+''); }
 }
 
 // ── Admin: debug catch-up settle with visible output ──
 async function debugCatchUpSettle(){
-  const el=document.getElementById('settle-debug');
+  const el=document.getElementById('settle-debug-persist');
   if(!el) return;
-  el.textContent='Starting catch-up settle...\n';
+  el.textContent=''; // clear on new run
+  const log=(s)=>{ el.textContent+=s+'\n'; el.scrollTop=el.scrollHeight; };
+  log('=== '+new Date().toLocaleTimeString('en-IN')+' — Catch-up settle ===');
 
-  if(!LEAGUE){ el.textContent+='❌ No LEAGUE loaded\n'; return; }
-  if(!ME){ el.textContent+='❌ No user logged in\n'; return; }
+  if(!LEAGUE){ log('❌ No LEAGUE loaded'); return; }
+  if(!ME){ log('❌ No user logged in'); return; }
   if(ME.username!==LEAGUE.admin_username){
-    el.textContent+='❌ Not admin. Logged in as: '+ME.username+', admin is: '+LEAGUE.admin_username+'\n';
+    log('❌ Not admin. Logged in as: '+ME.username+', admin is: '+LEAGUE.admin_username+'');
     return;
   }
-  el.textContent+='✓ Admin check passed ('+ME.username+')\n';
+  log('✓ Admin check passed ('+ME.username+')');
 
   const unsettled=MATCHES.filter(m=>!m.resolved&&m.home!=='TBD'&&m.away!=='TBD');
-  el.textContent+='Unsettled matches in DB: '+unsettled.length+'\n';
-  if(!unsettled.length){ el.textContent+='Nothing to settle.\n'; return; }
+  log('Unsettled matches in DB: '+unsettled.length+'');
+  if(!unsettled.length){ log('Nothing to settle.'); return; }
   unsettled.slice(0,5).forEach(m=>{
-    el.textContent+='  '+m.id+': '+m.home+' vs '+m.away+' ('+m.match_date+')\n';
+    log('  '+m.id+': '+m.home+' vs '+m.away+' ('+m.match_date+')');
   });
-  if(unsettled.length>5) el.textContent+='  ... and '+(unsettled.length-5)+' more\n';
+  if(unsettled.length>5) log('  ... and '+(unsettled.length-5)+' more');
 
-  el.textContent+='\nFetching worldcup26.ir...\n';
+  log('\nFetching worldcup26.ir...');
   try{
     const res=await fetch('https://worldcup26.ir/get/games');
-    if(!res.ok){ el.textContent+='❌ HTTP '+res.status+'\n'; return; }
+    if(!res.ok){ log('❌ HTTP '+res.status+''); return; }
     const apiGames=await res.json();
     const games=Array.isArray(apiGames)?apiGames:(apiGames.games||apiGames.data||apiGames.matches||[]);
-    el.textContent+='✓ Got '+games.length+' matches from API\n';
+    log('✓ Got '+games.length+' matches from API');
     if(games.length===0){
-      el.textContent+='Response keys: '+Object.keys(apiGames).join(', ')+'\n';
-      el.textContent+='Response preview: '+JSON.stringify(apiGames).slice(0,500)+'\n';
+      log('Response keys: '+Object.keys(apiGames).join(', ')+'');
+      log('Response preview: '+JSON.stringify(apiGames).slice(0,500)+'');
     }
     const finishedGames=games.filter(g=>{ const te=(g.time_elapsed||'').toLowerCase(); const fin=(g.finished||'').toUpperCase()==='TRUE'; return te==='finished'||(fin&&(te===''||te==='notstarted'||te==='null'||!te)); });
-    el.textContent+='Finished matches from API: '+finishedGames.length+'\n';
+    log('Finished matches from API: '+finishedGames.length+'');
 
     // Show ALL API games that match our unsettled teams — including non-finished ones
-    el.textContent+='\nAPI data for our unsettled matches:\n';
+    log('\nAPI data for our unsettled matches:');
     unsettled.forEach(m=>{
       const apiMatch=games.find(g=>{
         const h=normaliseTeamName(g.home_team_name_en||'');
@@ -3732,18 +3737,18 @@ async function debugCatchUpSettle(){
                (normaliseTeamName(m.home)===a&&normaliseTeamName(m.away)===h);
       });
       if(apiMatch){
-        el.textContent+='  '+m.id+' '+m.home+' vs '+m.away+': time_elapsed="'+apiMatch.time_elapsed+'" finished="'+apiMatch.finished+'" score='+apiMatch.home_score+'-'+apiMatch.away_score+'\n';
+        log('  '+m.id+' '+m.home+' vs '+m.away+': time_elapsed="'+apiMatch.time_elapsed+'" finished="'+apiMatch.finished+'" score='+apiMatch.home_score+'-'+apiMatch.away_score+'');
       } else {
-        el.textContent+='  '+m.id+' '+m.home+' vs '+m.away+': NOT FOUND IN API\n';
+        log('  '+m.id+' '+m.home+' vs '+m.away+': NOT FOUND IN API');
       }
     });
-    el.textContent+='\n';
+    log('');
 
     finishedGames.forEach(fg=>{
-      el.textContent+='  API finished: '+fg.home_team_name_en+' '+fg.home_score+'-'+fg.away_score+' '+fg.away_team_name_en+'\n';
+      log('  API finished: '+fg.home_team_name_en+' '+fg.home_score+'-'+fg.away_score+' '+fg.away_team_name_en+'');
     });
 
-    el.textContent+='\nMatching to DB...\n';
+    log('\nMatching to DB...');
     let caught=0;
     for(const fg of finishedGames){
       const apiHome=normaliseTeamName(fg.home_team_name_en||'');
@@ -3751,7 +3756,7 @@ async function debugCatchUpSettle(){
       const gh=parseInt(fg.home_score);
       const ga=parseInt(fg.away_score);
       if(isNaN(gh)||isNaN(ga)){
-        el.textContent+='  ⚠ Invalid score for '+fg.home_team_name_en+' vs '+fg.away_team_name_en+'\n';
+        log('  ⚠ Invalid score for '+fg.home_team_name_en+' vs '+fg.away_team_name_en+'');
         continue;
       }
 
@@ -3766,7 +3771,7 @@ async function debugCatchUpSettle(){
       );
 
       if(!m){
-        el.textContent+='  ⚠ No DB match for: '+apiHome+' vs '+apiAway+'\n';
+        log('  ⚠ No DB match for: '+apiHome+' vs '+apiAway+'');
         continue;
       }
 
@@ -3775,25 +3780,25 @@ async function debugCatchUpSettle(){
       const finalH=isReversed?ga:gh;
       const finalA=isReversed?gh:ga;
 
-      el.textContent+='  ✓ Matched '+m.id+': '+m.home+' vs '+m.away+' → '+finalH+'-'+finalA+(isReversed?' (reversed)':'')+'\n';
-      el.textContent+='    Settling...\n';
+      log('  ✓ Matched '+m.id+': '+m.home+' vs '+m.away+' → '+finalH+'-'+finalA+(isReversed?' (reversed)':'')+'');
+      log('    Settling...');
       try{
         await settleWithScore(m.id, finalH, finalA);
-        el.textContent+='    ✅ Settled!\n';
+        log('    ✅ Settled!');
         caught++;
       }catch(se){
-        el.textContent+='    ❌ Settle error: '+se.message+'\n';
+        log('    ❌ Settle error: '+se.message+'');
       }
     }
 
-    el.textContent+='\nDone. Settled '+caught+' match(es).\n';
+    log('\nDone. Settled '+caught+' match(es).');
     if(caught>0){
       await loadAll();
       renderAll();
-      el.textContent+='Leaderboard updated!\n';
+      log('Leaderboard updated!');
     }
   }catch(e){
-    el.textContent+='❌ Fetch error: '+e.message+'\n';
+    log('❌ Fetch error: '+e.message+'');
   }
 }
 
@@ -4108,10 +4113,15 @@ function renderAdmin(){
   <div class="card" style="margin-bottom:4px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <div style="font-size:13px;color:var(--muted)">Fetch scores from worldcup26.ir and settle finished matches</div>
-      <button onclick="debugCatchUpSettle()" style="background:var(--gold);color:var(--dark);border:none;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">⚡ Run now</button>
-      <button onclick="debugGroupsApi()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--muted);cursor:pointer;margin-left:6px">🔍 Test groups API</button>
+      <div style="display:flex;gap:6px">
+        <button onclick="debugCatchUpSettle()" style="background:var(--gold);color:var(--dark);border:none;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">⚡ Run now</button>
+        <button onclick="debugGroupsApi()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--muted);cursor:pointer">🔍 Test groups API</button>
+        <button onclick="const t=document.getElementById('settle-debug-persist');if(t){navigator.clipboard.writeText(t.textContent).then(()=>toast('Copied ✓')).catch(()=>{});}" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--muted);cursor:pointer">📋 Copy log</button>
+        <button onclick="document.getElementById('settle-debug-persist').textContent=''" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--muted);cursor:pointer">✕ Clear</button>
+      </div>
     </div>
-    <div id="settle-debug" style="font-size:11px;color:var(--muted);white-space:pre-wrap"></div>
+    <div id="settle-debug" style="display:none"></div>
+    <div id="settle-debug-persist" style="font-size:11px;color:var(--muted);white-space:pre-wrap;max-height:300px;overflow-y:auto;background:rgba(0,0,0,.2);border-radius:6px;padding:8px;font-family:monospace"></div>
   </div>
 <div class="sec">Bet amounts by stage</div>
   <div class="card">
@@ -4323,6 +4333,7 @@ async function settleRandom(mid){
 }
 
 async function quickSettle(mid, h, a){
+  if(SETTLING.has(mid)){ toast('Already settling…'); return; }
   if(!confirm(`Settle match with score ${h}–${a}?`)) return;
   const m=MATCHES.find(x=>x.id===mid);
   await settleWithScore(mid, parseInt(h), parseInt(a));
@@ -4356,6 +4367,12 @@ async function settleWithScore(mid, h, a){
   if(SETTLING.has(mid)){ console.warn('settleWithScore: already settling '+mid+' — skipped'); return; }
   SETTLING.add(mid);
   try{
+  // Re-fetch resolved status from DB — catches concurrent sessions that settled while we were loading
+  const {data:freshMatch}=await sb.from('matches').select('resolved').eq('id',mid).single();
+  if(freshMatch?.resolved){
+    console.warn('settleWithScore: '+mid+' already resolved in DB (concurrent session) — skipped');
+    return;
+  }
   const act=outcome(h,a);
   const arr=PREDS[mid]||[];
   const memberNames=MEMBERS.map(u=>u.username);
@@ -4363,7 +4380,6 @@ async function settleWithScore(mid, h, a){
   const pot=parts.length*betFor(m);
   const exact=parts.filter(p=>p.pred_home===h&&p.pred_away===a);
   const outW=parts.filter(p=>outcome(p.pred_home,p.pred_away)===act);
-  const allSame=parts.length>0&&parts.every(p=>outcome(p.pred_home,p.pred_away)===act);
 
   // ── 2× Multiplier payout model ──────────────────────────────────────
   // Priority: exact winners first, then outcome winners (if not all-same), else refund.
@@ -4385,7 +4401,7 @@ async function settleWithScore(mid, h, a){
     const r=applyMultiplier(exact);
     winType=r.boldW.length?'exact_bold':'exact';
     winPool=exact; sv=r.sv; rem=r.rem; remTo=r.remTo; boldW=r.boldW; nonBoldW=r.nonBoldW;
-  } else if(!allSame&&outW.length){
+  } else if(outW.length){
     const r=applyMultiplier(outW);
     winType=r.boldW.length?'outcome_bold':'outcome';
     winPool=outW; sv=r.sv; rem=r.rem; remTo=r.remTo; boldW=r.boldW; nonBoldW=r.nonBoldW;
@@ -4398,7 +4414,6 @@ async function settleWithScore(mid, h, a){
   // resolved_share stores the 1-share base value; bold winners earn 2× on payout
   const share=winType==='refund'?sv:sv;
   // winner_team = the team that won the match (by score or penalty shootout per API)
-  // For draws: API reports AET score same both sides, winner_team must be set separately
   const winnerTeam=h>a?m.home:a>h?m.away:null;
   const updateObj={
     result_home:h,result_away:a,resolved:true,
@@ -4406,7 +4421,18 @@ async function settleWithScore(mid, h, a){
     resolved_winners:winnerNames
   };
   if(winnerTeam) updateObj.winner_team=winnerTeam;
-  await sb.from('matches').update(updateObj).eq('id',mid);
+
+  // ── DB-level double-settle guard ──────────────────────────────────────
+  // Only update if resolved=false in DB right now. If another session already
+  // settled this match, the update affects 0 rows → we bail out safely.
+  const {data:updatedRows,error:updateErr}=await sb.from('matches')
+    .update(updateObj).eq('id',mid).eq('resolved',false).select('id');
+  if(updateErr){ console.error('Settle update error:',updateErr); return; }
+  if(!updatedRows||updatedRows.length===0){
+    console.warn('settleWithScore: match '+mid+' already resolved in DB — skipping user balance update');
+    return; // Another session beat us to it — do NOT touch user balances
+  }
+
   for(const p of parts){
     const {data:freshUser}=await sb.from('users').select('earned,spent').eq('username',p.username).single();
     const curEarned=freshUser?.earned||0;
@@ -4429,6 +4455,8 @@ async function settleWithScore(mid, h, a){
 
 async function settle(mid){
   if(!LEAGUE||!ME){toast('Not logged in');return;}
+  // Prevent double-settle from multiple button taps
+  if(SETTLING.has(mid)){ toast('Already settling this match…'); return; }
   const _hraw=document.getElementById('ah_'+mid)?.value;
   const _araw=document.getElementById('aa_'+mid)?.value;
   if(_hraw===''||_hraw===undefined||_araw===''||_araw===undefined){toast('Enter scores first');return;}
@@ -4443,7 +4471,6 @@ async function settle(mid){
   const pot=parts.length*betFor(m);
   const exact=parts.filter(p=>p.pred_home===h&&p.pred_away===a);
   const outW=parts.filter(p=>outcome(p.pred_home,p.pred_away)===act);
-  const allSame=parts.length>0&&parts.every(p=>outcome(p.pred_home,p.pred_away)===act);
 
   // ── 2× Multiplier payout model ──────────────────────────────────────
   // Priority: exact winners first, then outcome winners (if not all-same), else refund.
@@ -4465,7 +4492,7 @@ async function settle(mid){
     const r=applyMultiplier(exact);
     winType=r.boldW.length?'exact_bold':'exact';
     winPool=exact; sv=r.sv; rem=r.rem; remTo=r.remTo; boldW=r.boldW; nonBoldW=r.nonBoldW;
-  } else if(!allSame&&outW.length){
+  } else if(outW.length){
     const r=applyMultiplier(outW);
     winType=r.boldW.length?'outcome_bold':'outcome';
     winPool=outW; sv=r.sv; rem=r.rem; remTo=r.remTo; boldW=r.boldW; nonBoldW=r.nonBoldW;
