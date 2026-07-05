@@ -880,7 +880,21 @@ function renderMatchList(){
     const isAdmin=ME&&LEAGUE&&ME.username===LEAGUE.admin_username;
     let rightHtml='';
     if(status==='settled'){
-      rightHtml=`<div style="font-size:20px;font-weight:700;color:var(--gold);flex-shrink:0">${m.result_home}–${m.result_away}</div>`;
+      // For KO drawn matches — show AET score + penalty winner
+      const isKODraw=isKnockout(m)&&parseInt(m.result_home)===parseInt(m.result_away);
+      const liveKey=normaliseTeamName(m.home)+'_'+normaliseTeamName(m.away);
+      const liveD=LIVE_SCORES[liveKey];
+      let penLine='';
+      if(isKODraw){
+        if(liveD&&liveD.homePenalty!=null&&liveD.awayPenalty!=null){
+          const penWinner=liveD.homePenalty>liveD.awayPenalty?m.home:m.away;
+          penLine='<div style="font-size:10px;color:var(--success);margin-top:1px;text-align:right">🏆 '+penWinner+' '+liveD.homePenalty+'–'+liveD.awayPenalty+' pens</div>';
+        }
+      }
+      rightHtml='<div style="flex-shrink:0;text-align:right">'
+        +'<div style="font-size:20px;font-weight:700;color:var(--gold)">'
+        +m.result_home+'–'+m.result_away+(isKODraw?'<span style="font-size:11px;color:var(--muted);margin-left:3px">AET</span>':'')
+        +'</div>'+penLine+'</div>';
     } else if(status==='finished'){
       // API confirmed FT — show score + quick settle for admin
       const hasLiveScore=live&&live.home!=null;
@@ -1120,7 +1134,15 @@ function openMatchSheet(mid){
   if(status==='settled'){
     html+=`<div style="text-align:center;padding:14px;background:rgba(255,200,48,.08);border:1px solid rgba(255,200,48,.2);border-radius:10px;margin-bottom:12px">
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${m.home_flag} ${m.home} &nbsp;vs&nbsp; ${m.away} ${m.away_flag}</div>
-      <div style="font-size:30px;font-weight:700;color:var(--gold)">${m.result_home} – ${m.result_away}</div>
+      <div style="font-size:30px;font-weight:700;color:var(--gold)">${m.result_home} – ${m.result_away}${isKnockout(m)&&parseInt(m.result_home)===parseInt(m.result_away)?'<span style="font-size:14px;color:var(--muted);margin-left:6px">AET</span>':''}</div>
+      ${(()=>{
+        if(!isKnockout(m)||parseInt(m.result_home)!==parseInt(m.result_away)) return '';
+        const lk=normaliseTeamName(m.home)+'_'+normaliseTeamName(m.away);
+        const ld=LIVE_SCORES[lk];
+        if(!ld||ld.homePenalty==null) return '';
+        const pw=ld.homePenalty>ld.awayPenalty?m.home:m.away;
+        return '<div style="font-size:12px;color:var(--success);margin-top:6px">🏆 '+pw+' advances · '+ld.homePenalty+'–'+ld.awayPenalty+' on penalties</div>';
+      })()}
     </div>`;
   } else if(isLiveOrProgress){
     const live=liveDataFor(m);
@@ -3000,12 +3022,20 @@ async function fetchLiveScores(){
       // Map worldcup26.ir statuses to our internal status codes
       // IMPORTANT: time_elapsed is the real-time indicator; finished field can be stale/premature.
       // Priority: time_elapsed first, finished field only as fallback.
+      // For KO matches: if penalty scores present → PEN, else finished → AET (not FT)
+      // because autoSettleFinished requires AET/PEN for KO matches to avoid settling at 90min.
       let status='NS'; // not started
-      if(elapsed==='finished') status='FT';
+      const hasPenalty=!isNaN(parseInt(g.home_penalty_score))&&!isNaN(parseInt(g.away_penalty_score));
+      if(elapsed==='finished'){
+        if(hasPenalty) status='PEN';
+        else status='AET'; // finished KO match without penalties = went to AET or won in 90min
+                           // autoSettleFinished accepts AET for KO, FT for group
+      }
       else if(elapsed==='notstarted'||elapsed===''||elapsed==='null'||!elapsed){
-        // No live activity — check finished field as fallback
-        if(fin) status='FT';
-        else status='NS';
+        if(fin){
+          if(hasPenalty) status='PEN';
+          else status='AET';
+        } else status='NS';
       }
       else status='LIVE'; // any other time_elapsed value (e.g. "45", "HT", "90+3") = in progress
 
@@ -3080,7 +3110,9 @@ async function autoSettleFinished(){
   for(const m of MATCHES){
     if(m.resolved) continue;
     const liveKey=normaliseTeamName(m.home)+'_'+normaliseTeamName(m.away);
-    const live=LIVE_SCORES[liveKey];
+    const liveKeyRev=normaliseTeamName(m.away)+'_'+normaliseTeamName(m.home);
+    const live=LIVE_SCORES[liveKey]||LIVE_SCORES[liveKeyRev];
+    const isReversed=!LIVE_SCORES[liveKey]&&!!LIVE_SCORES[liveKeyRev];
     if(!live) continue;
     if(live.home==null||live.away==null) continue;
 
@@ -3106,8 +3138,8 @@ async function autoSettleFinished(){
       continue;
     }
 
-    await settleWithScore(m.id, live.home, live.away);
-    toast('✓ Auto-settled: '+m.home+' '+live.home+'–'+live.away+' '+m.away
+    await settleWithScore(m.id, isReversed?live.away:live.home, isReversed?live.home:live.away);
+    toast('✓ Auto-settled: '+m.home+' '+(isReversed?live.away:live.home)+'–'+(isReversed?live.home:live.away)+' '+m.away
       +(koMatch&&live.status==='PEN'?' (pen)':koMatch&&live.status==='AET'?' (aet)':''));
     anySettled=true;
   }
@@ -3131,8 +3163,15 @@ async function catchUpSettle(){
     const games=Array.isArray(apiGames)?apiGames:(apiGames.games||apiGames.data||apiGames.matches||[]);
     console.log('Catch-up: worldcup26.ir returned '+games.length+' matches');
 
-    const finishedGames=games.filter(g=>{ const te=(g.time_elapsed||'').toLowerCase(); const fin=(g.finished||'').toUpperCase()==='TRUE'; return te==='finished'||(fin&&(te===''||te==='notstarted'||te==='null'||!te)); });
-    console.log('Catch-up: '+finishedGames.length+' finished matches');
+    // For catch-up settle: accept both 'finished' time_elapsed AND finished=TRUE
+    // Also accept KO matches where API shows 'finished' status — no delay needed
+    // since catch-up runs on login well after the match ended
+    const finishedGames=games.filter(g=>{
+      const te=(g.time_elapsed||'').toLowerCase();
+      const fin=(g.finished||'').toUpperCase()==='TRUE';
+      return te==='finished'||(fin&&(te===''||te==='notstarted'||te==='null'||!te));
+    });
+    console.log('Catch-up: '+finishedGames.length+' finished matches from API');
 
     let caught=0;
     for(const fg of finishedGames){
@@ -3146,12 +3185,21 @@ async function catchUpSettle(){
         !x.resolved
         && normaliseTeamName(x.home)===apiHome
         && normaliseTeamName(x.away)===apiAway
+      ) || unsettled.find(x=>
+        !x.resolved
+        && normaliseTeamName(x.home)===apiAway
+        && normaliseTeamName(x.away)===apiHome
       );
       if(!m) continue;
 
-      console.log('Settling: '+m.home+' '+gh+'-'+ga+' '+m.away+' ('+m.id+')');
-      await settleWithScore(m.id, gh, ga);
-      toast('⚡ Settled: '+m.home+' '+gh+'–'+ga+' '+m.away, 4000);
+      // If home/away reversed vs DB, swap scores accordingly
+      const isReversed=normaliseTeamName(m.home)===apiAway;
+      const finalH=isReversed?ga:gh;
+      const finalA=isReversed?gh:ga;
+
+      console.log('Settling: '+m.home+' '+finalH+'-'+finalA+' '+m.away+' ('+m.id+(isReversed?' reversed':'')+')');
+      await settleWithScore(m.id, finalH, finalA);
+      toast('⚡ Settled: '+m.home+' '+finalH+'–'+finalA+' '+m.away, 4000);
       caught++;
     }
 
@@ -3184,11 +3232,14 @@ function startLivePolling(){
   const POLL_QUIET_MS  = 5*60*1000;  // 5 min — waiting for kickoff or settle window
   let   _pollInterval  = POLL_QUIET_MS;
 
-  function schedulePoll(){
+function schedulePoll(){
     if(livePoller) clearInterval(livePoller);
     livePoller=setInterval(()=>{
       const liveNow=_liveMatchCount();
-      const hasPending=MATCHES.some(m=>{
+      // Keep polling if: any match is live/in-progress/finished OR any unsettled KO match exists
+      // (to catch matches as they kick off and finish between rounds)
+      const hasUnsettledKO=MATCHES.some(m=>!m.resolved&&isKnockout(m)&&m.home!=='TBD'&&m.away!=='TBD');
+      const hasPending=hasUnsettledKO||MATCHES.some(m=>{
         if(m.resolved) return false;
         const s=matchStatus(m);
         if(s==='inprogress'||s==='live'||s==='finished') return true;
@@ -3200,6 +3251,7 @@ function startLivePolling(){
       const desired=liveNow>0 ? POLL_LIVE_MS : POLL_QUIET_MS;
       if(desired!==_pollInterval){ _pollInterval=desired; schedulePoll(); return; }
       fetchLiveScores();
+      autoSettleFinished();
     }, _pollInterval);
   }
   schedulePoll();
@@ -3380,6 +3432,17 @@ async function screenshotStageBreakdown(){
   const medals=['🥇','🥈','🥉'];
   const stgLabels=activeStages.map(r=>r.key==='group'?'Grp':r.key==='sf'?'SF':r.key.toUpperCase());
 
+  // Compute stage winners (best net P/L per stage)
+  const stageWinners={};
+  activeStages.forEach(r=>{
+    let best=null, bestPl=-Infinity;
+    sortedMembers.forEach(u=>{
+      const v=calcRoundStats(u.username)[r.key]?.pl||0;
+      if(v>bestPl){ bestPl=v; best=u.username; }
+    });
+    if(best&&bestPl>0) stageWinners[r.key]=best;
+  });
+
   // Layout constants
   const scale=2;
   const pad=20;
@@ -3470,14 +3533,24 @@ async function screenshotStageBreakdown(){
     ctx.fillStyle=nameCol;
     ctx.fillText(pfx+' '+u.username, colX(0)+6, y+23);
 
-    // Stage values
+    // Stage values — gold cell background for stage winner
     activeStages.forEach((r,si)=>{
       const v=s[r.key]?.pl||0;
       const str=v>0?'+'+v:v===0?'—':String(v);
-      const col=v>0?'#3ddc84':v<0?'#ff5a59':'#9fe89f';
-      ctx.fillStyle=col;
-      ctx.font='13px -apple-system, sans-serif';
+      const isStageWinner=stageWinners[r.key]===u.username;
       const x=colX(si+1);
+
+      // Gold cell background for stage winner
+      if(isStageWinner){
+        ctx.fillStyle='rgba(255,200,48,0.18)';
+        ctx.beginPath();
+        ctx.roundRect(x+2, y+3, stgW-4, rowH-6, 4);
+        ctx.fill();
+      }
+
+      const col=isStageWinner?'#ffc830':v>0?'#3ddc84':v<0?'#ff5a59':'#9fe89f';
+      ctx.fillStyle=col;
+      ctx.font=(isStageWinner?'bold ':'')+'13px -apple-system, sans-serif';
       ctx.fillText(str, x+(stgW-ctx.measureText(str).width)/2, y+23);
     });
 
@@ -3515,6 +3588,8 @@ async function screenshotStageBreakdown(){
   ctx.fillStyle='rgba(255,255,255,0.3)';
   const ts=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})+' IST';
   ctx.fillText(ts, totalW-ctx.measureText(ts).width-pad, y+20);
+  ctx.fillStyle='rgba(255,200,48,0.6)';
+  ctx.fillText('■ Stage winner', pad, y+20);
 
   // Share or download
   canvas.toBlob(async blob=>{
@@ -3645,9 +3720,27 @@ async function debugCatchUpSettle(){
       el.textContent+='Response preview: '+JSON.stringify(apiGames).slice(0,500)+'\n';
     }
     const finishedGames=games.filter(g=>{ const te=(g.time_elapsed||'').toLowerCase(); const fin=(g.finished||'').toUpperCase()==='TRUE'; return te==='finished'||(fin&&(te===''||te==='notstarted'||te==='null'||!te)); });
-    el.textContent+='Finished matches: '+finishedGames.length+'\n';
+    el.textContent+='Finished matches from API: '+finishedGames.length+'\n';
+
+    // Show ALL API games that match our unsettled teams — including non-finished ones
+    el.textContent+='\nAPI data for our unsettled matches:\n';
+    unsettled.forEach(m=>{
+      const apiMatch=games.find(g=>{
+        const h=normaliseTeamName(g.home_team_name_en||'');
+        const a=normaliseTeamName(g.away_team_name_en||'');
+        return (normaliseTeamName(m.home)===h&&normaliseTeamName(m.away)===a)||
+               (normaliseTeamName(m.home)===a&&normaliseTeamName(m.away)===h);
+      });
+      if(apiMatch){
+        el.textContent+='  '+m.id+' '+m.home+' vs '+m.away+': time_elapsed="'+apiMatch.time_elapsed+'" finished="'+apiMatch.finished+'" score='+apiMatch.home_score+'-'+apiMatch.away_score+'\n';
+      } else {
+        el.textContent+='  '+m.id+' '+m.home+' vs '+m.away+': NOT FOUND IN API\n';
+      }
+    });
+    el.textContent+='\n';
+
     finishedGames.forEach(fg=>{
-      el.textContent+='  '+fg.home_team_name_en+' '+fg.home_score+'-'+fg.away_score+' '+fg.away_team_name_en+'\n';
+      el.textContent+='  API finished: '+fg.home_team_name_en+' '+fg.home_score+'-'+fg.away_score+' '+fg.away_team_name_en+'\n';
     });
 
     el.textContent+='\nMatching to DB...\n';
@@ -3666,6 +3759,10 @@ async function debugCatchUpSettle(){
         !x.resolved
         && normaliseTeamName(x.home)===apiHome
         && normaliseTeamName(x.away)===apiAway
+      ) || unsettled.find(x=>
+        !x.resolved
+        && normaliseTeamName(x.home)===apiAway
+        && normaliseTeamName(x.away)===apiHome
       );
 
       if(!m){
@@ -3673,10 +3770,15 @@ async function debugCatchUpSettle(){
         continue;
       }
 
-      el.textContent+='  ✓ Matched '+m.id+': '+m.home+' vs '+m.away+' → '+gh+'-'+ga+'\n';
+      // If reversed, swap the scores to match DB home/away order
+      const isReversed=normaliseTeamName(m.home)===apiAway;
+      const finalH=isReversed?ga:gh;
+      const finalA=isReversed?gh:ga;
+
+      el.textContent+='  ✓ Matched '+m.id+': '+m.home+' vs '+m.away+' → '+finalH+'-'+finalA+(isReversed?' (reversed)':'')+'\n';
       el.textContent+='    Settling...\n';
       try{
-        await settleWithScore(m.id, gh, ga);
+        await settleWithScore(m.id, finalH, finalA);
         el.textContent+='    ✅ Settled!\n';
         caught++;
       }catch(se){
