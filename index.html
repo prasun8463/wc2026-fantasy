@@ -3110,7 +3110,9 @@ async function autoSettleFinished(){
   for(const m of MATCHES){
     if(m.resolved) continue;
     const liveKey=normaliseTeamName(m.home)+'_'+normaliseTeamName(m.away);
-    const live=LIVE_SCORES[liveKey];
+    const liveKeyRev=normaliseTeamName(m.away)+'_'+normaliseTeamName(m.home);
+    const live=LIVE_SCORES[liveKey]||LIVE_SCORES[liveKeyRev];
+    const isReversed=!LIVE_SCORES[liveKey]&&!!LIVE_SCORES[liveKeyRev];
     if(!live) continue;
     if(live.home==null||live.away==null) continue;
 
@@ -3136,8 +3138,8 @@ async function autoSettleFinished(){
       continue;
     }
 
-    await settleWithScore(m.id, live.home, live.away);
-    toast('✓ Auto-settled: '+m.home+' '+live.home+'–'+live.away+' '+m.away
+    await settleWithScore(m.id, isReversed?live.away:live.home, isReversed?live.home:live.away);
+    toast('✓ Auto-settled: '+m.home+' '+(isReversed?live.away:live.home)+'–'+(isReversed?live.home:live.away)+' '+m.away
       +(koMatch&&live.status==='PEN'?' (pen)':koMatch&&live.status==='AET'?' (aet)':''));
     anySettled=true;
   }
@@ -3176,12 +3178,21 @@ async function catchUpSettle(){
         !x.resolved
         && normaliseTeamName(x.home)===apiHome
         && normaliseTeamName(x.away)===apiAway
+      ) || unsettled.find(x=>
+        !x.resolved
+        && normaliseTeamName(x.home)===apiAway
+        && normaliseTeamName(x.away)===apiHome
       );
       if(!m) continue;
 
-      console.log('Settling: '+m.home+' '+gh+'-'+ga+' '+m.away+' ('+m.id+')');
-      await settleWithScore(m.id, gh, ga);
-      toast('⚡ Settled: '+m.home+' '+gh+'–'+ga+' '+m.away, 4000);
+      // If home/away reversed vs DB, swap scores accordingly
+      const isReversed=normaliseTeamName(m.home)===apiAway;
+      const finalH=isReversed?ga:gh;
+      const finalA=isReversed?gh:ga;
+
+      console.log('Settling: '+m.home+' '+finalH+'-'+finalA+' '+m.away+' ('+m.id+(isReversed?' reversed':'')+')');
+      await settleWithScore(m.id, finalH, finalA);
+      toast('⚡ Settled: '+m.home+' '+finalH+'–'+finalA+' '+m.away, 4000);
       caught++;
     }
 
@@ -3214,11 +3225,14 @@ function startLivePolling(){
   const POLL_QUIET_MS  = 5*60*1000;  // 5 min — waiting for kickoff or settle window
   let   _pollInterval  = POLL_QUIET_MS;
 
-  function schedulePoll(){
+function schedulePoll(){
     if(livePoller) clearInterval(livePoller);
     livePoller=setInterval(()=>{
       const liveNow=_liveMatchCount();
-      const hasPending=MATCHES.some(m=>{
+      // Keep polling if: any match is live/in-progress/finished OR any unsettled KO match exists
+      // (to catch matches as they kick off and finish between rounds)
+      const hasUnsettledKO=MATCHES.some(m=>!m.resolved&&isKnockout(m)&&m.home!=='TBD'&&m.away!=='TBD');
+      const hasPending=hasUnsettledKO||MATCHES.some(m=>{
         if(m.resolved) return false;
         const s=matchStatus(m);
         if(s==='inprogress'||s==='live'||s==='finished') return true;
@@ -3230,6 +3244,7 @@ function startLivePolling(){
       const desired=liveNow>0 ? POLL_LIVE_MS : POLL_QUIET_MS;
       if(desired!==_pollInterval){ _pollInterval=desired; schedulePoll(); return; }
       fetchLiveScores();
+      autoSettleFinished();
     }, _pollInterval);
   }
   schedulePoll();
@@ -3719,6 +3734,10 @@ async function debugCatchUpSettle(){
         !x.resolved
         && normaliseTeamName(x.home)===apiHome
         && normaliseTeamName(x.away)===apiAway
+      ) || unsettled.find(x=>
+        !x.resolved
+        && normaliseTeamName(x.home)===apiAway
+        && normaliseTeamName(x.away)===apiHome
       );
 
       if(!m){
@@ -3726,10 +3745,15 @@ async function debugCatchUpSettle(){
         continue;
       }
 
-      el.textContent+='  ✓ Matched '+m.id+': '+m.home+' vs '+m.away+' → '+gh+'-'+ga+'\n';
+      // If reversed, swap the scores to match DB home/away order
+      const isReversed=normaliseTeamName(m.home)===apiAway;
+      const finalH=isReversed?ga:gh;
+      const finalA=isReversed?gh:ga;
+
+      el.textContent+='  ✓ Matched '+m.id+': '+m.home+' vs '+m.away+' → '+finalH+'-'+finalA+(isReversed?' (reversed)':'')+'\n';
       el.textContent+='    Settling...\n';
       try{
-        await settleWithScore(m.id, gh, ga);
+        await settleWithScore(m.id, finalH, finalA);
         el.textContent+='    ✅ Settled!\n';
         caught++;
       }catch(se){
