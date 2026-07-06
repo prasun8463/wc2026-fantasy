@@ -723,8 +723,7 @@ function matchStatus(m){
     return 'future';
   }
   // Check live score API data first
-  const liveKey=normaliseTeamName(m.home)+'_'+normaliseTeamName(m.away);
-  const live=LIVE_SCORES[liveKey];
+  const live=liveDataFor(m);
   if(live){
     if(['FT','AET','PEN'].includes(live.status)){
       // Don't trust FT from the API until minimum match duration has actually elapsed.
@@ -744,7 +743,14 @@ function matchStatus(m){
 }
 
 function liveDataFor(m){
-  return LIVE_SCORES[normaliseTeamName(m.home)+'_'+normaliseTeamName(m.away)]||null;
+  const k1=normaliseTeamName(m.home)+'_'+normaliseTeamName(m.away);
+  const k2=normaliseTeamName(m.away)+'_'+normaliseTeamName(m.home);
+  const d=LIVE_SCORES[k1]||LIVE_SCORES[k2];
+  if(!d) return null;
+  // If reversed key matched, swap home/away scores so they align with DB order
+  if(!LIVE_SCORES[k1]&&LIVE_SCORES[k2])
+    return {...d, home:d.away, away:d.home, homePenalty:d.awayPenalty, awayPenalty:d.homePenalty, _reversed:true};
+  return d;
 }
 
 function isToday(m){return matchStatus(m)==='open';}
@@ -3192,12 +3198,30 @@ async function catchUpSettle(){
       );
       if(!m) continue;
 
-      // If home/away reversed vs DB, swap scores accordingly
       const isReversed=normaliseTeamName(m.home)===apiAway;
       const finalH=isReversed?ga:gh;
       const finalA=isReversed?gh:ga;
 
       console.log('Settling: '+m.home+' '+finalH+'-'+finalA+' '+m.away+' ('+m.id+(isReversed?' reversed':'')+')');
+      await settleWithScore(m.id, finalH, finalA);
+      toast('⚡ Settled: '+m.home+' '+finalH+'–'+finalA+' '+m.away, 4000);
+      caught++;
+    }
+
+    // Secondary pass: settle from LIVE_SCORES for any KO matches the API filter missed
+    // (API sometimes returns notstarted/FALSE for finished KO matches briefly after FT)
+    for(const m of unsettled){
+      if(m.resolved) continue; // may have been settled in first pass
+      const key=normaliseTeamName(m.home)+'_'+normaliseTeamName(m.away);
+      const keyRev=normaliseTeamName(m.away)+'_'+normaliseTeamName(m.home);
+      const live=LIVE_SCORES[key]||LIVE_SCORES[keyRev];
+      if(!live) continue;
+      if(!['FT','AET','PEN'].includes(live.status)) continue;
+      if(live.home==null||live.away==null) continue;
+      const isReversed=!!LIVE_SCORES[keyRev]&&!LIVE_SCORES[key];
+      const finalH=isReversed?live.away:live.home;
+      const finalA=isReversed?live.home:live.away;
+      console.log('Settling from LIVE_SCORES: '+m.home+' '+finalH+'-'+finalA+' '+m.away+' ('+m.id+')');
       await settleWithScore(m.id, finalH, finalA);
       toast('⚡ Settled: '+m.home+' '+finalH+'–'+finalA+' '+m.away, 4000);
       caught++;
@@ -3788,6 +3812,30 @@ async function debugCatchUpSettle(){
         caught++;
       }catch(se){
         log('    ❌ Settle error: '+se.message+'');
+      }
+    }
+
+    // Secondary pass: settle from LIVE_SCORES for KO matches API filter missed
+    log('\nSecondary pass: checking LIVE_SCORES for missed KO matches...');
+    for(const m of unsettled){
+      if(MATCHES.find(x=>x.id===m.id)?.resolved) continue;
+      const key=normaliseTeamName(m.home)+'_'+normaliseTeamName(m.away);
+      const keyRev=normaliseTeamName(m.away)+'_'+normaliseTeamName(m.home);
+      const live=LIVE_SCORES[key]||LIVE_SCORES[keyRev];
+      if(!live){ log('  '+m.id+' '+m.home+' vs '+m.away+': not in LIVE_SCORES'); continue; }
+      log('  '+m.id+' '+m.home+' vs '+m.away+': LIVE_SCORES status='+live.status+' score='+live.home+'-'+live.away+'');
+      if(!['FT','AET','PEN'].includes(live.status)) continue;
+      if(live.home==null||live.away==null) continue;
+      const isRev=!!LIVE_SCORES[keyRev]&&!LIVE_SCORES[key];
+      const fH=isRev?live.away:live.home;
+      const fA=isRev?live.home:live.away;
+      log('  → Settling '+m.home+' '+fH+'-'+fA+' '+m.away+'...');
+      try{
+        await settleWithScore(m.id, fH, fA);
+        log('  ✅ Settled from LIVE_SCORES!');
+        caught++;
+      }catch(se){
+        log('  ❌ Error: '+se.message+'');
       }
     }
 
