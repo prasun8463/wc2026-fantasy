@@ -404,7 +404,7 @@ function calcRoundStats(username){
       if((m.resolved_winners||[]).includes(username)){
         const myPred=(PREDS[m.id]||[]).find(p=>p.username===username);
         const isBoldWin=myPred&&myPred.bold&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold');
-        earned+=(m.resolved_share||0)*(isBoldWin?2:1);
+        earned+=actualWinnerPayout(m, username, PREDS[m.id]||[]);
       }
     });
     stats[r.key]={bet:spent, won:earned, pl:earned-spent};
@@ -431,15 +431,14 @@ function actualWinnerPayout(m, username, preds){
   if(!winners.includes(username)) return 0;
   if(m.resolved_type==='refund') return m.resolved_share||0;
   const isBoldType=m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold';
-  const sv=m.resolved_share||0;
   const pot=m.resolved_pot||(betFor(m)*(preds||[]).length);
   const winnerPreds=(preds||[]).filter(p=>winners.includes(p.username));
   const boldWinners=isBoldType?winnerPreds.filter(p=>p.bold):[];
   const totalShares=isBoldType?boldWinners.length*2+(winnerPreds.length-boldWinners.length):winnerPreds.length;
-  const remainder=totalShares>0?pot-(sv*totalShares):0;
-  const firstWinner=(boldWinners[0]||winnerPreds[0])?.username;
+  if(totalShares===0) return 0;
+  const base=pot/totalShares;
   const isBold=isBoldType&&boldWinners.some(p=>p.username===username);
-  return sv*(isBold?2:1)+(username===firstWinner?remainder:0);
+  return Math.round(base*(isBold?2:1));
 }
 
 // ── Sanitization ────────────────────────────────────────────────
@@ -889,7 +888,7 @@ function renderMatchList(){
       const myPRow=(PREDS[m.id]||[]).find(p=>p.username===ME?.username);
       const iMyBold=myPRow&&myPRow.bold===true;
       const boldW2=(won&&iMyBold&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold'));
-      const share2=boldW2?(m.resolved_share||0)*2:(m.resolved_share||0);
+      const share2=won?actualWinnerPayout(m, ME?.username, PREDS[m.id]||[]):(m.resolved_share||0);
       const rl=won&&m.resolved_type==='exact_bold'&&iMyBold?'🔥 Bold Exact +₹'+share2
               :won&&m.resolved_type==='outcome_bold'&&iMyBold?'🔥 Bold Outcome +₹'+share2
               :won&&(m.resolved_type==='exact_bold'||m.resolved_type==='exact')?'Exact +₹'+share2
@@ -1199,7 +1198,7 @@ function openMatchSheet(mid){
       const myPDrawer2=(PREDS[m.id]||[]).find(p=>p.username===ME.username);
       const isThisBold=myPDrawer2&&myPDrawer2.bold===true;
       const boldW3=(won&&isThisBold&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold'));
-      const share3=boldW3?(m.resolved_share||0)*2:(m.resolved_share||0);
+      const share3=won?actualWinnerPayout(m, ME.username, PREDS[m.id]||[]):(m.resolved_share||0);
       const rl=won&&m.resolved_type==='exact'&&!isThisBold?'Exact! +₹'+share3
               :won&&(m.resolved_type==='exact_bold'||m.resolved_type==='exact')&&isThisBold?'🔥 Bold Exact! +₹'+share3
               :won&&m.resolved_type==='outcome_bold'&&isThisBold?'🔥 Bold Outcome! +₹'+share3
@@ -1328,7 +1327,7 @@ function openMatchSheet(mid){
       // Only show outcome tags on fully settled matches — in-progress should be neutral
       const isBoldPick=p.bold===true;
       const isBoldWin=won&&isBoldPick&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold');
-      const winShare=(m.resolved_share||0)*(isBoldWin?2:1);
+      const winShare=actualWinnerPayout(m, u, PREDS[m.id]||[]);
       const tag=!m.resolved
         ? `<span style="font-size:10px;color:var(--muted);padding:2px 6px">–</span>`
         : won&&(m.resolved_type==='exact'||m.resolved_type==='exact_bold')&&!isBoldPick?`<span class="rtag rt-exact">Exact</span>`
@@ -1509,7 +1508,7 @@ function ppShowType(type){
       const won=(m.resolved_winners||[]).includes(username);
       const myPDrawer=(PREDS[m.id]||[]).find(p=>p.username===username);
       const isBoldWinDrawer=won&&myPDrawer&&myPDrawer.bold&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold');
-      const wonAmt=won?(m.resolved_share||0)*(isBoldWinDrawer?2:1):0;
+      const wonAmt=won?actualWinnerPayout(m, ME.username, PREDS[m.id]||[]):0;
       const wonColor=wonAmt>0?'var(--success)':'var(--red)';
       const wonStr=wonAmt>0?'+₹'+wonAmt:'-₹'+betFor(m);
       html+='<div onclick="toggleMatchSheet(\''+m.id+'\')" style="cursor:pointer;display:contents">'
@@ -1951,7 +1950,7 @@ function showScorecardModal(type){
   const totalWon=matches.filter(m=>(m.resolved_winners||[]).includes(ME.username)).reduce((s,m)=>{
     const myPModal=(PREDS[m.id]||[]).find(p=>p.username===ME.username);
     const isBoldWinModal=myPModal&&myPModal.bold&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold');
-    return s+(m.resolved_share||0)*(isBoldWinModal?2:1);
+    return s+actualWinnerPayout(m, username, PREDS[m.id]||[]);
   },0);
   let topHtml=`<div class="pot-strip">
     <div class="pot-cell"><div class="pot-lbl">Matches</div><div class="pot-val">${matches.length}</div></div>
