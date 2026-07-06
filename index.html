@@ -3925,8 +3925,16 @@ async function runReconciliationAudit(){
       if(myP) calcSpent+=betFor(m);
       if((m.resolved_winners||[]).includes(u.username)){
         const myPAudit=(PREDS[m.id]||[]).find(p=>p.username===u.username);
+        // Use same rounding as settleWithScore: round(base * multiplier) per winner
+        // resolved_share = round(pot/totalShares) — the non-bold base
+        // bold winners get round(base*2), not resolved_share*2 (can differ by 1)
+        const allWinPreds=(PREDS[m.id]||[]).filter(p=>(m.resolved_winners||[]).includes(p.username));
+        const boldWinCount=allWinPreds.filter(p=>p.bold&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold')).length;
+        const nonBoldWinCount=allWinPreds.filter(p=>!p.bold||(m.resolved_type!=='exact_bold'&&m.resolved_type!=='outcome_bold')).length;
+        const totalShares=boldWinCount*2+nonBoldWinCount;
+        const base=totalShares>0?(m.resolved_pot||0)/totalShares:0;
         const isBoldWinAudit=myPAudit&&myPAudit.bold&&(m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold');
-        calcEarned+=(m.resolved_share||0)*(isBoldWinAudit?2:1);
+        calcEarned+=totalShares>0?Math.round(base*(isBoldWinAudit?2:1)):(m.resolved_share||0);
       }
     });
     totalOut+=(u.earned||0);
