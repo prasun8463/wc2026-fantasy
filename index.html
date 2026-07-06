@@ -3886,7 +3886,9 @@ async function runReconciliationAudit(){
   resolvedMatches.forEach(m=>{
     const preds=PREDS[m.id]||[];
     const bet=betFor(m);
-    const pot=preds.length*bet;
+    // Use resolved_pot from DB (actual amount collected) not prediction count
+    // Prediction count can differ if member joined late or pot was computed differently
+    const pot=m.resolved_pot||(preds.length*bet);
     const winners=m.resolved_winners||[];
     const share=m.resolved_share||0;
     // Account for bold winners earning 2x share (exact_bold / outcome_bold match types)
@@ -3939,12 +3941,11 @@ async function runReconciliationAudit(){
     totalOut+=(u.earned||0);
     const spentDiff=(u.spent||0)-calcSpent;
     const earnedDiff=(u.earned||0)-calcEarned;
-    // Tolerate positive earned differences — these are rounding remainders from floor()
-    // distributed to the first bold winner. They accumulate legitimately across matches.
-    // Only flag: (1) any spent mismatch, (2) negative earned diff (DB < calc = missing credit),
-    // (3) positive earned diff that is a round number ≥100 (likely a double-credit)
-    const isRoundingRemainder=earnedDiff>0&&earnedDiff<100&&earnedDiff%50!==0;
-    if(spentDiff!==0 || earnedDiff<0 || (earnedDiff>=100)){
+    // Tolerate ±1 earned difference — JS Math.round() vs PostgreSQL ROUND() can differ by 1
+    // on 0.5 boundaries (JS rounds up, Postgres uses banker's rounding).
+    // Only flag: (1) any spent mismatch, (2) earned diff outside ±1 range
+    // (3) positive earned diff ≥100 (likely a double-credit)
+    if(spentDiff!==0 || earnedDiff<-1 || earnedDiff>=100){
       userIssues.push({username:u.username, dbSpent:u.spent||0, calcSpent, dbEarned:u.earned||0, calcEarned});
     }
   });
