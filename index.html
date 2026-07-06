@@ -423,6 +423,25 @@ const KNOCKOUT_DURATION_MS = 150 * 60 * 1000;    // 90 + 30 ET + 30 penalties (k
 const KNOCKOUT_STAGES = ['R32','R16','QF','SF','Final','3rd'];
 function isKnockout(m){ return KNOCKOUT_STAGES.includes(m?.grp); }
 
+// Compute actual amount a winner received including floor() remainder
+// Remainder goes to first bold winner (or first winner if none bold)
+function actualWinnerPayout(m, username, preds){
+  if(!m||!m.resolved) return 0;
+  const winners=m.resolved_winners||[];
+  if(!winners.includes(username)) return 0;
+  if(m.resolved_type==='refund') return m.resolved_share||0;
+  const isBoldType=m.resolved_type==='exact_bold'||m.resolved_type==='outcome_bold';
+  const sv=m.resolved_share||0;
+  const pot=m.resolved_pot||(betFor(m)*(preds||[]).length);
+  const winnerPreds=(preds||[]).filter(p=>winners.includes(p.username));
+  const boldWinners=isBoldType?winnerPreds.filter(p=>p.bold):[];
+  const totalShares=isBoldType?boldWinners.length*2+(winnerPreds.length-boldWinners.length):winnerPreds.length;
+  const remainder=totalShares>0?pot-(sv*totalShares):0;
+  const firstWinner=(boldWinners[0]||winnerPreds[0])?.username;
+  const isBold=isBoldType&&boldWinners.some(p=>p.username===username);
+  return sv*(isBold?2:1)+(username===firstWinner?remainder:0);
+}
+
 // ── Sanitization ────────────────────────────────────────────────
 function esc(s){ // HTML-escape user-controlled strings before innerHTML
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -4438,24 +4457,27 @@ async function settleWithScore(mid, h, a){
     const boldW=pool.filter(p=>p.bold===true);
     const nonBoldW=pool.filter(p=>!p.bold);
     const totalShares=boldW.length*2+nonBoldW.length;
-    const sv=totalShares>0?Math.floor(pot/totalShares):0;
-    const rem=totalShares>0?pot-(sv*totalShares):0;
-    const remTo=(boldW[0]||pool[0])?.username||null;
-    return {boldW,nonBoldW,sv,rem,remTo};
+    if(totalShares===0) return {boldW,nonBoldW,sv:pot,rem:0,remTo:null,payouts:{}};
+    const base=pot/totalShares;
+    const payouts={};
+    for(const p of boldW) payouts[p.username]=Math.round(base*2);
+    for(const p of nonBoldW) payouts[p.username]=Math.round(base);
+    const sv=Math.round(base);
+    return {boldW,nonBoldW,sv,rem:0,remTo:null,payouts};
   }
 
-  let winType,winPool,sv,rem,remTo,boldW,nonBoldW;
+  let winType,winPool,sv,r,boldW,nonBoldW;
   if(exact.length){
-    const r=applyMultiplier(exact);
+    r=applyMultiplier(exact);
     winType=r.boldW.length?'exact_bold':'exact';
-    winPool=exact; sv=r.sv; rem=r.rem; remTo=r.remTo; boldW=r.boldW; nonBoldW=r.nonBoldW;
+    winPool=exact; sv=r.sv; boldW=r.boldW; nonBoldW=r.nonBoldW;
   } else if(outW.length){
-    const r=applyMultiplier(outW);
+    r=applyMultiplier(outW);
     winType=r.boldW.length?'outcome_bold':'outcome';
-    winPool=outW; sv=r.sv; rem=r.rem; remTo=r.remTo; boldW=r.boldW; nonBoldW=r.nonBoldW;
+    winPool=outW; sv=r.sv; boldW=r.boldW; nonBoldW=r.nonBoldW;
   } else {
     // Refund — everyone gets their bet back
-    winType='refund'; winPool=parts; sv=betFor(m); rem=0; remTo=null; boldW=[]; nonBoldW=parts;
+    winType='refund'; winPool=parts; sv=betFor(m); r={payouts:{}}; boldW=[]; nonBoldW=parts;
   }
 
   const winnerNames=winPool.map(p=>p.username);
@@ -4490,9 +4512,8 @@ async function settleWithScore(mid, h, a){
     if(winType==='refund'){
       earnAdd=sv; // everyone gets bet back
     } else if(winnerNames.includes(p.username)){
-      const isBoldW=boldW.some(b=>b.username===p.username);
-      earnAdd=isBoldW?sv*2:sv;
-      if(p.username===remTo) earnAdd+=rem; // rounding remainder to first bold winner
+      // Use individually-rounded payout from applyMultiplier
+      earnAdd=r.payouts[p.username]||0;
     }
     await sb.from('users').update({spent:curSpent+betAmt,earned:curEarned+earnAdd}).eq('username',p.username);
   }
@@ -4529,24 +4550,27 @@ async function settle(mid){
     const boldW=pool.filter(p=>p.bold===true);
     const nonBoldW=pool.filter(p=>!p.bold);
     const totalShares=boldW.length*2+nonBoldW.length;
-    const sv=totalShares>0?Math.floor(pot/totalShares):0;
-    const rem=totalShares>0?pot-(sv*totalShares):0;
-    const remTo=(boldW[0]||pool[0])?.username||null;
-    return {boldW,nonBoldW,sv,rem,remTo};
+    if(totalShares===0) return {boldW,nonBoldW,sv:pot,rem:0,remTo:null,payouts:{}};
+    const base=pot/totalShares;
+    const payouts={};
+    for(const p of boldW) payouts[p.username]=Math.round(base*2);
+    for(const p of nonBoldW) payouts[p.username]=Math.round(base);
+    const sv=Math.round(base);
+    return {boldW,nonBoldW,sv,rem:0,remTo:null,payouts};
   }
 
-  let winType,winPool,sv,rem,remTo,boldW,nonBoldW;
+  let winType,winPool,sv,r,boldW,nonBoldW;
   if(exact.length){
-    const r=applyMultiplier(exact);
+    r=applyMultiplier(exact);
     winType=r.boldW.length?'exact_bold':'exact';
-    winPool=exact; sv=r.sv; rem=r.rem; remTo=r.remTo; boldW=r.boldW; nonBoldW=r.nonBoldW;
+    winPool=exact; sv=r.sv; boldW=r.boldW; nonBoldW=r.nonBoldW;
   } else if(outW.length){
-    const r=applyMultiplier(outW);
+    r=applyMultiplier(outW);
     winType=r.boldW.length?'outcome_bold':'outcome';
-    winPool=outW; sv=r.sv; rem=r.rem; remTo=r.remTo; boldW=r.boldW; nonBoldW=r.nonBoldW;
+    winPool=outW; sv=r.sv; boldW=r.boldW; nonBoldW=r.nonBoldW;
   } else {
     // Refund — everyone gets their bet back
-    winType='refund'; winPool=parts; sv=betFor(m); rem=0; remTo=null; boldW=[]; nonBoldW=parts;
+    winType='refund'; winPool=parts; sv=betFor(m); r={payouts:{}}; boldW=[]; nonBoldW=parts;
   }
 
   const winnerNames=winPool.map(p=>p.username);
@@ -4568,9 +4592,7 @@ async function settle(mid){
     if(winType==='refund'){
       earnAdd=sv;
     } else if(winnerNames.includes(p.username)){
-      const isBoldW=boldW.some(b=>b.username===p.username);
-      earnAdd=isBoldW?sv*2:sv;
-      if(p.username===remTo) earnAdd+=rem;
+      earnAdd=r.payouts[p.username]||0;
     }
     const betAmt=betFor(m);
     await sb.from('users').update({spent:curSpent+betAmt, earned:curEarned+earnAdd}).eq('username',p.username);
