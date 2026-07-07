@@ -1134,6 +1134,7 @@ function maybeCloseMatchSheet(e){ if(e.target.id==='match-sheet') closeMatchShee
 function hidePredForm(mid){ const el=document.getElementById('pred-form-'+mid); if(el)el.style.display='none'; }
 
 function openMatchSheet(mid){
+  try{
   const m=MATCHES.find(x=>x.id===mid); if(!m)return;
   const arr=PREDS[mid]||[];
   const myP=arr.find(p=>p.username===ME.username);
@@ -1354,6 +1355,10 @@ function openMatchSheet(mid){
 
   document.getElementById('ms-body').innerHTML=html;
   document.getElementById('match-sheet').classList.add('open');
+  }catch(err){
+    console.error('openMatchSheet error:',err);
+    document.getElementById('ms-body').innerHTML='<div style="padding:20px;color:var(--red);font-size:12px">Error rendering match: '+esc(err.message)+'<br><br>Please try closing and reopening. Report if this persists.</div>';
+  }
 }
 
 
