@@ -2788,6 +2788,7 @@ async function renderGroups(){
         97:['France','Morocco'],         98:['Spain','Belgium'],
         99:['Norway','England'],         100:['Argentina','Switzerland'],
         101:['France','Spain'],          102:['TBD','TBD'],
+        103:['TBD','TBD'],               104:['TBD','TBD'],
       };
       const ID_MAP={
         73:'r01',74:'r03',75:'r04',76:'r02',
@@ -2798,7 +2799,7 @@ async function renderGroups(){
         93:'r16_05',94:'r16_06',95:'r16_07',96:'r16_08',
         97:'qf_01',98:'qf_02',99:'qf_03',100:'qf_04',
         101:'sf_01',102:'sf_02',
-        // Final ID when created
+        103:'3rd',104:'fin',
       };
 
       const pair=TEAMS[matchNum];
@@ -2885,7 +2886,7 @@ async function renderGroups(){
     html+='<div class="sec">Knockout bracket</div>';
     html+='<div style="font-size:11px;color:var(--muted);margin-bottom:12px">Auto-updates as matches settle · Scroll to see both sides</div>';
     html+='<div style="overflow-x:auto;margin-bottom:16px">';
-    html+='<div style="min-width:920px;display:grid;grid-template-columns:88px 88px 88px 90px 88px 88px 88px;gap:6px;align-items:start">';
+    html+='<div style="min-width:1100px;display:grid;grid-template-columns:88px 88px 88px 88px 90px 88px 88px 88px 88px;gap:6px;align-items:start">';
 
     // R32 LEFT
     html+='<div>'+colHeader('R32')+'<div style="display:flex;flex-direction:column;gap:4px">';
@@ -2902,6 +2903,11 @@ async function renderGroups(){
     qfL.forEach(function(s){ html+='<div style="margin-bottom:44px">'+knockoutCard(s.a,s.b,s.m,false)+'</div>'; });
     html+='</div></div>';
 
+    // SF LEFT (single match: winner of qfL[0] vs winner of qfL[1])
+    html+='<div>'+colHeader('SF')+'<div style="display:flex;flex-direction:column;padding-top:130px">';
+    html+=knockoutCard(w97,w98,101,false);
+    html+='</div></div>';
+
     // FINAL (center)
     const sf1loser=w101?(w101.name===w97?.name?w98:w97):null;
     const sf2loser=w102?(w102.name===w99?.name?w100:w99):null;
@@ -2910,6 +2916,11 @@ async function renderGroups(){
     html+='<div style="font-size:9px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;text-align:center;padding:5px 2px;margin:14px 0 5px;border-bottom:1px solid var(--border)">3rd place · Jul 18</div>';
     html+='<div>'+knockoutCard(sf1loser,sf2loser,103,false)+'</div>';
     html+='</div>';
+
+    // SF RIGHT (single match: winner of qfR[0] vs winner of qfR[1])
+    html+='<div>'+colHeader('SF')+'<div style="display:flex;flex-direction:column;padding-top:130px">';
+    html+=knockoutCard(w99,w100,102,false);
+    html+='</div></div>';
 
     // QF RIGHT
     html+='<div>'+colHeader('QF')+'<div style="display:flex;flex-direction:column;gap:4px;padding-top:46px">';
