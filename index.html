@@ -3507,14 +3507,14 @@ async function screenshotStageBreakdown(){
   });
 
   // Layout constants
-  const scale=2;
+  const scale=3;
   const pad=20;
-  const rowH=36;
-  const nameW=140;
-  const stgW=70;
-  const totW=90;
-  const betW=75;
-  const pctW=70;
+  const rowH=40;
+  const nameW=150;
+  const stgW=74;
+  const totW=95;
+  const betW=80;
+  const pctW=72;
   const cols=[nameW,...activeStages.map(()=>stgW),totW,betW,pctW];
   const totalW=cols.reduce((a,b)=>a+b,0)+pad*2;
   const headerRows=3; // league name, date, column headers
@@ -3525,6 +3525,9 @@ async function screenshotStageBreakdown(){
   canvas.height=totalH*scale;
   const ctx=canvas.getContext('2d');
   ctx.scale(scale,scale);
+  ctx.imageSmoothingEnabled=true;
+  ctx.imageSmoothingQuality='high';
+  ctx.textBaseline='alphabetic';
 
   // Background
   ctx.fillStyle='#0a140a';
@@ -3536,7 +3539,7 @@ async function screenshotStageBreakdown(){
   let y=pad;
 
   // League name
-  ctx.font='bold 16px -apple-system, sans-serif';
+  ctx.font='bold 18px -apple-system, sans-serif';
   ctx.fillStyle='#ffc830';
   ctx.fillText('🏆 '+LEAGUE.name, pad, y+20);
   y+=rowH;
@@ -3545,7 +3548,7 @@ async function screenshotStageBreakdown(){
   const dt=new Date(Date.now()+IST_OFFSET_MS);
   const dStr=MONTH_NAMES[dt.getUTCMonth()]+' '+dt.getUTCDate();
   const settledCount=MATCHES.filter(m=>m.resolved).length;
-  ctx.font='13px -apple-system, sans-serif';
+  ctx.font='15px -apple-system, sans-serif';
   ctx.fillStyle='#9fe89f';
   ctx.fillText(dStr+' · '+settledCount+' of '+MATCHES.length+' matches settled', pad, y+18);
   y+=rowH;
@@ -3553,7 +3556,7 @@ async function screenshotStageBreakdown(){
   // Column headers
   ctx.fillStyle='rgba(255,255,255,0.06)';
   ctx.fillRect(0, y, totalW, rowH);
-  ctx.font='bold 12px -apple-system, sans-serif';
+  ctx.font='bold 14px -apple-system, sans-serif';
   ctx.fillStyle='#9fe89f';
   ctx.fillText('Player', colX(0)+6, y+22);
   stgLabels.forEach((lbl,i)=>{
@@ -3592,9 +3595,9 @@ async function screenshotStageBreakdown(){
     // Rank + name
     const pfx=i<3&&pl>0?medals[i]:(i+1)+'.';
     const nameCol=isMe?'#85B7EB':'#ffffff';
-    ctx.font=(isMe?'bold ':'')+'13px -apple-system, sans-serif';
+    ctx.font=(isMe?'bold ':'')+'15px -apple-system, sans-serif';
     ctx.fillStyle=nameCol;
-    ctx.fillText(pfx+' '+u.username, colX(0)+6, y+23);
+    ctx.fillText(pfx+' '+u.username, colX(0)+6, y+25);
 
     // Stage values — gold cell background for stage winner
     activeStages.forEach((r,si)=>{
@@ -3613,31 +3616,31 @@ async function screenshotStageBreakdown(){
 
       const col=isStageWinner?'#ffc830':v>0?'#3ddc84':v<0?'#ff5a59':'#9fe89f';
       ctx.fillStyle=col;
-      ctx.font=(isStageWinner?'bold ':'')+'13px -apple-system, sans-serif';
-      ctx.fillText(str, x+(stgW-ctx.measureText(str).width)/2, y+23);
+      ctx.font=(isStageWinner?'bold ':'')+'15px -apple-system, sans-serif';
+      ctx.fillText(str, x+(stgW-ctx.measureText(str).width)/2, y+25);
     });
 
     // Total P/L
     const totStr=pl>0?'+₹'+pl:pl<0?'-₹'+Math.abs(pl):'₹0';
     const totCol=pl>0?'#3ddc84':pl<0?'#ff5a59':'#9fe89f';
     ctx.fillStyle=totCol;
-    ctx.font='bold 13px -apple-system, sans-serif';
+    ctx.font='bold 15px -apple-system, sans-serif';
     const tx=colX(cols.length-3);
-    ctx.fillText(totStr, tx+(totW-ctx.measureText(totStr).width)/2, y+23);
+    ctx.fillText(totStr, tx+(totW-ctx.measureText(totStr).width)/2, y+25);
 
     // Total Bet (context for why total P/L may be high but P/L% low, or vice versa)
     const betStr='₹'+s.overall.bet;
     ctx.fillStyle='#9fe89f';
-    ctx.font='13px -apple-system, sans-serif';
+    ctx.font='15px -apple-system, sans-serif';
     const bx=colX(cols.length-2);
-    ctx.fillText(betStr, bx+(betW-ctx.measureText(betStr).width)/2, y+23);
+    ctx.fillText(betStr, bx+(betW-ctx.measureText(betStr).width)/2, y+25);
 
     // P/L%
     const pctStr=(pct>0?'+':'')+pct+'%';
     const pctCol=pct>0?'#3ddc84':pct<0?'#ff5a59':'#9fe89f';
     ctx.fillStyle=pctCol;
     const px=colX(cols.length-1);
-    ctx.fillText(pctStr, px+(pctW-ctx.measureText(pctStr).width)/2, y+23);
+    ctx.fillText(pctStr, px+(pctW-ctx.measureText(pctStr).width)/2, y+25);
 
     y+=rowH;
 
@@ -3647,7 +3650,7 @@ async function screenshotStageBreakdown(){
   });
 
   // Footer
-  ctx.font='11px -apple-system, sans-serif';
+  ctx.font='12px -apple-system, sans-serif';
   ctx.fillStyle='rgba(255,255,255,0.3)';
   const ts=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})+' IST';
   ctx.fillText(ts, totalW-ctx.measureText(ts).width-pad, y+20);
@@ -3767,6 +3770,9 @@ async function debugCatchUpSettle(){
     return;
   }
   log('✓ Admin check passed ('+ME.username+')');
+
+  log('\nRefreshing LIVE_SCORES (fetchLiveScores)...');
+  try{ await fetchLiveScores(); log('✓ LIVE_SCORES refreshed'); }catch(fe){ log('⚠ fetchLiveScores error: '+fe.message); }
 
   const unsettled=MATCHES.filter(m=>!m.resolved&&m.home!=='TBD'&&m.away!=='TBD');
   log('Unsettled matches in DB: '+unsettled.length+'');
