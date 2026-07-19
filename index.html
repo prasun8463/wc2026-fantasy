@@ -3774,27 +3774,19 @@ async function screenshotTournamentWrap(){
     });
   });
 
-  // Find the tournament's single biggest win overall (for the headline banner)
-  let championAmt=-1, champion=null;
-  Object.entries(bestWins).forEach(([u,w])=>{
-    if(w.amt>championAmt){ championAmt=w.amt; champion=w; }
-  });
-  const bigWinners=Object.entries(bestWins).filter(([u,w])=>w.amt===championAmt).map(([u])=>u);
-
   const leagueChamp=sortedMembers[0];
 
   // Layout
   const scale=3;
   const pad=22;
-  const cardH=92;
+  const cardH=98;
   const cardGap=8;
   const cardW=680;
-  const bannerH=68;
   const champBannerH=46;
   const thanksH=64;
   const legendH=30;
   const totalW=cardW+pad*2;
-  const totalH=pad+56+champBannerH+12+bannerH+14+(sortedMembers.length*(cardH+cardGap))+legendH+thanksH+pad;
+  const totalH=pad+56+champBannerH+14+(sortedMembers.length*(cardH+cardGap))+legendH+thanksH+pad;
 
   const canvas=document.createElement('canvas');
   canvas.width=totalW*scale;
@@ -3820,7 +3812,7 @@ async function screenshotTournamentWrap(){
   ctx.fillText('Tournament Wrap · '+totalMatches+' matches settled', pad, y+14);
   y+=26;
 
-  // Champion banner — bold, trophy emoji, stands out
+  // Champion banner — bold, trophy emoji, center-aligned, stands out
   ctx.fillStyle='rgba(255,200,48,0.16)';
   ctx.strokeStyle='rgba(255,200,48,0.5)';
   ctx.lineWidth=1.5;
@@ -3829,24 +3821,10 @@ async function screenshotTournamentWrap(){
   ctx.fill(); ctx.stroke();
   ctx.fillStyle='#ffc830';
   ctx.font='bold 19px -apple-system, sans-serif';
-  ctx.fillText('🏆 Champion: '+(leagueChamp?leagueChamp.username:'—'), pad+16, y+30);
+  ctx.textAlign='center';
+  ctx.fillText('🏆 Champion: '+(leagueChamp?leagueChamp.username:'—'), pad+cardW/2, y+30);
+  ctx.textAlign='left';
   y+=champBannerH+14;
-
-  // Biggest win banner
-  ctx.fillStyle='rgba(255,200,48,0.1)';
-  ctx.strokeStyle='rgba(255,200,48,0.3)';
-  ctx.lineWidth=1;
-  ctx.beginPath();
-  ctx.roundRect(pad,y,cardW,bannerH,8);
-  ctx.fill(); ctx.stroke();
-  ctx.fillStyle='#ffc830';
-  ctx.font='bold 15px -apple-system, sans-serif';
-  ctx.fillText('🎯 Biggest win of the tournament: ₹'+championAmt, pad+14, y+24);
-  ctx.fillStyle='#9fe89f';
-  ctx.font='12px -apple-system, sans-serif';
-  const bannerSub=bigWinners.join(' & ')+' · '+champion.home+' vs '+champion.away+' ('+champion.grp+')';
-  ctx.fillText(bannerSub, pad+14, y+44);
-  y+=bannerH+14;
 
   // Player cards
   sortedMembers.forEach((u,i)=>{
@@ -3866,15 +3844,15 @@ async function screenshotTournamentWrap(){
     const rank=i<3?medals[i]:(i+1)+'.';
     const nameCol=isChamp?'#ffc830':(isMe?'#4a9eff':'#fff');
     ctx.fillStyle=nameCol;
-    ctx.font=(isChamp||isMe?'bold ':'')+'16px -apple-system, sans-serif';
-    ctx.fillText(rank+' '+u.username, pad+8, y+22);
+    ctx.font=(isChamp||isMe?'bold ':'bold ')+'18px -apple-system, sans-serif';
+    ctx.fillText(rank+' '+u.username, pad+8, y+23);
 
     ctx.fillStyle='#9fe89f';
-    ctx.font='10px -apple-system, sans-serif';
-    ctx.fillText(participationPct+'% played · '+hitRate+'% hit rate'+(lowParticipation?' *':''), pad+8, y+36);
+    ctx.font='11px -apple-system, sans-serif';
+    ctx.fillText(participationPct+'% played · '+hitRate+'% hit rate'+(lowParticipation?' *':''), pad+8, y+38);
 
-    // Stacked bar
-    const barX=pad+8, barY=y+44, barW=380, barH=16;
+    // Stacked bar — widened to close the gap toward the P/L column
+    const barX=pad+8, barY=y+46, barW=430, barH=17;
     const total=b.exact+b.outcome+b.wrong+b.void||1;
     let bx=barX;
     const segs=[
@@ -3894,32 +3872,31 @@ async function screenshotTournamentWrap(){
     ctx.restore();
 
     ctx.fillStyle='#9fe89f';
-    ctx.font='9px -apple-system, sans-serif';
-    ctx.fillText(b.exact+' exact · '+b.outcome+' outcome · '+b.wrong+' wrong · '+b.void+' void', barX, barY+barH+12);
+    ctx.font='10px -apple-system, sans-serif';
+    ctx.fillText(b.exact+' exact · '+b.outcome+' outcome · '+b.wrong+' wrong · '+b.void+' void', barX, barY+barH+13);
 
     // Best single win
     const bw=bestWins[u.username];
     if(bw){
       ctx.fillStyle='#ffc830';
-      ctx.font='10px -apple-system, sans-serif';
+      ctx.font='bold 11px -apple-system, sans-serif';
       const matchStr=bw.home+' vs '+bw.away;
-      const truncated=matchStr.length>28?matchStr.slice(0,26)+'…':matchStr;
-      ctx.fillText('🏅 Best: +₹'+bw.amt+' ('+truncated+', '+bw.grp+')', barX, barY+barH+26);
+      const truncated=matchStr.length>30?matchStr.slice(0,28)+'…':matchStr;
+      ctx.fillText('🏅 Best: +₹'+bw.amt+' ('+truncated+', '+bw.grp+')', barX, barY+barH+29);
     }
 
-    // Right-side P/L stats
-    const rx=pad+cardW-110;
+    // Right-side P/L stats — pulled left to sit closer to the bar
     const totStr=pl>0?'+₹'+pl:pl<0?'-₹'+Math.abs(pl):'₹0';
     const totCol=pl>0?'#3ddc84':pl<0?'#ff5a59':'#9fe89f';
     ctx.fillStyle=totCol;
-    ctx.font='bold 17px -apple-system, sans-serif';
+    ctx.font='bold 19px -apple-system, sans-serif';
     ctx.textAlign='right';
     ctx.fillText(totStr, pad+cardW-8, y+26);
 
     const pctStr=(pct>0?'+':'')+pct+'%';
-    ctx.font='12px -apple-system, sans-serif';
+    ctx.font='bold 13px -apple-system, sans-serif';
     ctx.fillStyle=pct>0?'#3ddc84':pct<0?'#ff5a59':'#9fe89f';
-    ctx.fillText(pctStr, pad+cardW-8, y+44);
+    ctx.fillText(pctStr, pad+cardW-8, y+46);
     ctx.textAlign='left';
 
     if(lowParticipation) ctx.globalAlpha=1;
