@@ -1912,6 +1912,65 @@ function renderAll(){
   if(activeTab==='groups') renderGroups();
   if(activeTab==='league') renderLeague();
   if(activeTab==='admin') renderAdmin();
+  checkFinalSettledPrompt();
+}
+
+// ── Tournament-over celebration banner ───────────────────────────
+// Fires once per device, for EVERY player, when leagues.final_settled_at
+// is newly set (stamped by the DB trigger the moment the Final resolves).
+function checkFinalSettledPrompt(){
+  if(!LEAGUE||!LEAGUE.final_settled_at) return;
+  const seenKey='wrap_seen_'+LEAGUE.id+'_'+LEAGUE.final_settled_at;
+  if(localStorage.getItem(seenKey)) return; // already shown on this device
+  localStorage.setItem(seenKey,'1');
+  showFinalWrapBanner();
+}
+
+function showFinalWrapBanner(){
+  const fin=MATCHES.find(m=>m.id==='fin');
+  let wcChampion=null, wcChampFlag='🏆';
+  if(fin&&fin.resolved&&fin.result_home!=null){
+    const h=parseInt(fin.result_home), a=parseInt(fin.result_away);
+    if(h>a){ wcChampion=fin.home; wcChampFlag=fin.home_flag||'🏳️'; }
+    else if(a>h){ wcChampion=fin.away; wcChampFlag=fin.away_flag||'🏳️'; }
+    else if(fin.penalty_winner){ wcChampion=fin.penalty_winner; wcChampFlag=fin.penalty_winner===fin.home?(fin.home_flag||'🏳️'):(fin.away_flag||'🏳️'); }
+  }
+
+  const sortedMembers=[...MEMBERS].sort((a,b)=>{
+    const sa=calcRoundStats(a.username).overall, sb=calcRoundStats(b.username).overall;
+    return plPct(sb.bet,sb.won)-plPct(sa.bet,sa.won);
+  }).filter(u=>calcRoundStats(u.username).overall.bet>0);
+  const leagueChamp=sortedMembers[0];
+
+  const isAdmin=ME&&LEAGUE&&ME.username===LEAGUE.admin_username;
+
+  const el=document.createElement('div');
+  el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  el.innerHTML=`
+    <div style="background:var(--dark);border:1px solid rgba(255,200,48,.4);border-radius:16px;padding:30px 22px;max-width:360px;text-align:center">
+      <div style="font-size:44px;margin-bottom:8px">🏆</div>
+      <div style="color:var(--gold);font-weight:800;font-size:20px;margin-bottom:4px">The tournament is over!</div>
+      ${wcChampion?`
+      <div style="margin:16px 0;padding:14px;background:rgba(255,200,48,.08);border:1px solid rgba(255,200,48,.25);border-radius:12px">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">World Cup Champions</div>
+        <div style="font-size:28px;margin-bottom:4px">${esc(wcChampFlag)}</div>
+        <div style="color:#fff;font-weight:800;font-size:18px">${esc(wcChampion)}</div>
+      </div>`:''}
+      ${leagueChamp?`
+      <div style="margin-bottom:16px">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">League Champion</div>
+        <div style="color:var(--gold);font-weight:800;font-size:17px">🥇 ${esc(leagueChamp.username)}</div>
+      </div>`:''}
+      <div style="color:var(--muted);font-size:14px;margin-bottom:20px;line-height:1.5">Thanks for playing this tournament with us! 🎉</div>
+      ${isAdmin?`
+      <button onclick="this.closest('div[style*=fixed]').remove();goTab('admin');setTimeout(()=>screenshotTournamentWrap(),300)" style="background:var(--gold);color:var(--dark);border:none;border-radius:10px;padding:12px 24px;font-size:15px;font-weight:700;cursor:pointer;width:100%;margin-bottom:8px">
+        🎉 View Tournament Wrap
+      </button>`:''}
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:10px;padding:10px 24px;font-size:13px;cursor:pointer;width:100%">
+        ${isAdmin?'Maybe later':'Close'}
+      </button>
+    </div>`;
+  document.body.appendChild(el);
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -3673,6 +3732,246 @@ async function screenshotStageBreakdown(){
   },'image/png');
 }
 
+async function screenshotTournamentWrap(){
+  if(!LEAGUE||!MEMBERS||!MEMBERS.length){ toast('No data yet'); return; }
+  toast('Generating Tournament Wrap...', 2000);
+
+  const sortedMembers=[...MEMBERS].sort((a,b)=>{
+    const sa=calcRoundStats(a.username).overall, sb=calcRoundStats(b.username).overall;
+    return plPct(sb.bet,sb.won)-plPct(sa.bet,sa.won);
+  }).filter(u=>calcRoundStats(u.username).overall.bet>0);
+
+  const totalMatches=MATCHES.filter(m=>m.resolved).length;
+  const medals=['🥇','🥈','🥉'];
+
+  // Per-user exact/outcome/wrong/void breakdown + participation
+  const breakdown={};
+  sortedMembers.forEach(u=>{
+    breakdown[u.username]={exact:0,outcome:0,wrong:0,void:0,predicted:0};
+  });
+  MATCHES.filter(m=>m.resolved).forEach(m=>{
+    (PREDS[m.id]||[]).forEach(p=>{
+      const b=breakdown[p.username];
+      if(!b) return;
+      b.predicted++;
+      const won=(m.resolved_winners||[]).includes(p.username);
+      if(m.resolved_type==='refund'){ if(won) b.void++; }
+      else if(won&&(m.resolved_type==='exact'||m.resolved_type==='exact_bold')) b.exact++;
+      else if(won&&(m.resolved_type==='outcome'||m.resolved_type==='outcome_bold')) b.outcome++;
+      else b.wrong++;
+    });
+  });
+
+  // Find each player's single biggest win across the whole tournament
+  const bestWins={};
+  MATCHES.filter(m=>m.resolved&&m.resolved_type!=='refund').forEach(m=>{
+    const preds=PREDS[m.id]||[];
+    (m.resolved_winners||[]).forEach(uname=>{
+      const amt=actualWinnerPayout(m, uname, preds);
+      if(!bestWins[uname]||amt>bestWins[uname].amt){
+        bestWins[uname]={amt, home:m.home, away:m.away, grp:m.grp};
+      }
+    });
+  });
+
+  // Find the tournament's single biggest win overall (for the headline banner)
+  let championAmt=-1, champion=null;
+  Object.entries(bestWins).forEach(([u,w])=>{
+    if(w.amt>championAmt){ championAmt=w.amt; champion=w; }
+  });
+  const bigWinners=Object.entries(bestWins).filter(([u,w])=>w.amt===championAmt).map(([u])=>u);
+
+  const leagueChamp=sortedMembers[0];
+
+  // Layout
+  const scale=3;
+  const pad=22;
+  const cardH=92;
+  const cardGap=8;
+  const cardW=680;
+  const bannerH=68;
+  const champBannerH=46;
+  const thanksH=64;
+  const legendH=30;
+  const totalW=cardW+pad*2;
+  const totalH=pad+56+champBannerH+12+bannerH+14+(sortedMembers.length*(cardH+cardGap))+legendH+thanksH+pad;
+
+  const canvas=document.createElement('canvas');
+  canvas.width=totalW*scale;
+  canvas.height=totalH*scale;
+  const ctx=canvas.getContext('2d');
+  ctx.scale(scale,scale);
+  ctx.imageSmoothingEnabled=true;
+  ctx.imageSmoothingQuality='high';
+  ctx.textBaseline='alphabetic';
+
+  ctx.fillStyle='#0a140a';
+  ctx.fillRect(0,0,totalW,totalH);
+
+  let y=pad;
+
+  // Title
+  ctx.fillStyle='#ffc830';
+  ctx.font='bold 22px -apple-system, sans-serif';
+  ctx.fillText('🏆 '+esc(LEAGUE.name), pad, y+22);
+  y+=30;
+  ctx.fillStyle='#9fe89f';
+  ctx.font='13px -apple-system, sans-serif';
+  ctx.fillText('Tournament Wrap · '+totalMatches+' matches settled', pad, y+14);
+  y+=26;
+
+  // Champion banner — bold, trophy emoji, stands out
+  ctx.fillStyle='rgba(255,200,48,0.16)';
+  ctx.strokeStyle='rgba(255,200,48,0.5)';
+  ctx.lineWidth=1.5;
+  ctx.beginPath();
+  ctx.roundRect(pad,y,cardW,champBannerH,10);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#ffc830';
+  ctx.font='bold 19px -apple-system, sans-serif';
+  ctx.fillText('🏆 Champion: '+(leagueChamp?leagueChamp.username:'—'), pad+16, y+30);
+  y+=champBannerH+14;
+
+  // Biggest win banner
+  ctx.fillStyle='rgba(255,200,48,0.1)';
+  ctx.strokeStyle='rgba(255,200,48,0.3)';
+  ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.roundRect(pad,y,cardW,bannerH,8);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#ffc830';
+  ctx.font='bold 15px -apple-system, sans-serif';
+  ctx.fillText('🎯 Biggest win of the tournament: ₹'+championAmt, pad+14, y+24);
+  ctx.fillStyle='#9fe89f';
+  ctx.font='12px -apple-system, sans-serif';
+  const bannerSub=bigWinners.join(' & ')+' · '+champion.home+' vs '+champion.away+' ('+champion.grp+')';
+  ctx.fillText(bannerSub, pad+14, y+44);
+  y+=bannerH+14;
+
+  // Player cards
+  sortedMembers.forEach((u,i)=>{
+    const s=calcRoundStats(u.username).overall;
+    const pl=s.won-s.bet;
+    const pct=Math.round(plPct(s.bet,s.won));
+    const b=breakdown[u.username]||{exact:0,outcome:0,wrong:0,void:0,predicted:0};
+    const isMe=ME&&u.username===ME.username;
+    const isChamp=i===0;
+    const participationPct=Math.round(b.predicted/totalMatches*100);
+    const hitRate=b.predicted>0?Math.round((b.exact+b.outcome)/b.predicted*100):0;
+    const lowParticipation=participationPct<80;
+
+    if(isMe){ ctx.fillStyle='rgba(74,158,255,0.08)'; ctx.beginPath(); ctx.roundRect(pad,y,cardW,cardH,8); ctx.fill(); }
+    if(lowParticipation){ ctx.globalAlpha=0.6; }
+
+    const rank=i<3?medals[i]:(i+1)+'.';
+    const nameCol=isChamp?'#ffc830':(isMe?'#4a9eff':'#fff');
+    ctx.fillStyle=nameCol;
+    ctx.font=(isChamp||isMe?'bold ':'')+'16px -apple-system, sans-serif';
+    ctx.fillText(rank+' '+u.username, pad+8, y+22);
+
+    ctx.fillStyle='#9fe89f';
+    ctx.font='10px -apple-system, sans-serif';
+    ctx.fillText(participationPct+'% played · '+hitRate+'% hit rate'+(lowParticipation?' *':''), pad+8, y+36);
+
+    // Stacked bar
+    const barX=pad+8, barY=y+44, barW=380, barH=16;
+    const total=b.exact+b.outcome+b.wrong+b.void||1;
+    let bx=barX;
+    const segs=[
+      {v:b.exact,c:'#3ddc84'},
+      {v:b.outcome,c:'#4a9eff'},
+      {v:b.wrong,c:'#3a3a3a'},
+      {v:b.void,c:'#6b6b6b'},
+    ];
+    ctx.save();
+    ctx.beginPath(); ctx.roundRect(barX,barY,barW,barH,4); ctx.clip();
+    segs.forEach(seg=>{
+      const w=(seg.v/total)*barW;
+      ctx.fillStyle=seg.c;
+      ctx.fillRect(bx,barY,w,barH);
+      bx+=w;
+    });
+    ctx.restore();
+
+    ctx.fillStyle='#9fe89f';
+    ctx.font='9px -apple-system, sans-serif';
+    ctx.fillText(b.exact+' exact · '+b.outcome+' outcome · '+b.wrong+' wrong · '+b.void+' void', barX, barY+barH+12);
+
+    // Best single win
+    const bw=bestWins[u.username];
+    if(bw){
+      ctx.fillStyle='#ffc830';
+      ctx.font='10px -apple-system, sans-serif';
+      const matchStr=bw.home+' vs '+bw.away;
+      const truncated=matchStr.length>28?matchStr.slice(0,26)+'…':matchStr;
+      ctx.fillText('🏅 Best: +₹'+bw.amt+' ('+truncated+', '+bw.grp+')', barX, barY+barH+26);
+    }
+
+    // Right-side P/L stats
+    const rx=pad+cardW-110;
+    const totStr=pl>0?'+₹'+pl:pl<0?'-₹'+Math.abs(pl):'₹0';
+    const totCol=pl>0?'#3ddc84':pl<0?'#ff5a59':'#9fe89f';
+    ctx.fillStyle=totCol;
+    ctx.font='bold 17px -apple-system, sans-serif';
+    ctx.textAlign='right';
+    ctx.fillText(totStr, pad+cardW-8, y+26);
+
+    const pctStr=(pct>0?'+':'')+pct+'%';
+    ctx.font='12px -apple-system, sans-serif';
+    ctx.fillStyle=pct>0?'#3ddc84':pct<0?'#ff5a59':'#9fe89f';
+    ctx.fillText(pctStr, pad+cardW-8, y+44);
+    ctx.textAlign='left';
+
+    if(lowParticipation) ctx.globalAlpha=1;
+
+    y+=cardH;
+    ctx.strokeStyle='rgba(255,255,255,0.06)';
+    ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(pad+cardW,y); ctx.stroke();
+    y+=cardGap;
+  });
+
+  // Legend
+  const legendItems=[['Exact','#3ddc84'],['Outcome','#4a9eff'],['Wrong','#3a3a3a'],['Void','#6b6b6b']];
+  let lx=pad;
+  ctx.font='10px -apple-system, sans-serif';
+  legendItems.forEach(([label,color])=>{
+    ctx.fillStyle=color;
+    ctx.beginPath(); ctx.roundRect(lx,y+6,8,8,2); ctx.fill();
+    ctx.fillStyle='#9fe89f';
+    ctx.fillText(label, lx+12, y+14);
+    lx+=ctx.measureText(label).width+34;
+  });
+  y+=legendH;
+
+  // Thank you banner — same style/font as league name banner
+  ctx.fillStyle='rgba(255,200,48,0.14)';
+  ctx.strokeStyle='rgba(255,200,48,0.4)';
+  ctx.lineWidth=1.5;
+  ctx.beginPath();
+  ctx.roundRect(pad,y,cardW,thanksH,10);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#ffc830';
+  ctx.font='bold 22px -apple-system, sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText('🎉 Thank you for playing! 🎉', pad+cardW/2, y+thanksH/2+8);
+  ctx.textAlign='left';
+
+  canvas.toBlob(async blob=>{
+    const file=new File([blob],'tournament-wrap.png',{type:'image/png'});
+    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+      try{
+        await navigator.share({files:[file],title:'Tournament Wrap'});
+        return;
+      }catch(e){ if(e.name==='AbortError')return; }
+    }
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download='tournament-wrap.png'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    toast('Image saved — share from your photos 📸', 3000);
+  },'image/png');
+}
+
 async function copyLeaderboard(){  const msg=generateLeaderboardMessage();
   try {
     await navigator.clipboard.writeText(msg);
@@ -4159,6 +4458,9 @@ function renderAdmin(){
         </button>
         <button onclick="copyStageBreakdown()" style="background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;padding:10px 18px;cursor:pointer;font-weight:600;touch-action:manipulation">
           📋 Copy text
+        </button>
+        <button onclick="screenshotTournamentWrap()" style="background:linear-gradient(135deg,rgba(255,200,48,.2),rgba(255,200,48,.08));border:1px solid rgba(255,200,48,.4);border-radius:8px;color:var(--gold);font-size:14px;padding:10px 18px;cursor:pointer;font-weight:700;touch-action:manipulation">
+          🎉 Tournament Wrap
         </button>
       </div>
     </div>`:'';
