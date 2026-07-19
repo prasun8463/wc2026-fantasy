@@ -3779,7 +3779,7 @@ async function screenshotTournamentWrap(){
   // Layout
   const scale=3;
   const pad=22;
-  const cardH=98;
+  const cardH=94;
   const cardGap=8;
   const cardW=680;
   const champBannerH=46;
@@ -3851,38 +3851,47 @@ async function screenshotTournamentWrap(){
     ctx.font='11px -apple-system, sans-serif';
     ctx.fillText(participationPct+'% played · '+hitRate+'% hit rate'+(lowParticipation?' *':''), pad+8, y+38);
 
-    // Stacked bar — widened to close the gap toward the P/L column
-    const barX=pad+8, barY=y+46, barW=430, barH=17;
+    // Stacked bar with counts drawn directly on each segment
+    const barX=pad+8, barY=y+46, barW=430, barH=24;
     const total=b.exact+b.outcome+b.wrong+b.void||1;
     let bx=barX;
     const segs=[
-      {v:b.exact,c:'#3ddc84'},
-      {v:b.outcome,c:'#4a9eff'},
-      {v:b.wrong,c:'#3a3a3a'},
-      {v:b.void,c:'#6b6b6b'},
+      {v:b.exact,c:'#3ddc84',txt:'#0a140a'},
+      {v:b.outcome,c:'#4a9eff',txt:'#fff'},
+      {v:b.wrong,c:'#3a3a3a',txt:'#cfcfcf'},
+      {v:b.void,c:'#6b6b6b',txt:'#fff'},
     ];
     ctx.save();
-    ctx.beginPath(); ctx.roundRect(barX,barY,barW,barH,4); ctx.clip();
+    ctx.beginPath(); ctx.roundRect(barX,barY,barW,barH,5); ctx.clip();
     segs.forEach(seg=>{
       const w=(seg.v/total)*barW;
       ctx.fillStyle=seg.c;
       ctx.fillRect(bx,barY,w,barH);
+      // Draw the count centered in its segment, but only if there's room for it
+      // (a number wider than its slice would spill into the neighboring color)
+      if(seg.v>0){
+        ctx.font='bold 12px -apple-system, sans-serif';
+        const label=''+seg.v;
+        const labelW=ctx.measureText(label).width;
+        if(labelW+6<=w){
+          ctx.fillStyle=seg.txt;
+          ctx.textAlign='center';
+          ctx.fillText(label, bx+w/2, barY+barH/2+4);
+          ctx.textAlign='left';
+        }
+      }
       bx+=w;
     });
     ctx.restore();
 
-    ctx.fillStyle='#9fe89f';
-    ctx.font='10px -apple-system, sans-serif';
-    ctx.fillText(b.exact+' exact · '+b.outcome+' outcome · '+b.wrong+' wrong · '+b.void+' void', barX, barY+barH+13);
-
-    // Best single win
+    // Best single win — moved up to fill the space freed by removing the redundant count line
     const bw=bestWins[u.username];
     if(bw){
       ctx.fillStyle='#ffc830';
       ctx.font='bold 11px -apple-system, sans-serif';
       const matchStr=bw.home+' vs '+bw.away;
       const truncated=matchStr.length>30?matchStr.slice(0,28)+'…':matchStr;
-      ctx.fillText('🏅 Best: +₹'+bw.amt+' ('+truncated+', '+bw.grp+')', barX, barY+barH+29);
+      ctx.fillText('🏅 Best win +₹'+bw.amt+' · '+truncated+' ('+bw.grp+')', barX, barY+barH+18);
     }
 
     // Right-side P/L stats — pulled left to sit closer to the bar
